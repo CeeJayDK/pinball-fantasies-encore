@@ -63,7 +63,7 @@ The original layout.
 | Left and right Shift, Ctrl or Alt | flippers |
 | Down arrow | pull the plunger, release to shoot |
 | Space | nudge the table (too often tilts it) |
-| P | pause; while paused, A angle, S scrolling, M music, R resolution |
+| P | pause; while paused, A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
 | M | music on or off |
 | Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
 | Command+F | fullscreen |

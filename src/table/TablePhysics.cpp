@@ -12,6 +12,17 @@ constexpr std::size_t kMaterialKicker = 3;
 i16 clampSpeed(i32 v, i16 max) { return static_cast<i16>(std::clamp<i32>(v, -max, max)); }
 }  // namespace
 
+/// The Higher angle adds 3 to the playfield's downward pull of 8 (so 11/8 of it). A ball
+/// needs sqrt(11/8), about 1.17 times the speed to climb as high; playing it showed the
+/// flippers and plunger want a little more than that, so at that angle they, and the speed
+/// limit, are scaled by 125/100.
+i16 Table::angleBoost(i32 v) const {
+  return static_cast<i16>(options_.angle == Angle::Higher ? v * 125 / 100 : v);
+}
+
+namespace {
+}  // namespace
+
 void Table::ballTeleportFreeze(Layer layer, std::array<i16, 2> pos) {
   ball_.layer = layer;
   ball_.setPos(pos);
@@ -93,7 +104,7 @@ std::optional<Table::Collision> Table::physicsCheckCollision() {
         extra = static_cast<i16>(std::abs(dy) >> 2);
       }
       const i16 s = flippers_[f].speed;
-      flipperSpeed = {static_cast<i16>(dy * -s), static_cast<i16>(-(dx + extra) * -s)};
+      flipperSpeed = {angleBoost(dy * -s), angleBoost(-(dx + extra) * -s)};
     }
   } else if ((*material == 3 || *material == 7) && !tilted_) {
     for (std::size_t b = 0; b < assets_.bumpers.size(); ++b) {
@@ -106,9 +117,10 @@ std::optional<Table::Collision> Table::physicsCheckCollision() {
 }
 
 void Table::physicsNewDir(const Collision& c) {
+  const i16 maxSpeed = angleBoost(ball_.maxSpeed);
   const Material& m = materials_[c.material];
-  const std::array<i16, 2> speed = {clampSpeed(ball_.speed[0] + c.flipperSpeed[0], ball_.maxSpeed),
-                                    clampSpeed(ball_.speed[1] + c.flipperSpeed[1] + push_.speed, ball_.maxSpeed)};
+  const std::array<i16, 2> speed = {clampSpeed(ball_.speed[0] + c.flipperSpeed[0], maxSpeed),
+                                    clampSpeed(ball_.speed[1] + c.flipperSpeed[1] + push_.speed, maxSpeed)};
   const std::size_t a = static_cast<std::size_t>((0x800 - c.angle) & 0x7ff);
   i32 cos = assets_.sineTable[a + 0x200], sin = assets_.sineTable[a];
   i32 dot = (speed[0] * cos - speed[1] * sin) >> 13;
@@ -157,7 +169,7 @@ void Table::physicsNewDir(const Collision& c) {
   speedX = static_cast<i16>(speedX - c.flipperSpeed[0]);
   speedY = static_cast<i16>(speedY - c.flipperSpeed[1]);
   speedY = static_cast<i16>(speedY - push_.speed);
-  ball_.speed = {clampSpeed(speedX, ball_.maxSpeed), clampSpeed(speedY, ball_.maxSpeed)};
+  ball_.speed = {clampSpeed(speedX, maxSpeed), clampSpeed(speedY, maxSpeed)};
   if (c.cnt >= 6) {
     ball_.posHires[0] += -cos >> 6;
     ball_.posHires[1] += -sin >> 6;
@@ -182,7 +194,7 @@ void Table::ballMove() {
 void Table::springRelease() {
   if (atSpring_) {
     const i16 factor = hifps_ ? -166 : -138;
-    ball_.speed = {0, static_cast<i16>(factor * springPos_ - rand(0x100))};
+    ball_.speed = {0, angleBoost(factor * springPos_ - rand(0x100))};
     ball_.rotation = static_cast<i16>(rand(0x10));
   }
   playSfxBind(SfxBind::SpringUp, static_cast<u8>(springPos_ * 2));
@@ -241,7 +253,8 @@ void Table::ballGravity() {
   const std::size_t ramp = physmaps_[static_cast<std::size_t>(ball_.layer)](cx, cy) >> 4;
   if (ramp == 0xf || ramp >= assets_.ramps.size()) return;
   ball_.accel = hifps_ ? assets_.ramps[ramp].accelHires : assets_.ramps[ramp].accel;
-  if (!options_.angleHigh) ball_.accel[1] = static_cast<i16>(ball_.accel[1] - 3);
+  if (options_.angle == Angle::Low) ball_.accel[1] = static_cast<i16>(ball_.accel[1] - 3);
+  if (options_.angle == Angle::Higher) ball_.accel[1] = static_cast<i16>(ball_.accel[1] + 3);
 }
 
 std::array<i16, 2> Table::ballCenter() const {

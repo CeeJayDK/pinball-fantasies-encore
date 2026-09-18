@@ -51,6 +51,8 @@ int main(int argc, char** argv) {
     return 1;
   }
   pfr::Config cfg = pfr::Config::defaults();
+  if (const char* a = std::getenv("PFR_ANGLE"))
+    cfg.options.angle = a[0] == 'l' ? pfr::Angle::Low : a[0] == 'x' ? pfr::Angle::Higher : pfr::Angle::High;
   pfr::Table t(*prg, *mod, cfg, table, seed);
   std::vector<float> audio(960 * 2);
   std::vector<std::string> events;
@@ -62,6 +64,8 @@ int main(int argc, char** argv) {
   std::string lastScore;
   int lastBall = 0;
   int prevY = 0;
+  int flipAt = -1, lowestAfterFlip = 999, shots = 0;
+  long sumTop = 0;
   for (int f = 0; f < frames; ++f) {
     if (f == 30) t.handleKey(Key::Enter, true), t.handleKey(Key::Enter, false);
     const auto pos = t.ballPos();
@@ -79,6 +83,13 @@ int main(int argc, char** argv) {
     const bool zone = falling && pos[1] > 485 && pos[1] < 545;
     const bool wantL = zone && pos[0] < 150;
     const bool wantR = zone && pos[0] >= 130 && pos[0] < 290;
+    // Measure each flipper shot: the highest point the ball reaches within 3 seconds.
+    if ((wantL && !left) || (wantR && !right)) {
+      if (flipAt >= 0 && lowestAfterFlip < 400) { sumTop += lowestAfterFlip; ++shots; }
+      flipAt = f;
+      lowestAfterFlip = 999;
+    }
+    if (flipAt >= 0 && f - flipAt < 180) lowestAfterFlip = std::min<int>(lowestAfterFlip, pos[1]);
     if (wantL != left) t.handleKey(Key::ShiftLeft, left = wantL);
     if (wantR != right) t.handleKey(Key::ShiftRight, right = wantR);
 
@@ -99,7 +110,8 @@ int main(int argc, char** argv) {
     }
     if (std::getenv("PFR_DM") && f % 500 == 499) printDm(t);
   }
-  printDm(t);
+  if (std::getenv("PFR_DM")) printDm(t);
+  if (shots) std::printf("flipper shots reaching the upper table: %d, average top y %ld\n", shots, sumTop / shots);
   if (png) {
     std::vector<pfr::u8> pixels(320 * static_cast<std::size_t>(t.screenHeight()));
     std::vector<pfr::Rgb> pal(256);

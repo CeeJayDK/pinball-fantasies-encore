@@ -108,12 +108,13 @@ void Table::toggleMusic() {
 }
 
 void Table::pauseOptionAngle() {
-  options_.angleHigh = !options_.angleHigh;
+  options_.angle = nextAngle(options_.angle);
   dm_.clear();
-  if (options_.angleHigh)
-    dmPuts(DmFont::H13, {40, 1}, "ANGLE HIGH");
-  else
-    dmPuts(DmFont::H13, {44, 1}, "ANGLE LOW");
+  switch (options_.angle) {
+    case Angle::Low: dmPuts(DmFont::H13, {44, 1}, "ANGLE LOW"); break;
+    case Angle::High: dmPuts(DmFont::H13, {40, 1}, "ANGLE HIGH"); break;
+    case Angle::Higher: dmPuts(DmFont::H13, {32, 1}, "ANGLE HIGHER"); break;
+  }
   pauseCycle_ = 0;
   optionChanged_ = true;
 }

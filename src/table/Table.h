@@ -196,6 +196,7 @@ class Table {
   void scoreBumper();
   void ballTeleportFreeze(Layer layer, std::array<i16, 2> pos);
   void ballTeleport(Layer layer, std::array<i16, 2> pos, std::array<i16, 2> speed);
+  i16 angleBoost(i32 v) const;
   i16 speedFix(i16 v) const { return hifps_ ? v : static_cast<i16>(i32{v} * 5 / 6); }
 
   // --- script.rs

@@ -221,7 +221,7 @@ void Intro::renderOptions(u8* data, Rgb* pal, bool lq, std::optional<u8> cursor)
   auto put = [](std::vector<u8>& line, std::string_view s) { std::copy(s.begin(), s.end(), line.begin() + 16); };
   const Options& o = config_.options;
   lines[2][16] = static_cast<u8>('0' + o.balls);
-  put(lines[3], o.angleHigh ? "HIGH" : "LOW");
+  put(lines[3], o.angle == Angle::Low ? "LOW" : o.angle == Angle::High ? "HIGH" : "HIGHER");
   put(lines[4], o.scrollSpeed == ScrollSpeed::Hard ? "HARD" : o.scrollSpeed == ScrollSpeed::Medium ? "MEDIUM" : "SOFT");
   put(lines[5], o.noMusic ? "OFF" : "ON");
   put(lines[6], o.resolution == Resolution::Normal ? "NORMAL" : o.resolution == Resolution::High ? "HIGH" : "FULL");
@@ -259,7 +259,7 @@ void Intro::handleOption(u8 which) {
   Options& o = config_.options;
   switch (which) {
     case 0: o.balls = o.balls == 3 ? 5 : 3; break;
-    case 1: o.angleHigh = !o.angleHigh; break;
+    case 1: o.angle = nextAngle(o.angle); break;
     case 2:
       o.scrollSpeed = o.scrollSpeed == ScrollSpeed::Hard     ? ScrollSpeed::Medium
                       : o.scrollSpeed == ScrollSpeed::Medium ? ScrollSpeed::Soft

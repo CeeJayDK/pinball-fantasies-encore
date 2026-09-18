@@ -13,9 +13,14 @@ inline i16 rawScrollSpeed(ScrollSpeed s) { return s == ScrollSpeed::Hard ? 20 : 
 
 enum class Resolution : u8 { Normal, High, Full };
 
+/// Table slope. Low and High are the original's. Higher is this remake's addition: the
+/// same step again beyond High, with stronger flippers and plunger to match.
+enum class Angle : u8 { Low, High, Higher };
+inline Angle nextAngle(Angle a) { return a == Angle::High ? Angle::Higher : a == Angle::Higher ? Angle::Low : Angle::High; }
+
 struct Options {
   u8 balls = 3;
-  bool angleHigh = true;
+  Angle angle = Angle::High;
   ScrollSpeed scrollSpeed = ScrollSpeed::Medium;
   Resolution resolution = Resolution::Normal;
   bool noMusic = false;

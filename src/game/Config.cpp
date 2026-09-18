@@ -33,7 +33,8 @@ Config Config::load(const std::filesystem::path& dir, const std::filesystem::pat
   if (auto cfg = read("PINBALL.CFG"); cfg && cfg->size() == 6) {
     const Bytes& b = *cfg;
     c.options.balls = b[0] == 1 ? 5 : 3;
-    c.options.angleHigh = b[1] != 1;
+    // 0 high, 1 low (as the DOS setup writes them); 2 is Higher, which the DOS game reads as high.
+    c.options.angle = b[1] == 1 ? Angle::Low : b[1] == 2 ? Angle::Higher : Angle::High;
     c.options.scrollSpeed = b[2] == 0 ? ScrollSpeed::Hard : b[2] == 2 ? ScrollSpeed::Soft : ScrollSpeed::Medium;
     c.options.noMusic = b[3] == 1;
     c.options.resolution = b[4] == 1 ? Resolution::High : b[4] == 2 ? Resolution::Full : Resolution::Normal;
@@ -52,7 +53,7 @@ Config Config::load(const std::filesystem::path& dir, const std::filesystem::pat
 }
 
 void Config::saveOptions(const std::filesystem::path& dir, const Options& o) {
-  const u8 raw[6] = {static_cast<u8>(o.balls == 5), static_cast<u8>(!o.angleHigh), static_cast<u8>(o.scrollSpeed),
+  const u8 raw[6] = {static_cast<u8>(o.balls == 5), static_cast<u8>(o.angle == Angle::Low ? 1 : o.angle == Angle::Higher ? 2 : 0), static_cast<u8>(o.scrollSpeed),
                      static_cast<u8>(o.noMusic), static_cast<u8>(o.resolution), static_cast<u8>(o.mono)};
   file::writeAll(dir / "PINBALL.CFG", raw);
 }
