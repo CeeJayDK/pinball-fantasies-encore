@@ -1,0 +1,51 @@
+#include <cstdio>
+#include <cstring>
+#include <string>
+
+#include "core/Log.h"
+#include "game/App.h"
+
+namespace {
+
+void usage() {
+  std::puts("Pinball Fantasies Remastered\n"
+            "  --data <dir>     folder with the original game files (INTRO.PRG, TABLE1.PRG, ...)\n"
+            "  --table <1-4>    open a table directly instead of the menu\n"
+            "  --fullscreen     start in fullscreen\n"
+            "  --skip-intro     go straight to the table chooser\n"
+            "  --square-pixels  do not stretch the picture to the original 4:3 shape\n"
+            "  --smooth         soften pixel edges, which steadies the picture while scrolling\n"
+            "  --res <mode>     screen mode: normal (320x240), high (320x350) or full (whole table)\n"
+            "  --scale <n>      window scale factor (default 3)\n"
+            "  --screenshot <f> render a frame to a PNG file and quit\n"
+            "  --screenshot-frame <n>  which frame to capture (default 30)\n"
+            "  --verbose        debug logging\n");
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  pfr::AppOptions options;
+  for (int i = 1; i < argc; ++i) {
+    const std::string a = argv[i];
+    auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
+    if (a == "--data") options.dataDir = next();
+    else if (a == "--table") options.table = std::atoi(next());
+    else if (a == "--fullscreen") options.fullscreen = true;
+    else if (a == "--skip-intro") options.skipIntro = true;
+    else if (a == "--square-pixels") options.squarePixels = true;
+    else if (a == "--smooth") options.smoothEdges = true;
+    else if (a == "--res") {
+      const std::string m = next();
+      options.resolution = m == "normal" ? pfr::Resolution::Normal : m == "full" ? pfr::Resolution::Full : pfr::Resolution::High;
+    }
+    else if (a == "--scale") options.windowScale = std::max(1, std::atoi(next()));
+    else if (a == "--screenshot") options.screenshot = next();
+    else if (a == "--screenshot-frame") options.screenshotFrame = std::max(1, std::atoi(next()));
+    else if (a == "--verbose") pfr::log::setMinimumLevel(pfr::log::Level::Debug);
+    else if (a == "--help" || a == "-h") { usage(); return 0; }
+    else if (a.rfind("-psn", 0) == 0) { /* macOS launch services */ }
+    else { usage(); return 2; }
+  }
+  return pfr::App(std::move(options)).run();
+}

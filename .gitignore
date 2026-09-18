@@ -1,0 +1,13 @@
+build/
+.DS_Store
+*.png
+!docs/*.png
+re/*.asm
+re/*.lst
+re/*.hex
+re/*.bin
+__pycache__/
+# Reverse-engineering scratch (disassembly, dumps of the original binaries) stays local:
+# it is derived from the game's files, which are never redistributed.
+re/*
+!re/legacy-engine/

@@ -1,0 +1,245 @@
+#include "game/App.h"
+
+#include <SDL3/SDL.h>
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+
+#include "core/Error.h"
+#include "core/File.h"
+#include "core/Log.h"
+#include "core/Png.h"
+#include "platform/DataLocator.h"
+
+namespace pfr {
+namespace {
+
+constexpr double kFrame = 1.0 / 60.0;  ///< both screens run 60 frames a second, as in pfr
+
+/// The table's 240- and 350-line screens fill a 4:3 display, so their pixels are not
+/// square. The full-height mode keeps the 350-line pixel shape and shows the whole table.
+double tablePixelAspect(int height) {
+  const int shaped = height > 350 ? 350 : height;
+  return (4.0 / 3.0) / (320.0 / shaped);
+}
+
+std::filesystem::path executableDir() {
+  const char* base = SDL_GetBasePath();
+  return base ? std::filesystem::path(base) : std::filesystem::current_path();
+}
+
+/// The keys the game understands, from SDL key codes (the original layout: Shift, Ctrl or
+/// Alt for the flippers, Space to nudge, Down to pull the plunger, F1-F4 for the tables).
+Key keyFor(SDL_Keycode k) {
+  switch (k) {
+    case SDLK_LSHIFT: return Key::ShiftLeft;
+    case SDLK_RSHIFT: return Key::ShiftRight;
+    case SDLK_LCTRL: return Key::ControlLeft;
+    case SDLK_RCTRL: return Key::ControlRight;
+    case SDLK_LALT: return Key::AltLeft;
+    case SDLK_RALT: return Key::AltRight;
+    case SDLK_SPACE: return Key::Space;
+    case SDLK_DOWN: return Key::ArrowDown;
+    case SDLK_UP: return Key::ArrowUp;
+    case SDLK_LEFT: return Key::ArrowLeft;
+    case SDLK_RIGHT: return Key::ArrowRight;
+    case SDLK_RETURN:
+    case SDLK_KP_ENTER: return Key::Enter;
+    case SDLK_ESCAPE: return Key::Escape;
+    default: break;
+  }
+  if (k >= SDLK_F1 && k <= SDLK_F8) return static_cast<Key>(static_cast<int>(Key::F1) + static_cast<int>(k - SDLK_F1));
+  if (k >= SDLK_1 && k <= SDLK_8) return static_cast<Key>(static_cast<int>(Key::Digit1) + static_cast<int>(k - SDLK_1));
+  if (k >= SDLK_A && k <= SDLK_Z) return static_cast<Key>(static_cast<int>(Key::A) + static_cast<int>(k - SDLK_A));
+  return Key::None;
+}
+
+}  // namespace
+
+App::App(AppOptions options) : options_(std::move(options)), frame_(640, 480) {}
+
+bool App::init() {
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
+    log::error(std::string("SDL_Init: ") + SDL_GetError());
+    return false;
+  }
+  auto dataDir = locateGameData(options_.dataDir);
+  if (!dataDir) dataDir = askForGameData();
+  if (!dataDir) {
+    log::error("the Pinball Fantasies data files were not found");
+    reportMissingGameData();
+    return false;
+  }
+  files_ = GameFiles::fromDirectory(*dataDir);
+  rememberGameData(*dataDir);
+  log::info("game data: " + files_.directory.string());
+  // Options and high scores live beside the app's preferences, never in the game folder.
+  saveDir_ = preferencesDir();
+  config_ = Config::load(saveDir_, files_.directory);
+  if (options_.resolution) config_.options.resolution = *options_.resolution;
+
+  // Prefer the shaders in the source tree while developing, so edits take effect at once.
+  const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "shaders";
+  shaderDir_ = std::filesystem::exists(source) ? source : executableDir() / "shaders";
+
+  if (!window_.create("Pinball Fantasies", 640 * std::max(1, options_.windowScale) / 2,
+                      480 * std::max(1, options_.windowScale) / 2))
+    return false;
+  if (options_.fullscreen) window_.setFullscreen(true);
+  if (!renderer_.init(shaderDir_, 640, 480, 1.0)) return false;
+  renderer_.setSmoothEdges(options_.smoothEdges);
+  audio_.open(48000);
+
+  if (options_.table >= 1 && options_.table <= 4)
+    openTable(options_.table - 1);
+  else
+    openIntro(options_.skipIntro ? 0 : -1);
+  return true;
+}
+
+void App::resizeFrame(int width, int height, double pixelAspect) {
+  if (frame_.width() != width || frame_.height() != height) frame_ = Framebuffer(width, height);
+  renderer_.setPixelAspect(options_.squarePixels ? 1.0 : pixelAspect);
+}
+
+void App::openIntro(int returningFrom) {
+  audio_.setSource({});
+  table_.reset();
+  // The slideshow plays to INTRO.MOD; coming back from a table the menu plays MOD2.MOD.
+  const auto prg = file::readAll(files_.intro);
+  const auto mod = file::readAll(returningFrom < 0 ? files_.introMusic : files_.menuMusic);
+  if (!prg || !mod) throw DataError("cannot read INTRO.PRG or its music");
+  intro_ = std::make_unique<Intro>(*prg, *mod, config_, returningFrom);
+  resizeFrame(intro_->width(), intro_->height(), 1.0);
+  audio_.setSource([p = &intro_->player()](float* out, int frames) { p->render(out, frames); });
+}
+
+void App::openTable(int index) {
+  audio_.setSource({});
+  intro_.reset();
+  const auto prg = file::readAll(files_.tables[static_cast<std::size_t>(index)]);
+  const auto mod = file::readAll(files_.tableMusic[static_cast<std::size_t>(index)]);
+  if (!prg || !mod) throw DataError("cannot read the table files");
+  const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
+  table_ = std::make_unique<Table>(*prg, *mod, config_, index, seed);
+  resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+  audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
+  log::info("opened table " + std::to_string(index + 1));
+}
+
+void App::handleKey(const SDL_Event& e) {
+  if (e.type != SDL_EVENT_KEY_DOWN && e.type != SDL_EVENT_KEY_UP) return;
+  if (e.key.repeat) return;
+  if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F && (e.key.mod & SDL_KMOD_GUI)) {
+    window_.setFullscreen(!window_.fullscreen());
+    return;
+  }
+  const Key k = keyFor(e.key.key);
+  if (k == Key::None) return;
+  const bool down = e.type == SDL_EVENT_KEY_DOWN;
+  if (table_) table_->handleKey(k, down);
+  else if (intro_) intro_->handleKey(k, down);
+}
+
+void App::update(double dt) {
+  clock_ += dt;
+  while (clock_ >= kFrame) {
+    clock_ -= kFrame;
+    if (intro_) {
+      const IntroAction a = intro_->runFrame();
+      switch (a.kind) {
+        case IntroAction::Kind::OpenTable:
+          config_.options = intro_->options();
+          openTable(a.table);
+          break;
+        case IntroAction::Kind::SaveOptions:
+          config_.options = intro_->options();
+          Config::saveOptions(saveDir_, config_.options);
+          resizeFrame(intro_->width(), intro_->height(), 1.0);
+          break;
+        case IntroAction::Kind::Quit: running_ = false; return;
+        case IntroAction::Kind::None: break;
+      }
+    } else if (table_) {
+      const TableAction a = table_->runFrame();
+      const int index = table_->tableIndex();
+      switch (a.kind) {
+        case TableAction::Kind::SaveOptions:
+          config_.options = table_->options();
+          Config::saveOptions(saveDir_, config_.options);
+          break;
+        case TableAction::Kind::SaveHighScores:
+          config_.highScores[static_cast<std::size_t>(index)] = table_->highScores();
+          Config::saveHighScores(saveDir_, index, table_->highScores());
+          break;
+        case TableAction::Kind::Quit:
+          config_.options = table_->options();
+          openIntro(index);
+          return;
+        case TableAction::Kind::None: break;
+      }
+      if (table_) resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+    }
+  }
+}
+
+void App::render(double now) {
+  std::array<Rgb, 256> colors{};
+  if (table_)
+    table_->render(frame_.data(), colors.data());
+  else if (intro_)
+    intro_->render(frame_.data(), colors.data());
+  palette_.set(0, std::vector<Rgb>(colors.begin(), colors.end()));
+  int w = 0, h = 0;
+  window_.drawableSize(w, h);
+  renderer_.setPalette(palette_);
+  renderer_.draw(frame_, w, h, now);
+  if (options_.screenshot && ++frameCounter_ >= options_.screenshotFrame) {
+    std::vector<u8> rgb(static_cast<std::size_t>(w) * h * 3);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, rgb.data());
+    writeRgbPng(*options_.screenshot, rgb.data(), w, h, true);
+    log::info("screenshot written to " + options_.screenshot->string());
+    running_ = false;
+  }
+  window_.swap();
+}
+
+int App::run() {
+  try {
+    if (!init()) return 1;
+    using clock = std::chrono::steady_clock;
+    const auto start = clock::now();
+    auto last = start;
+    double reloadTimer = 0;
+    while (running_) {
+      SDL_Event e;
+      while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_EVENT_QUIT) running_ = false;
+        handleKey(e);
+      }
+      const auto nowT = clock::now();
+      const double dt = std::min(0.1, std::chrono::duration<double>(nowT - last).count());
+      last = nowT;
+      update(dt);
+      reloadTimer += dt;
+      if (reloadTimer > 1.0) {
+        reloadTimer = 0;
+        renderer_.pollShaderReload();
+      }
+      render(std::chrono::duration<double>(nowT - start).count());
+    }
+  } catch (const DataError& e) {
+    log::error(e.what());
+    audio_.close();
+    SDL_Quit();
+    return 1;
+  }
+  audio_.setSource({});
+  audio_.close();
+  SDL_Quit();
+  return 0;
+}
+
+}  // namespace pfr
