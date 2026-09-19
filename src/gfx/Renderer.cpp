@@ -64,6 +64,7 @@ void Renderer::ensureSceneTarget(int w, int h) {
 void Renderer::pollShaderReload() {
   palettePass_.reloadIfChanged();
   postPass_.reloadIfChanged();
+  if (crtLoaded_) crtPass_.reloadIfChanged();
 }
 
 void Renderer::setPalette(const Palette& palette) { setRowPalettes(palette.colors().data(), 1); }
@@ -109,6 +110,23 @@ void Renderer::draw(const Framebuffer& frame, int windowWidth, int windowHeight,
   glClearColor(0, 0, 0, 1);
   glClear(GL_COLOR_BUFFER_BIT);
   glViewport(viewport_.x, viewport_.y, viewport_.w, viewport_.h);
+  if (crt_ && !crtLoaded_) {
+    crtLoaded_ = true;
+    if (!crtPass_.load(shaderDir_ / "fullscreen.vert", shaderDir_ / "crt-lottes.frag")) {
+      log::error("the CRT shader failed to load; showing the picture without it");
+      crt_ = false;
+    }
+  }
+  if (crt_) {
+    crtPass_.use();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, sceneTex_);
+    glUniform1i(crtPass_.uniform("uScene"), 0);
+    glUniform2f(crtPass_.uniform("uSceneSize"), static_cast<float>(sceneW_), static_cast<float>(sceneH_));
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    return;
+  }
   postPass_.use();
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, sceneTex_);

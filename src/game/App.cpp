@@ -89,6 +89,10 @@ bool App::init() {
   if (options_.fullscreen) window_.setFullscreen(true);
   if (!renderer_.init(shaderDir_, 640, 480, 1.0)) return false;
   renderer_.setSmoothEdges(options_.smoothEdges);
+  {
+    const auto saved = file::readAll(saveDir_ / "crt.txt");
+    setCrt(options_.crt.value_or(saved && !saved->empty() && (*saved)[0] == '1'));
+  }
   audio_.open(48000);
 
   if (options_.table >= 1 && options_.table <= 4)
@@ -96,6 +100,14 @@ bool App::init() {
   else
     openIntro(options_.skipIntro ? 0 : -1);
   return true;
+}
+
+/// The CRT look on or off, remembered for next time.
+void App::setCrt(bool on) {
+  renderer_.setCrt(on);
+  const char c = on ? '1' : '0';
+  file::writeAll(saveDir_ / "crt.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
+  log::info(std::string("CRT look ") + (on ? "on" : "off"));
 }
 
 void App::resizeFrame(int width, int height, double pixelAspect) {
@@ -133,6 +145,10 @@ void App::handleKey(const SDL_Event& e) {
   if (e.key.repeat) return;
   if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F && (e.key.mod & SDL_KMOD_GUI)) {
     window_.setFullscreen(!window_.fullscreen());
+    return;
+  }
+  if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F9) {
+    setCrt(!renderer_.crt());
     return;
   }
   const Key k = keyFor(e.key.key);

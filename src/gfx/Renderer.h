@@ -22,6 +22,9 @@ class Renderer {
   void setPixelAspect(double aspect) { pixelAspect_ = aspect; }
   /// false draws with hard pixel edges, true softens only the edge that straddles two pixels.
   void setSmoothEdges(bool on) { smoothEdges_ = on; }
+  /// Presents the picture through the CRT-Lottes shader (shaders/crt-lottes.frag).
+  void setCrt(bool on) { crt_ = on; }
+  bool crt() const { return crt_; }
 
   /// Uploads a single palette shared by every scanline.
   void setPalette(const Palette& palette);
@@ -48,6 +51,9 @@ class Renderer {
   Rect viewport_;
   ShaderProgram palettePass_;
   ShaderProgram postPass_;
+  ShaderProgram crtPass_;
+  bool crt_ = false;
+  bool crtLoaded_ = false;
   std::filesystem::path shaderDir_;
 };
 
