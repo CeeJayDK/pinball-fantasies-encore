@@ -17,6 +17,8 @@ void usage() {
             "  --smooth         soften pixel edges, which steadies the picture while scrolling\n"
             "  --crt            CRT look: scanlines, shadow mask, glow (F9 switches it); remembered\n"
             "  --no-crt         the original crisp pixels\n"
+            "  --hd, --no-hd    high-resolution pictures in the intro and menu, or the originals (F10); remembered\n"
+            "  --hd-dir <dir>   pictures to use instead of the application's own (default: hd/ in the preferences folder)\n"
             "  --res <mode>     screen mode: normal (320x240), high (320x350) or full (whole table)\n"
             "  --scale <n>      window scale factor (default 3)\n"
             "  --screenshot <f> render a frame to a PNG file and quit\n"
@@ -39,6 +41,9 @@ int main(int argc, char** argv) {
     else if (a == "--smooth") options.smoothEdges = true;
     else if (a == "--crt") options.crt = true;
     else if (a == "--no-crt") options.crt = false;
+    else if (a == "--hd") options.hd = true;
+    else if (a == "--no-hd") options.hd = false;
+    else if (a == "--hd-dir") options.hdDir = next();
     else if (a == "--res") {
       const std::string m = next();
       options.resolution = m == "normal" ? pfr::Resolution::Normal : m == "full" ? pfr::Resolution::Full : pfr::Resolution::High;

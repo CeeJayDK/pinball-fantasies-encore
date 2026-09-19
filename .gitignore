@@ -2,6 +2,7 @@ build/
 .DS_Store
 *.png
 !docs/*.png
+!assets/hd/*.png
 re/*.asm
 re/*.lst
 re/*.hex

@@ -55,11 +55,13 @@ add_executable(pinball-fantasies MACOSX_BUNDLE
   src/platform/Window.cpp
   src/platform/DataLocator.cpp
   src/platform/AudioDevice.cpp
+  src/platform/ImageFile.cpp
   src/gfx/Renderer.cpp
   src/gfx/ShaderProgram.cpp
   src/game/App.cpp
 )
-target_link_libraries(pinball-fantasies PRIVATE pfr_core SDL3::SDL3 OpenGL::GL)
+target_link_libraries(pinball-fantasies PRIVATE pfr_core SDL3::SDL3 OpenGL::GL
+  "-framework ImageIO" "-framework CoreGraphics" "-framework CoreFoundation")
 target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 PFR_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 set_target_properties(pinball-fantasies PROPERTIES
   OUTPUT_NAME "Pinball Fantasies"
@@ -68,14 +70,17 @@ set_target_properties(pinball-fantasies PROPERTIES
   MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
   MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
 
-# Shaders travel with the bundle. This runs on every build, not only when the executable
+# Shaders and the intro's high-resolution pictures travel with the bundle. This runs on every build, not only when the executable
 # is relinked, so editing a shader alone still reaches the application.
 add_custom_target(pfr_shaders ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/shaders"
           "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources/shaders"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          "${CMAKE_SOURCE_DIR}/assets/hd"
+          "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources/hd"
   DEPENDS pinball-fantasies
-  COMMENT "Copying shaders into the application bundle")
+  COMMENT "Copying shaders and pictures into the application bundle")
 
 # ---------------------------------------------------------------------------
 # Command-line tools (asset inspection, no SDL).

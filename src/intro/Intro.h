@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "game/Config.h"
+#include "gfx/HdLayer.h"
 #include "intro/IntroAssets.h"
 #include "sound/Player.h"
 #include "table/Keys.h"
@@ -23,7 +24,8 @@ class Intro {
 
   IntroAction runFrame();
   void handleKey(Key key, bool pressed);
-  void render(u8* pixels, Rgb* palette) const;
+  /// `hd`, if given, receives where each original picture was drawn, for replacements.
+  void render(u8* pixels, Rgb* palette, HdFrame* hd = nullptr) const;
 
   int width() const { return 640; }
   int height() const { return vertical() ? 960 : 480; }
@@ -62,6 +64,9 @@ class Intro {
   void renderText(u8* data, Rgb* pal, bool lq) const;
   void renderOptions(u8* data, Rgb* pal, bool lq, std::optional<u8> cursor) const;
   void nextPage();
+  void hdUse(HdPicture p, const IntroImage& img) const;
+  void hdMark(int pos, HdPicture p, int x8, int y8, u16 flags) const;
+  void hdClear(int pos) const;
   void handleOption(u8 which);
 
   std::unique_ptr<Player> player_;
@@ -76,6 +81,7 @@ class Intro {
   u16 leftN_ = 0;
   bool leftOptions_ = false;
   bool leftIsOptions_ = false;
+  mutable HdFrame* hd_ = nullptr;  ///< set only while render() runs
 };
 
 }  // namespace pfr

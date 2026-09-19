@@ -11,6 +11,7 @@
 #include "core/Log.h"
 #include "core/Png.h"
 #include "platform/DataLocator.h"
+#include "platform/ImageFile.h"
 
 namespace pfr {
 namespace {
@@ -93,6 +94,12 @@ bool App::init() {
     const auto saved = file::readAll(saveDir_ / "crt.txt");
     setCrt(options_.crt.value_or(saved && !saved->empty() && (*saved)[0] == '1'));
   }
+  loadHdPictures();
+  {
+    const auto saved = file::readAll(saveDir_ / "hd.txt");
+    renderer_.setHdEnabled(options_.hd.value_or(!saved || saved->empty() || (*saved)[0] != '0'));
+    if (options_.hd) setHd(*options_.hd);
+  }
   audio_.open(48000);
 
   if (options_.table >= 1 && options_.table <= 4)
@@ -108,6 +115,43 @@ void App::setCrt(bool on) {
   const char c = on ? '1' : '0';
   file::writeAll(saveDir_ / "crt.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
   log::info(std::string("CRT look ") + (on ? "on" : "off"));
+}
+
+/// High-resolution replacements for the intro's pictures, named after HdPicture
+/// (slide1.png ... slide5.png, left.png, table1.png ... table4.png, hiscores.png). Each file
+/// must show the whole original picture, edge to edge, at any size. The application carries
+/// its own (assets/hd); one in --hd-dir, or else in hd/ in the preferences folder, takes its place.
+void App::loadHdPictures() {
+  const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "assets" / "hd";
+  const std::filesystem::path bundled = std::filesystem::exists(source) ? source : executableDir() / "hd";
+  const std::filesystem::path own = options_.hdDir.value_or(saveDir_ / "hd");
+  int count = 0, replaced = 0;
+  for (std::size_t i = 1; i < HdFrame::kCount; ++i) {
+    const auto p = static_cast<HdPicture>(i);
+    const std::string name = std::string(hdPictureName(p)) + ".png";
+    auto path = own / name;
+    if (std::filesystem::exists(path))
+      ++replaced;
+    else
+      path = bundled / name;
+    if (!std::filesystem::exists(path)) continue;
+    const auto image = loadImageFile(path);
+    if (!image) {
+      log::error("cannot read " + path.string());
+      continue;
+    }
+    renderer_.setHdPicture(p, image->width, image->height, image->pixels.data());
+    ++count;
+  }
+  if (count) log::info("replacement pictures: " + std::to_string(count) + ", " + std::to_string(replaced) + " of them from " + own.string());
+}
+
+/// The replacement pictures on or off, remembered for next time.
+void App::setHd(bool on) {
+  renderer_.setHdEnabled(on);
+  const char c = on ? '1' : '0';
+  file::writeAll(saveDir_ / "hd.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
+  log::info(std::string("replacement pictures ") + (on ? "on" : "off"));
 }
 
 void App::resizeFrame(int width, int height, double pixelAspect) {
@@ -149,6 +193,10 @@ void App::handleKey(const SDL_Event& e) {
   }
   if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F9) {
     setCrt(!renderer_.crt());
+    return;
+  }
+  if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F10) {
+    if (renderer_.hasHdPictures()) setHd(!renderer_.hdEnabled());
     return;
   }
   const Key k = keyFor(e.key.key);
@@ -205,12 +253,12 @@ void App::render(double now) {
   if (table_)
     table_->render(frame_.data(), colors.data());
   else if (intro_)
-    intro_->render(frame_.data(), colors.data());
+    intro_->render(frame_.data(), colors.data(), renderer_.hasHdPictures() ? &hd_ : nullptr);
   palette_.set(0, std::vector<Rgb>(colors.begin(), colors.end()));
   int w = 0, h = 0;
   window_.drawableSize(w, h);
   renderer_.setPalette(palette_);
-  renderer_.draw(frame_, w, h, now);
+  renderer_.draw(frame_, w, h, now, intro_ && !table_ ? &hd_ : nullptr);
   if (options_.screenshot && ++frameCounter_ >= options_.screenshotFrame) {
     std::vector<u8> rgb(static_cast<std::size_t>(w) * h * 3);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);

@@ -28,6 +28,8 @@ struct AppOptions {
   bool smoothEdges = false;   ///< soften the one pixel that straddles two source pixels
   std::optional<Resolution> resolution;  ///< overrides the saved screen mode
   std::optional<bool> crt;               ///< overrides the saved CRT look
+  std::optional<bool> hd;                ///< overrides the saved choice of replacement pictures
+  std::optional<std::filesystem::path> hdDir;  ///< where replacement pictures are read from
   int windowScale = 3;
   std::optional<std::filesystem::path> screenshot;  ///< render one frame, save it, quit
   int screenshotFrame = 30;
@@ -47,6 +49,8 @@ class App {
   void handleKey(const SDL_Event& e);
   void resizeFrame(int width, int height, double pixelAspect);
   void setCrt(bool on);
+  void loadHdPictures();
+  void setHd(bool on);
 
   AppOptions options_;
   std::filesystem::path shaderDir_, saveDir_;
@@ -57,6 +61,7 @@ class App {
   AudioDevice audio_;
   Framebuffer frame_;
   Palette palette_;
+  HdFrame hd_;
   std::unique_ptr<Intro> intro_;
   std::unique_ptr<Table> table_;
   double clock_ = 0;

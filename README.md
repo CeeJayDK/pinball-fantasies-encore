@@ -11,9 +11,10 @@ this project's own.
 
 ## Game files
 
-Nothing from the original is included. The game reads the pictures, collision maps, scripts,
-music and effects from your own copy of the DOS files, and it needs **exactly** the release pfr
-supports, because it reads the data at fixed addresses. At start-up every file is checked
+Nothing from the original is included, apart from the redrawn intro and menu pictures in
+`assets/hd`. The game reads the pictures, collision maps, scripts, music and effects from your
+own copy of the DOS files, and it needs **exactly** the release pfr supports, because it reads
+the data at fixed addresses. At start-up every file is checked
 against these SHA-256 sums, and a folder holding any other release is refused:
 
 ```
@@ -65,6 +66,8 @@ The original layout.
 | Space | nudge the table (too often tilts it) |
 | P | pause; while paused, A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
 | M | music on or off |
+| F9 | CRT look on or off |
+| F10 | high-resolution pictures in the intro and menu, or the originals |
 | Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
 | Command+F | fullscreen |
 
@@ -76,6 +79,9 @@ The original layout.
 | `--table <1-4>` | open a table directly |
 | `--skip-intro` | go straight to the table menu |
 | `--res normal\|high\|full` | screen mode: 320x240, 320x350, or the whole table at once |
+| `--crt`, `--no-crt` | CRT look (scanlines, shadow mask, glow); remembered |
+| `--hd`, `--no-hd` | high-resolution pictures in the intro and menu, or the originals; remembered |
+| `--hd-dir <dir>` | pictures to use instead of the application's own |
 | `--smooth` | soften the one pixel that straddles two source pixels; steadies scrolling |
 | `--square-pixels` | show the picture unstretched instead of filling a 4:3 screen |
 | `--fullscreen`, `--scale <n>` | window options |
@@ -87,6 +93,7 @@ The original layout.
 | --- | --- |
 | `pfr-play <dir> <table> [frames] [seed] [out.png]` | plays a game headlessly with a simple autopilot and prints the ball, the score, every trigger and (with `PFR_DM=1`) the dot matrix |
 | `pfr-assets <dir>` | loads every table and prints what was extracted |
+| `tools/hd_import.py <name>=<picture> ...` | prepares redrawn intro and menu pictures (trims, resizes to 3x the original) into `assets/hd` |
 | `tools/gen_pfr_tables.py <pfr> <out>` | regenerates `src/assets/PfrTables.inc`, the lookup tables copied mechanically from pfr's source |
 
 ## Layout
@@ -98,6 +105,7 @@ The original layout.
 | `src/intro` | The slideshow and the table menu with its text, high-score and options pages (pfr's `intro`) |
 | `src/sound` | The four-channel module player and the jingle sequencer (pfr's `sound`) |
 | `src/game` | Application shell and the options and high-score files |
+| `assets/hd` | Redrawn, high-resolution versions of the intro's slides, the menu's side panel, table banners and high-score heading, drawn in place of the originals |
 | `src/gfx`, `shaders` | Indexed framebuffer, palette, OpenGL renderer; `post.frag` is the hook for CRT-style effects and is hot-reloaded |
 | `src/platform` | SDL3 window, audio device, finding the game files |
 | `src/core`, `src/data` | Types, files, PNG and SHA-256, IFF pictures, the game-version check |

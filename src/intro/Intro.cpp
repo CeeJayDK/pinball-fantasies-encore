@@ -44,7 +44,11 @@ Intro::Intro(ByteView prg, ByteView module, const Config& config, int returningF
 void Intro::clearLeft(u8* data, int num) const {
   for (int y = 0; y < num; ++y) {
     const int yy = 95 + y;
-    for (int x = 8; x < 120; ++x) data[yy * 2 * kW + x] = data[(yy * 2 + 1) * kW + x] = 0x2;
+    for (int x = 8; x < 120; ++x) {
+      data[yy * 2 * kW + x] = data[(yy * 2 + 1) * kW + x] = 0x2;
+      hdClear(yy * 2 * kW + x);
+      hdClear((yy * 2 + 1) * kW + x);
+    }
   }
 }
 
@@ -58,7 +62,11 @@ void Intro::renderLeftText(u8* data, int baseY, int num, bool isOptions) const {
       for (int cy = 0; cy < 8; ++cy) {
         const u8 line = kCgaFont[chr][cy];
         for (int dx = 0; dx < 8; ++dx)
-          if (line & (0x80 >> dx)) data[(y + cy) * 2 * kW + x + dx] = data[((y + cy) * 2 + 1) * kW + x + dx] = 0;
+          if (line & (0x80 >> dx)) {
+            data[(y + cy) * 2 * kW + x + dx] = data[((y + cy) * 2 + 1) * kW + x + dx] = 0;
+            hdClear((y + cy) * 2 * kW + x + dx);
+            hdClear(((y + cy) * 2 + 1) * kW + x + dx);
+          }
       }
     }
 }
@@ -66,17 +74,25 @@ void Intro::renderLeftText(u8* data, int baseY, int num, bool isOptions) const {
 void Intro::unclearLeft(u8* data, int num) const {
   for (int y = 90 - num; y < 90; ++y) {
     const int yy = 95 + y;
-    for (int x = 8; x < 120; ++x) data[yy * 2 * kW + x] = data[(yy * 2 + 1) * kW + x] = assets_.left.data(x, yy);
+    for (int x = 8; x < 120; ++x) {
+      data[yy * 2 * kW + x] = data[(yy * 2 + 1) * kW + x] = assets_.left.data(x, yy);
+      hdMark(yy * 2 * kW + x, HdPicture::Left, x * 8, yy * 8, HdFrame::kHalfY);
+      hdMark((yy * 2 + 1) * kW + x, HdPicture::Left, x * 8, yy * 8 + 4, HdFrame::kHalfY);
+    }
   }
 }
 
 void Intro::renderLeft(u8* data, Rgb* pal, int offset) const {
   for (std::size_t i = 0; i < 16 && i < assets_.left.cmap.size(); ++i) pal[i] = assets_.left.cmap[i];
   const int lw = assets_.left.data.width();
+  hdUse(HdPicture::Left, assets_.left);
   if (vertical()) {
     for (int y = 0; y < 960; ++y) {
       const int sy = y <= 373 ? y / 2 : y <= 854 ? 186 : (y - 480) / 2;
-      for (int x = offset; x < lw; ++x) data[y * kW + x - offset] = assets_.left.data(x, sy);
+      for (int x = offset; x < lw; ++x) {
+        data[y * kW + x - offset] = assets_.left.data(x, sy);
+        hdMark(y * kW + x - offset, HdPicture::Left, x * 8, sy * 8 + (y & 1) * 4, HdFrame::kHalfY);
+      }
     }
     if (offset == 0)
       renderLeftText(data, 187 + 70, 120,
@@ -85,7 +101,10 @@ void Intro::renderLeft(u8* data, Rgb* pal, int offset) const {
     return;
   }
   for (int y = 0; y < 480; ++y)
-    for (int x = offset; x < lw; ++x) data[y * kW + x - offset] = assets_.left.data(x, y / 2);
+    for (int x = offset; x < lw; ++x) {
+      data[y * kW + x - offset] = assets_.left.data(x, y / 2);
+      hdMark(y * kW + x - offset, HdPicture::Left, x * 8, y * 4, HdFrame::kHalfY);
+    }
   switch (left_) {
     case LeftKind::None:
     case LeftKind::Image: break;
@@ -110,11 +129,15 @@ void Intro::renderTable(u8* data, Rgb* pal, const std::function<bool(int)>& f, i
   const int palBase = 0x10 * (table + 1);
   const IntroImage& img = assets_.tables[static_cast<std::size_t>(table)];
   for (std::size_t i = 0; i < 16 && i < img.cmap.size(); ++i) pal[static_cast<std::size_t>(palBase) + i] = img.cmap[i];
+  const auto picture = static_cast<HdPicture>(static_cast<int>(HdPicture::Table1) + table);
+  hdUse(picture, img);
   for (int y = 0; y < 95; ++y) {
     if (!f(flip ? 94 - y : y)) continue;
     for (int x = 0; x < 440; ++x) {
       const int p = (base + y) * 2 * kW + 160 + x;
       data[p] = data[p + kW] = static_cast<u8>(img.data(x, y) | palBase);
+      hdMark(p, picture, x * 8, y * 8, HdFrame::kHalfY);
+      hdMark(p + kW, picture, x * 8, y * 8 + 4, HdFrame::kHalfY);
     }
   }
 }
@@ -156,6 +179,8 @@ void Intro::renderChar(u8* data, const IntroImage& font, u8 chr, int x, int y) c
       if (fx + cx >= font.data.width() || fy + cy >= font.data.height()) continue;
       const int p = (y + cy) * 2 * kW + x + cx;
       data[p] = data[p + kW] = static_cast<u8>(font.data(fx + cx, fy + cy) | 0x10);
+      hdClear(p);
+      hdClear(p + kW);
     }
 }
 
@@ -186,10 +211,13 @@ void Intro::renderText(u8* data, Rgb* pal, bool lq) const {
   for (std::size_t i = 0; i < 16 && i < font.cmap.size(); ++i) pal[0x10 + i] = font.cmap[i];
   const TextPage& page = assets_.textPages[textPage_];
   if (page.hiScores) {
+    hdUse(HdPicture::HiScores, hiscores);
     for (int y = 0; y < hiscores.data.height(); ++y)
       for (int x = 0; x < hiscores.data.width(); ++x) {
         const int p = y * kW * 2 + x + 184;
         data[p] = data[p + kW] = static_cast<u8>(hiscores.data(x, y) | 0x10);
+        hdMark(p, HdPicture::HiScores, x * 8, y * 8, HdFrame::kHalfY);
+        hdMark(p + kW, HdPicture::HiScores, x * 8, y * 8 + 4, HdFrame::kHalfY);
       }
     if (vertical()) {
       for (int t = 0; t < 4; ++t) renderHiScores(data, font, t, 42 + t * 108);
@@ -235,6 +263,22 @@ void Intro::renderOptions(u8* data, Rgb* pal, bool lq, std::optional<u8> cursor)
     const int pos = *cursor == 6 ? 9 : *cursor + 2;
     renderChar(data, font, '>', 175, 14 + pos * pitch);
   }
+}
+
+void Intro::hdUse(HdPicture p, const IntroImage& img) const {
+  if (!hd_) return;
+  const auto i = static_cast<std::size_t>(p);
+  hd_->size[i] = {static_cast<u16>(img.data.width()), static_cast<u16>(img.data.height())};
+  hd_->used = static_cast<u16>(hd_->used | (1u << i));
+}
+
+void Intro::hdMark(int pos, HdPicture p, int x8, int y8, u16 flags) const {
+  if (hd_) hd_->map[static_cast<std::size_t>(pos)] = {static_cast<u16>(x8), static_cast<u16>(y8),
+                                                      static_cast<u16>(static_cast<u16>(p) | flags), 0};
+}
+
+void Intro::hdClear(int pos) const {
+  if (hd_) hd_->map[static_cast<std::size_t>(pos)].picture = 0;
 }
 
 // ---- logic ---------------------------------------------------------------------------------
@@ -500,31 +544,56 @@ void Intro::handleKey(Key key, bool pressed) {
   }
 }
 
-void Intro::render(u8* data, Rgb* pal) const {
+void Intro::render(u8* data, Rgb* pal, HdFrame* hd) const {
   using K = StateKind;
   const State& s = state_;
   const int h = height();
   std::fill(data, data + static_cast<std::size_t>(kW) * h, 0);
   std::fill(pal, pal + 256, Rgb{});
+  hd_ = hd;
+  if (hd) hd->reset(kW, h);
+  // The fades below mix every colour towards black (or white) by the same amount; the
+  // replacement pictures follow them.
+  auto fade = [&](int num, int den, Rgb color = {}) {
+    if (hd) hd->fade.fill(static_cast<float>(num) / static_cast<float>(den)), hd->fadeColor = color;
+  };
+  // The text pages fade only their own colours (0x10 to 0x1f), which the heading uses.
+  auto fadeText = [&](int num, int den) {
+    if (hd) hd->fade[static_cast<std::size_t>(HdPicture::HiScores)] = static_cast<float>(num) / static_cast<float>(den);
+  };
   switch (s.kind) {
     case K::Slide: {
       const int base = vertical() ? 240 : 0;
       const Slide& slide = assets_.slides[s.slide];
       const Grid8& img = slide.image.data;
       const bool doubled = img.width() == 320;
+      const auto picture = static_cast<HdPicture>(static_cast<std::size_t>(HdPicture::Slide1) + s.slide);
+      const bool replaceable = s.slide < 5;
+      if (replaceable) hdUse(picture, slide.image);
+      const int step = doubled ? 4 : 8;
+      const u16 flags = doubled ? HdFrame::kHalfX | HdFrame::kHalfY : 0;
       for (int y = 0; y < 480; ++y)
         for (int x = 0; x < kW; ++x) {
           const int sx = doubled ? x / 2 : x, sy = doubled ? y / 2 : y;
-          if (sx < img.width() && sy < img.height()) data[x + (base + y) * kW] = img(sx, sy);
+          if (sx < img.width() && sy < img.height()) {
+            data[x + (base + y) * kW] = img(sx, sy);
+            if (replaceable) hdMark(x + (base + y) * kW, picture, x * step, y * step, flags);
+          }
         }
       const auto& cmap = slide.image.cmap;
       switch (s.stage) {
-        case SlideStage::Gap: break;
-        case SlideStage::FadeIn:
-          fadePal(pal, cmap, slide.fadeFromWhite ? Rgb{0xff, 0xff, 0xff} : Rgb{}, s.n, slide.fadeInFrames);
+        case SlideStage::Gap: fade(0, 1); break;
+        case SlideStage::FadeIn: {
+          const Rgb from = slide.fadeFromWhite ? Rgb{0xff, 0xff, 0xff} : Rgb{};
+          fadePal(pal, cmap, from, s.n, slide.fadeInFrames);
+          fade(s.n, slide.fadeInFrames, from);
           break;
+        }
         case SlideStage::Show: std::copy(cmap.begin(), cmap.begin() + std::min<std::size_t>(cmap.size(), 256), pal); break;
-        case SlideStage::FadeOut: fadePal(pal, cmap, Rgb{}, slide.fadeOutFrames - s.n, slide.fadeOutFrames); break;
+        case SlideStage::FadeOut:
+          fadePal(pal, cmap, Rgb{}, slide.fadeOutFrames - s.n, slide.fadeOutFrames);
+          fade(slide.fadeOutFrames - s.n, slide.fadeOutFrames);
+          break;
       }
       break;
     }
@@ -550,12 +619,14 @@ void Intro::render(u8* data, Rgb* pal) const {
       renderTables(data, pal, [](int) { return true; });
       const std::vector<Rgb> o(pal, pal + 256);
       fadePal(pal, o, Rgb{}, 80 - s.n, 80);
+      fade(80 - s.n, 80);
       break;
     }
     case K::TextFadeIn:
       renderLeft(data, pal, 0);
       renderText(data, pal, true);
       scalePal(pal, 0x10, 0x20, s.n, 20);
+      fadeText(s.n, 20);
       break;
     case K::Text:
       renderLeft(data, pal, 0);
@@ -565,6 +636,7 @@ void Intro::render(u8* data, Rgb* pal) const {
       renderLeft(data, pal, 0);
       renderText(data, pal, true);
       scalePal(pal, 0x10, 0x20, 19 - s.n, 20);
+      fadeText(19 - s.n, 20);
       break;
     case K::OptionsFadeIn:
       renderLeft(data, pal, 0);
@@ -584,9 +656,11 @@ void Intro::render(u8* data, Rgb* pal) const {
       renderLeft(data, pal, 0);
       const std::vector<Rgb> o(pal, pal + 256);
       fadePal(pal, o, Rgb{}, 80 - s.n, 80);
+      fade(80 - s.n, 80);
       break;
     }
   }
+  hd_ = nullptr;
 }
 
 }  // namespace pfr
