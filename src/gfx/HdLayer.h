@@ -36,7 +36,18 @@ inline const char* hdPictureName(HdPicture p) {
 /// of a pixel, and the picture. The picture's bits 8 and 9 say that a screen pixel covers half
 /// a picture pixel across or down (the picture is drawn doubled in that direction).
 struct HdPixel {
-  u16 x8 = 0, y8 = 0, picture = 0, unused = 0;
+  static constexpr u16 kCovered = 1;  ///< something is drawn over the picture here (the ball)
+  u16 x8 = 0, y8 = 0, picture = 0, flags = 0;
+};
+
+/// A flipper, drawn as one picture turned to its angle instead of the original's drawn steps.
+struct HdSprite {
+  u16 picture = 0;                           ///< which of the frame's sprite pictures
+  float pivotFrameX = 0, pivotFrameY = 0;    ///< the hinge, in screen pixels
+  float pivotSpriteX = 0, pivotSpriteY = 0;  ///< the hinge, in the picture's pixels
+  float scaleX = 1, scaleY = 1;              ///< picture pixels per screen pixel
+  float angle = 0;                           ///< radians away from the resting position
+  float clipTop = 0, clipBottom = 0;         ///< the screen rows it may be drawn in
 };
 
 struct HdFrame {
@@ -49,6 +60,8 @@ struct HdFrame {
   u32 used = 0;                                   ///< bit per picture drawn this frame
   std::array<float, kCount> fade{};               ///< per picture: 1 = as drawn, 0 = all fadeColor
   Rgb fadeColor{};
+  std::vector<HdSprite> sprites;                  ///< drawn over the pictures, in order
+  float spriteTint = 1.0f;                        ///< the screen's fade, applied to the sprites
 
   void reset(int w, int h) {
     width = w;
@@ -57,6 +70,8 @@ struct HdFrame {
     used = 0;
     fade.fill(1.0f);
     fadeColor = {};
+    sprites.clear();
+    spriteTint = 1.0f;
   }
 };
 

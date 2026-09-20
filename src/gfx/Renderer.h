@@ -31,7 +31,11 @@ class Renderer {
   void setHdPicture(HdPicture p, int width, int height, const u8* rgba);
   bool hasHdPictures() const { return hdLoaded_ != 0; }
   void setHdEnabled(bool on) { hdEnabled_ = on; }
+  /// A picture drawn over the scene at an angle (a flipper), RGBA; `slot` is HdSprite::picture.
+  void setSpritePicture(std::size_t slot, int width, int height, const u8* rgba);
+  void clearSpritePictures();
   bool hdEnabled() const { return hdEnabled_; }
+
 
   /// Uploads a single palette shared by every scanline.
   void setPalette(const Palette& palette);
@@ -53,6 +57,7 @@ class Renderer {
   static void ensureTarget(Target& t, int w, int h);
   static void deleteTarget(Target& t);
   void drawHd(const HdFrame& hd);
+  void drawSprites(const HdFrame& hd);
   GLuint vao_ = 0;
   GLuint indexTex_ = 0;
   GLuint paletteTex_ = 0;
@@ -75,6 +80,11 @@ class Renderer {
   std::array<GLuint, HdFrame::kCount> hdTex_{};
   GLuint hdMapTex_ = 0;
   int hdMapW_ = 0, hdMapH_ = 0;
+  static constexpr std::size_t kSprites = 4;
+  ShaderProgram spritePass_;
+  bool spritePassLoaded_ = false;
+  std::array<GLuint, kSprites> spriteTex_{};
+  std::array<std::array<int, 2>, kSprites> spriteSize_{};
   std::filesystem::path shaderDir_;
 };
 

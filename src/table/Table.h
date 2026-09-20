@@ -70,6 +70,13 @@ class Table {
   /// `hd`, if given, receives where the playfield was drawn, for a replacement picture.
   void render(u8* pixels, Rgb* palette, HdFrame* hd = nullptr) const;
 
+  struct FlipperPicture {
+    int width = 0, height = 0;
+    Bytes rgba;
+  };
+  /// The flippers cut out of the artwork, for drawing them turned to their angle.
+  std::vector<FlipperPicture> flipperPictures() const;
+
   int screenHeight() const;
   const Options& options() const { return options_; }
   const HighScores& highScores() const { return highScores_; }
@@ -451,6 +458,15 @@ class Table {
   LampOverride lampOverride_ = LampOverride::None;
   int scrollKey_ = 0;  ///< -1 up, 1 down, while the arrow is held
   void buildLampAreas() const;
+  struct FlipperArt {
+    Grid8 background;          ///< the artwork with the flipper taken out
+    std::vector<u8> covered;   ///< per pixel: the flipper reaches it at some angle
+    std::vector<u8> rest;      ///< per pixel: the flipper covers it at rest
+    std::vector<float> angle;  ///< radians, per step
+  };
+  void buildFlipperArt() const;
+  float flipperAngle(std::size_t f) const;
+  mutable std::vector<FlipperArt> flipperArt_;
   mutable std::vector<u8> lampAreas_;  ///< per playfield pixel: the lamp it belongs to, plus 1
   bool optionChanged_ = false;
   std::array<bool, 2> flipperState_{};

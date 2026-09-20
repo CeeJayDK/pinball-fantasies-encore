@@ -24,6 +24,13 @@ int main(int argc, char** argv) {
                   t + 1, a.lights.size(), a.flippers.size(), a.bumpers.size(), a.rollTriggers[0].size(),
                   a.rollTriggers[1].size(), a.hitTriggers.size(), a.scripts.size(), a.msgs.size(), a.anims.size(),
                   binds, effects, a.ballOutline.size(), a.ramps.size());
+      for (std::size_t f = 0; f < a.flippers.size(); ++f) {
+        const pfr::Flipper& fl = a.flippers[f];
+        std::printf("  flipper %zu: %s%s, %dx%d at (%d,%d), pivot (%d,%d), %u steps to %d\n", f,
+                    fl.side == pfr::FlipperSide::Left ? "left" : "right", fl.isVertical ? ", vertical" : "",
+                    fl.gfx[0].width(), fl.gfx[0].height(), fl.rectX, fl.rectY, fl.originX, fl.originY,
+                    fl.quantumMax, fl.posMax);
+      }
     } catch (const std::exception& e) {
       std::printf("TABLE%d: FAILED: %s\n", t + 1, e.what());
       ++failures;

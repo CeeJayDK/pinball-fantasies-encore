@@ -16,6 +16,8 @@ Renderer::~Renderer() {
   for (GLuint& t : hdTex_)
     if (t) glDeleteTextures(1, &t);
   if (hdMapTex_) glDeleteTextures(1, &hdMapTex_);
+  for (GLuint& t : spriteTex_)
+    if (t) glDeleteTextures(1, &t);
 }
 
 void Renderer::deleteTarget(Target& t) {
@@ -75,6 +77,54 @@ void Renderer::pollShaderReload() {
   postPass_.reloadIfChanged();
   if (crtLoaded_) crtPass_.reloadIfChanged();
   if (hdPassLoaded_) hdPass_.reloadIfChanged();
+  if (spritePassLoaded_) spritePass_.reloadIfChanged();
+}
+
+void Renderer::setSpritePicture(std::size_t slot, int width, int height, const u8* rgba) {
+  if (slot >= kSprites) return;
+  if (!spriteTex_[slot]) glGenTextures(1, &spriteTex_[slot]);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, spriteTex_[slot]);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  spriteSize_[slot] = {width, height};
+}
+
+void Renderer::clearSpritePictures() { spriteSize_ = {}; }
+
+void Renderer::drawSprites(const HdFrame& hd) {
+  if (!spritePassLoaded_) {
+    spritePassLoaded_ = true;
+    if (!spritePass_.load(shaderDir_ / "fullscreen.vert", shaderDir_ / "sprite.frag"))
+      log::error("the flipper shader failed to load; the drawn positions are used instead");
+  }
+  if (!spritePass_.id()) return;
+  spritePass_.use();
+  glUniform1i(spritePass_.uniform("uMap"), 2);   // still bound from the picture pass
+  glUniform1i(spritePass_.uniform("uSprite"), 3);
+  glUniform2f(spritePass_.uniform("uFrameSize"), static_cast<float>(hd.width), static_cast<float>(hd.height));
+  glUniform1f(spritePass_.uniform("uTint"), hd.spriteTint);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glActiveTexture(GL_TEXTURE3);
+  for (const HdSprite& s : hd.sprites) {
+    if (s.picture >= kSprites || !spriteTex_[s.picture] || !spriteSize_[s.picture][0]) continue;
+    glBindTexture(GL_TEXTURE_2D, spriteTex_[s.picture]);
+    glUniform2f(spritePass_.uniform("uSpriteSize"), static_cast<float>(spriteSize_[s.picture][0]),
+                static_cast<float>(spriteSize_[s.picture][1]));
+    glUniform2f(spritePass_.uniform("uPivotFrame"), s.pivotFrameX, s.pivotFrameY);
+    glUniform2f(spritePass_.uniform("uPivotSprite"), s.pivotSpriteX, s.pivotSpriteY);
+    glUniform2f(spritePass_.uniform("uScale"), s.scaleX, s.scaleY);
+    glUniform1f(spritePass_.uniform("uAngle"), s.angle);
+    glUniform2f(spritePass_.uniform("uClip"), s.clipTop, s.clipBottom);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+  }
+  glDisable(GL_BLEND);
+  glActiveTexture(GL_TEXTURE0);
 }
 
 void Renderer::setHdPicture(HdPicture p, int width, int height, const u8* rgba) {
@@ -173,7 +223,10 @@ void Renderer::draw(const Framebuffer& frame, int windowWidth, int windowHeight,
   glUniform1i(palettePass_.uniform("uIndices"), 0);
   glUniform1i(palettePass_.uniform("uPalette"), 1);
   glDrawArrays(GL_TRIANGLES, 0, 3);
-  if (withHd) drawHd(*hd);
+  if (withHd) {
+    drawHd(*hd);
+    if (!hd->sprites.empty()) drawSprites(*hd);
+  }
 
   // Pass 2: present with aspect-correct letterboxing.
   glBindFramebuffer(GL_FRAMEBUFFER, 0);

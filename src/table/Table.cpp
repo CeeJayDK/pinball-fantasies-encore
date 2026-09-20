@@ -162,6 +162,31 @@ void Table::pauseConfirmQuit() {
   kbdState_ = KbdState::PausedConfirmQuit;
 }
 
+/// Marks every pixel a shape encloses, by flooding what is outside it instead.
+static void fillEnclosed(u8* mask, int w, int h) {
+  std::vector<u8> outside(static_cast<std::size_t>(w) * h, 0);
+  std::vector<int> queue;
+  auto visit = [&](int x, int y) {
+    const std::size_t p = static_cast<std::size_t>(y) * w + x;
+    if (mask[p] || outside[p]) return;
+    outside[p] = 1;
+    queue.push_back(static_cast<int>(p));
+  };
+  for (int x = 0; x < w; ++x) visit(x, 0), visit(x, h - 1);
+  for (int y = 0; y < h; ++y) visit(0, y), visit(w - 1, y);
+  while (!queue.empty()) {
+    const int p = queue.back();
+    queue.pop_back();
+    const int x = p % w, y = p / w;
+    if (x > 0) visit(x - 1, y);
+    if (x + 1 < w) visit(x + 1, y);
+    if (y > 0) visit(x, y - 1);
+    if (y + 1 < h) visit(x, y + 1);
+  }
+  for (std::size_t p = 0; p < outside.size(); ++p)
+    if (!outside[p]) mask[p] = 1;
+}
+
 /// Which lamp each playfield pixel belongs to, for the replacement pictures.
 ///
 /// A lamp is a few palette colours, so its pixels are the ones drawn in them. Where the
@@ -197,6 +222,155 @@ void Table::buildLampAreas() const {
       }
     }
   lampAreas_ = std::move(filled);
+}
+
+/// Takes each flipper out of its artwork, so it can be drawn turned to any angle.
+///
+/// The original draws a flipper by stamping one of twenty-one pictures of its rectangle, each
+/// holding the flipper and the playfield behind it. Which pixels are the flipper is not a
+/// question the pictures can answer on their own -- the hub looks the same in all of them --
+/// but the table already knows: the collision map it stamps for each step marks the flipper's
+/// own material. That shape, widened to take in the outline drawn around it, is the flipper;
+/// the playfield behind it is what the other pictures show in its place, and the angle of a
+/// step is the direction of the far end of its shape from the hinge.
+void Table::buildFlipperArt() const {
+  constexpr u8 kFlipperMaterial = 2;
+  flipperArt_.clear();
+  for (const Flipper& fl : assets_.flippers) {
+    const int w = fl.gfx[0].width(), h = fl.gfx[0].height();
+    const std::size_t steps = fl.gfx.size(), pixels = static_cast<std::size_t>(w) * h;
+
+    std::vector<u8> coveredAt(steps * pixels, 0);
+    for (std::size_t q = 0; q < steps && q < fl.physmap.size(); ++q)
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+          if ((fl.physmap[q](x, y) & 7) == kFlipperMaterial)
+            coveredAt[q * pixels + static_cast<std::size_t>(y) * w + x] = 1;
+
+    FlipperArt art;
+    art.background = Grid8(w, h);
+    art.covered.assign(pixels, 0);
+    art.rest.assign(pixels, 0);
+    std::vector<u8> known(pixels, 0);
+    for (std::size_t p = 0; p < pixels; ++p) {
+      std::array<u8, 256> count{};
+      u8 commonest = 0;
+      for (std::size_t q = 0; q < steps; ++q) {
+        if (coveredAt[q * pixels + p]) {
+          art.covered[p] = 1;
+          continue;
+        }
+        const u8 here = fl.gfx[q].raw()[p];
+        known[p] = 1;
+        if (++count[here] > count[commonest]) commonest = here;
+      }
+      art.background(static_cast<int>(p % w), static_cast<int>(p / w)) = commonest;
+    }
+    // The playfield is never seen under the hub, so spread the nearest of it inwards.
+    for (int pass = 0; pass < std::max(w, h); ++pass) {
+      bool spread = false;
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+          const std::size_t p = static_cast<std::size_t>(y) * w + x;
+          if (known[p]) continue;
+          const std::array<int, 4> around = {x > 0 ? static_cast<int>(p) - 1 : -1,
+                                             x + 1 < w ? static_cast<int>(p) + 1 : -1,
+                                             y > 0 ? static_cast<int>(p) - w : -1,
+                                             y + 1 < h ? static_cast<int>(p) + w : -1};
+          for (const int n : around)
+            if (n >= 0 && known[static_cast<std::size_t>(n)] == 1) {
+              art.background(x, y) = art.background.raw()[static_cast<std::size_t>(n)];
+              known[p] = 2;  // filled in this pass; usable in the next one
+              spread = true;
+              break;
+            }
+        }
+      for (u8& k : known)
+        if (k == 2) k = 1;
+      if (!spread) break;
+    }
+
+    // The artwork draws an outline around the flipper that the collision map does not have.
+    for (std::size_t q = 0; q < steps; ++q) {
+      u8* covered = &coveredAt[q * pixels];
+      std::vector<u8> grown(covered, covered + pixels);
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+          const std::size_t p = static_cast<std::size_t>(y) * w + x;
+          if (covered[p] || fl.gfx[q](x, y) == art.background(x, y)) continue;
+          for (int dy = -2; dy <= 2; ++dy)
+            for (int dx = -2; dx <= 2; ++dx) {
+              const int nx = x + dx, ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+              if (covered[static_cast<std::size_t>(ny) * w + nx]) grown[p] = 1;
+            }
+        }
+      std::copy(grown.begin(), grown.end(), covered);
+      fillEnclosed(covered, w, h);
+      for (std::size_t p = 0; p < pixels; ++p) {
+        if (!covered[p]) continue;
+        art.covered[p] = 1;
+        if (q == 0) art.rest[p] = 1;
+      }
+    }
+
+    const int ox = fl.originX - fl.rectX, oy = fl.originY - fl.rectY;
+    for (std::size_t q = 0; q < steps; ++q) {
+      const u8* covered = &coveredAt[q * pixels];
+      double far = 0;
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+          if (covered[static_cast<std::size_t>(y) * w + x]) far = std::max(far, std::hypot(x - ox, y - oy));
+      // The direction of the flipper's far end from its hinge, which is its angle.
+      double sx = 0, sy = 0;
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+          if (!covered[static_cast<std::size_t>(y) * w + x]) continue;
+          if (std::hypot(x - ox, y - oy) < 0.85 * far) continue;
+          sx += x - ox;
+          sy += y - oy;
+        }
+      art.angle.push_back(static_cast<float>(std::atan2(sy, sx)));
+    }
+    flipperArt_.push_back(std::move(art));
+  }
+}
+
+/// Where a flipper is now, in radians from its resting position. The table moves a flipper
+/// smoothly and only quantises it to pick a picture, so the angle follows the steps either side.
+float Table::flipperAngle(std::size_t f) const {
+  const FlipperArt& art = flipperArt_[f];
+  const int pos = std::max<int>(flippers_[f].pos, 0);
+  const std::size_t q = std::min<std::size_t>(static_cast<std::size_t>(pos / 55), art.angle.size() - 1);
+  const std::size_t next = std::min<std::size_t>(q + 1, art.angle.size() - 1);
+  const float frac = static_cast<float>(pos % 55) / 55.0f;
+  float step = art.angle[next] - art.angle[q];
+  if (step > 3.14159265f) step -= 6.2831853f;  // the right flipper's angles cross half a turn
+  if (step < -3.14159265f) step += 6.2831853f;
+  float angle = art.angle[q] + step * frac - art.angle[0];
+  if (angle > 3.14159265f) angle -= 6.2831853f;
+  if (angle < -3.14159265f) angle += 6.2831853f;
+  return angle;
+}
+
+std::vector<Table::FlipperPicture> Table::flipperPictures() const {
+  if (flipperArt_.empty()) buildFlipperArt();
+  std::vector<FlipperPicture> out;
+  for (std::size_t f = 0; f < assets_.flippers.size(); ++f) {
+    const Flipper& fl = assets_.flippers[f];
+    const FlipperArt& art = flipperArt_[f];
+    FlipperPicture picture{fl.gfx[0].width(), fl.gfx[0].height(), {}};
+    picture.rgba.resize(static_cast<std::size_t>(picture.width) * picture.height * 4);
+    for (std::size_t p = 0; p < art.rest.size(); ++p) {
+      const Rgb c = assets_.palette[fl.gfx[0].raw()[p]];
+      picture.rgba[p * 4] = c.r;
+      picture.rgba[p * 4 + 1] = c.g;
+      picture.rgba[p * 4 + 2] = c.b;
+      picture.rgba[p * 4 + 3] = art.rest[p] ? 255 : 0;
+    }
+    out.push_back(std::move(picture));
+  }
+  return out;
 }
 
 // ---- the frame ---------------------------------------------------------------------------
@@ -470,6 +644,8 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
   const auto hdOff = static_cast<u16>(static_cast<int>(HdPicture::Playfield1Off) + assets_.table);
   if (hd) {
     if (lampAreas_.empty()) buildLampAreas();
+    if (flipperArt_.empty()) buildFlipperArt();
+    hd->spriteTint = static_cast<float>(fade_) / 256.0f;
     for (const u16 p : {hdOn, hdOff}) {
       hd->size[p] = {320, 576};
       hd->used |= 1u << p;
@@ -510,8 +686,19 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       const Flipper& fl = assets_.flippers[f];
       const Grid8& gfx = fl.gfx[flippers_[f].quantum];
       if (sy >= fl.rectY && sy - fl.rectY < gfx.height()) {
-        for (int fx = 0; fx < gfx.width(); ++fx) row[fx + fl.rectX] = gfx(fx, sy - fl.rectY);
-        hdClearChanged(y, sy, row, fl.rectX, fl.rectX + gfx.width());
+        const int fy = sy - fl.rectY;
+        if (hd) {
+          // The renderer draws the flipper turned to its angle, so the frame keeps the
+          // playfield behind it, and the replacement picture steps aside where it may reach.
+          const FlipperArt& art = flipperArt_[f];
+          for (int fx = 0; fx < gfx.width(); ++fx) {
+            row[fx + fl.rectX] = art.background(fx, fy);
+            if (art.covered[static_cast<std::size_t>(fy) * gfx.width() + fx])
+              hd->map[static_cast<std::size_t>(y) * 320 + fx + fl.rectX].picture = 0;
+          }
+        } else {
+          for (int fx = 0; fx < gfx.width(); ++fx) row[fx + fl.rectX] = gfx(fx, fy);
+        }
       }
     }
     if (!inAttract_ && sy >= by && sy < by + 15) {
@@ -523,10 +710,22 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
         if (x < 0 || x >= 320) continue;
         if (sy < 576 && assets_.occmaps[static_cast<std::size_t>(ball_.layer)](x, sy) != 0) continue;
         row[x] = pix;
-        if (hd) hd->map[static_cast<std::size_t>(y) * 320 + x].picture = 0;
+        if (hd) {
+          HdPixel& m = hd->map[static_cast<std::size_t>(y) * 320 + x];
+          m.picture = 0;
+          m.flags = HdPixel::kCovered;  // the ball passes in front of the flippers
+        }
       }
     }
   }
+  if (hd)
+    for (std::size_t f = 0; f < assets_.flippers.size(); ++f) {
+      const Flipper& fl = assets_.flippers[f];
+      hd->sprites.push_back({static_cast<u16>(f), static_cast<float>(fl.originX),
+                             static_cast<float>(fl.originY - scroll_.pos - push_.offset()),
+                             static_cast<float>(fl.originX - fl.rectX), static_cast<float>(fl.originY - fl.rectY),
+                             1.0f, 1.0f, flipperAngle(f), 0.0f, static_cast<float>(height)});
+    }
   const int fullHeight = height + 33;
   for (int y = height; y < fullHeight; ++y) std::fill(data + static_cast<std::size_t>(y) * 320, data + static_cast<std::size_t>(y + 1) * 320, 0);
   for (int y = 0; y < 16; ++y) {

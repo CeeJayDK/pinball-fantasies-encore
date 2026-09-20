@@ -181,6 +181,10 @@ void App::openTable(int index) {
   table_ = std::make_unique<Table>(*prg, *mod, config_, index, seed);
   resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
+  renderer_.clearSpritePictures();
+  const auto flippers = table_->flipperPictures();
+  for (std::size_t f = 0; f < flippers.size(); ++f)
+    renderer_.setSpritePicture(f, flippers[f].width, flippers[f].height, flippers[f].rgba.data());
   log::info("opened table " + std::to_string(index + 1));
 }
 
@@ -250,10 +254,13 @@ void App::update(double dt) {
 
 void App::render(double now) {
   std::array<Rgb, 256> colors{};
+  // Only when the replacements will really be drawn: the table leaves the flippers out of the
+  // frame for the renderer to put back, so with them off it must draw everything itself.
+  HdFrame* const hd = renderer_.hasHdPictures() && renderer_.hdEnabled() ? &hd_ : nullptr;
   if (table_)
-    table_->render(frame_.data(), colors.data(), renderer_.hasHdPictures() ? &hd_ : nullptr);
+    table_->render(frame_.data(), colors.data(), hd);
   else if (intro_)
-    intro_->render(frame_.data(), colors.data(), renderer_.hasHdPictures() ? &hd_ : nullptr);
+    intro_->render(frame_.data(), colors.data(), hd);
   palette_.set(0, std::vector<Rgb>(colors.begin(), colors.end()));
   int w = 0, h = 0;
   window_.drawableSize(w, h);
