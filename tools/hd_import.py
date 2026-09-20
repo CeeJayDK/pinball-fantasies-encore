@@ -5,7 +5,9 @@
 
 <name> is one of slide1 ... slide5 (the opening slideshow: 21st Century, Digital Illusions,
 Frontline Design, "Presents...", the Pinball Fantasies title), left (the menu's side panel),
-table1 ... table4 (the menu's banners, F1 to F4) or hiscores (the high-score pages' heading).
+table1 ... table4 (the menu's banners, F1 to F4), hiscores (the high-score pages' heading),
+or playfield1_on ... playfield4_on and playfield1_off ... playfield4_off (a table's playfield
+with every lamp lit, and with every lamp off; the two must line up exactly).
 Each picture must show the whole original picture; bands of white or transparency around it
 are trimmed, and transparency is flattened onto black. The picture is then resized to <n>
 times the original's size (3 by default), or kept at its own size along a side where it is
@@ -32,13 +34,15 @@ except ModuleNotFoundError:
     sys.exit("Pillow is missing. Set up the tools environment:\n"
              "  python3 -m venv tools/.venv && tools/.venv/bin/pip install -r tools/requirements.txt")
 
-NAMES = [f"slide{i}" for i in range(1, 6)] + ["left"] + [f"table{i}" for i in range(1, 5)] + ["hiscores"]
+NAMES = ([f"slide{i}" for i in range(1, 6)] + ["left"] + [f"table{i}" for i in range(1, 5)] + ["hiscores"]
+         + [f"playfield{i}_{lamps}" for lamps in ("on", "off") for i in range(1, 5)])
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "assets" / "hd"
 
 # The original pictures' sizes, as stored in INTRO.PRG.
 ORIGINAL_SIZE = {**{f"slide{i}": (320, 240) for i in range(1, 5)}, "slide5": (640, 480),
                  "left": (130, 240), **{f"table{i}": (440, 95) for i in range(1, 5)},
-                 "hiscores": (400, 40)}
+                 "hiscores": (400, 40),
+                 **{f"playfield{i}_{lamps}": (320, 576) for lamps in ("on", "off") for i in range(1, 5)}}
 
 
 def is_padding(pixel):

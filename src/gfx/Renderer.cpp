@@ -89,7 +89,7 @@ void Renderer::setHdPicture(HdPicture p, int width, int height, const u8* rgba) 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  hdLoaded_ = static_cast<u16>(hdLoaded_ | (1u << i));
+  hdLoaded_ |= 1u << i;
 }
 
 void Renderer::drawHd(const HdFrame& hd) {

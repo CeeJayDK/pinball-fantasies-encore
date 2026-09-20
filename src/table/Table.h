@@ -12,6 +12,7 @@
 
 #include "assets/TableAssets.h"
 #include "game/Config.h"
+#include "gfx/HdLayer.h"
 #include "sound/Player.h"
 #include "table/Keys.h"
 #include "table/TableStates.h"
@@ -66,7 +67,8 @@ class Table {
   TableAction runFrame();
   void handleKey(Key key, bool pressed);
   /// Draws the visible screen: `height` rows of 320 palette indices, plus the palette.
-  void render(u8* pixels, Rgb* palette) const;
+  /// `hd`, if given, receives where the playfield was drawn, for a replacement picture.
+  void render(u8* pixels, Rgb* palette, HdFrame* hd = nullptr) const;
 
   int screenHeight() const;
   const Options& options() const { return options_; }
@@ -444,6 +446,10 @@ class Table {
 
   KbdState kbdState_ = KbdState::Main;
   u16 pauseCycle_ = 0;
+  /// Debugging, while paused: every lamp forced on or off, and scrolling by hand.
+  enum class LampOverride : u8 { None, AllOn, AllOff };
+  LampOverride lampOverride_ = LampOverride::None;
+  int scrollKey_ = 0;  ///< -1 up, 1 down, while the arrow is held
   bool optionChanged_ = false;
   std::array<bool, 2> flipperState_{};
   bool flipperPressed_ = false, flippersEnabled_ = false, spaceState_ = false, spacePressed_ = false;

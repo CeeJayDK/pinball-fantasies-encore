@@ -71,7 +71,7 @@ class Renderer {
   ShaderProgram hdPass_;
   bool hdPassLoaded_ = false;
   bool hdEnabled_ = true;
-  u16 hdLoaded_ = 0;  ///< bit per picture with a replacement
+  u32 hdLoaded_ = 0;  ///< bit per picture with a replacement
   std::array<GLuint, HdFrame::kCount> hdTex_{};
   GLuint hdMapTex_ = 0;
   int hdMapW_ = 0, hdMapH_ = 0;

@@ -167,6 +167,12 @@ void Table::pauseConfirmQuit() {
 TableAction Table::runFrame() {
   using K = TableAction::Kind;
   if (kbdState_ == KbdState::Paused) {
+    if (scrollKey_) {
+      const int top = 576 - scroll_.windowHeight;
+      const int p = std::clamp(static_cast<int>(scroll_.pos) + scrollKey_ * 4, 0, std::max(top, 0));
+      scroll_.pos = static_cast<u16>(p);
+      scroll_.rawPosF4 = static_cast<i16>(p << 4);
+    }
     ++pauseCycle_;
     if (pauseCycle_ == 120) {
       dm_.clear();
@@ -314,9 +320,18 @@ void Table::handleKey(Key key, bool pressed) {
     if (pressed && !spaceState_) spacePressed_ = true;
     spaceState_ = pressed;
   }
-  if (key == Key::ArrowDown) {
+  const bool paused = kbdState_ == KbdState::Paused || kbdState_ == KbdState::PausedConfirmQuit;
+  if (key == Key::ArrowDown && !paused) {
     springDownState_ = pressed;
     if (!pressed) springReleased_ = true;
+  }
+  // Debugging: while paused, the arrows scroll the table by hand.
+  if (key == Key::ArrowUp || key == Key::ArrowDown) {
+    const int dir = key == Key::ArrowUp ? -1 : 1;
+    if (pressed && paused)
+      scrollKey_ = dir;
+    else if (scrollKey_ == dir)
+      scrollKey_ = 0;
   }
   if (!pressed) return;
   const u8 chr = keyChar(key);
@@ -368,6 +383,12 @@ void Table::handleKey(Key key, bool pressed) {
         case Key::S: pauseOptionScrolling(); break;
         case Key::A: pauseOptionAngle(); break;
         case Key::P: unpause(); break;
+        // Debugging: every lamp on, then every lamp off, then as the game has them.
+        case Key::F7:
+          lampOverride_ = lampOverride_ == LampOverride::None    ? LampOverride::AllOn
+                          : lampOverride_ == LampOverride::AllOn ? LampOverride::AllOff
+                                                                 : LampOverride::None;
+          break;
         case Key::Escape: pauseConfirmQuit(); break;
         default: break;
       }
@@ -387,18 +408,48 @@ void Table::handleKey(Key key, bool pressed) {
   }
 }
 
-void Table::render(u8* data, Rgb* pal) const {
+void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
   for (std::size_t i = 0; i < 256; ++i) pal[i] = assets_.palette[i];
+  auto lampLit = [&](std::size_t l) {
+    return lampOverride_ == LampOverride::None ? lights_[l].lit : lampOverride_ == LampOverride::AllOn;
+  };
   for (std::size_t l = 0; l < assets_.lights.size(); ++l) {
     const Light& light = assets_.lights[l];
     for (std::size_t i = 0; i < light.colors.size(); ++i) {
       const Rgb c = light.colors[i];
-      pal[light.baseIndex + i] = lights_[l].lit ? c : Rgb{static_cast<u8>(c.r / 2), static_cast<u8>(c.g / 2), static_cast<u8>(c.b / 2)};
+      pal[light.baseIndex + i] = lampLit(l) ? c : Rgb{static_cast<u8>(c.r / 2), static_cast<u8>(c.g / 2), static_cast<u8>(c.b / 2)};
     }
   }
   pal[assets_.dmPalette.indexOn] = dm_.state ? assets_.dmPalette.colorOn : assets_.dmPalette.colorOff;
   const int height = screenHeight() == 576 + 33 ? 576 : screenHeight() - 33;
   const int springPos = springPos_ / 2;
+
+  // Replacement pictures: every playfield pixel takes the lit picture where it belongs to a
+  // lamp that is on, the unlit one elsewhere; whatever is drawn over it keeps the original.
+  // Only in colour: the mono mode greys the palette, which the pictures do not follow.
+  if (hd) hd->reset(320, screenHeight());
+  if (options_.mono) hd = nullptr;
+  std::array<u16, 256> hdPicture{};
+  if (hd) {
+    const auto on = static_cast<u16>(static_cast<int>(HdPicture::Playfield1On) + assets_.table);
+    const auto off = static_cast<u16>(static_cast<int>(HdPicture::Playfield1Off) + assets_.table);
+    hdPicture.fill(off);
+    for (std::size_t l = 0; l < assets_.lights.size(); ++l)
+      if (lampLit(l))
+        for (std::size_t i = 0; i < assets_.lights[l].colors.size(); ++i) hdPicture[assets_.lights[l].baseIndex + i] = on;
+    for (const u16 p : {on, off}) {
+      hd->size[p] = {320, 576};
+      hd->used |= 1u << p;
+    }
+    hd->fade.fill(static_cast<float>(fade_) / 256.0f);
+  }
+  // The flipper and plunger pictures carry the playfield around them; only where they differ
+  // from it does the original show through.
+  auto hdClearChanged = [&](int y, int sy, const u8* row, int x0, int x1) {
+    if (!hd) return;
+    for (int x = std::max(x0, 0); x < std::min(x1, 320); ++x)
+      if (sy >= 576 || row[x] != assets_.mainBoard(x, sy)) hd->map[static_cast<std::size_t>(y) * 320 + x].picture = 0;
+  };
   const auto [bx, by0] = ball_.pos();
   const int by = ball_.frozen ? by0 : by0 + push_.offset();
   for (int y = 0; y < height; ++y) {
@@ -407,17 +458,26 @@ void Table::render(u8* data, Rgb* pal) const {
     if (sy >= 576)
       std::fill(row, row + 320, 0);
     else
-      for (int x = 0; x < 320; ++x) row[x] = assets_.mainBoard(x, sy);
+      for (int x = 0; x < 320; ++x) {
+        row[x] = assets_.mainBoard(x, sy);
+        if (hd)
+          hd->map[static_cast<std::size_t>(y) * 320 + x] = {static_cast<u16>(x * 8), static_cast<u16>(sy * 8),
+                                                             hdPicture[row[x]], 0};
+      }
     if (sy >= 556 && sy < 556 + 17) {
       const int springY = sy - 553;
-      if (springY >= springPos)
+      if (springY >= springPos) {
         for (int sx = 0; sx < 10; ++sx) row[sx + 304] = assets_.spring(sx, springY - springPos);
+        hdClearChanged(y, sy, row, 304, 314);
+      }
     }
     for (std::size_t f = 0; f < assets_.flippers.size(); ++f) {
       const Flipper& fl = assets_.flippers[f];
       const Grid8& gfx = fl.gfx[flippers_[f].quantum];
-      if (sy >= fl.rectY && sy - fl.rectY < gfx.height())
+      if (sy >= fl.rectY && sy - fl.rectY < gfx.height()) {
         for (int fx = 0; fx < gfx.width(); ++fx) row[fx + fl.rectX] = gfx(fx, sy - fl.rectY);
+        hdClearChanged(y, sy, row, fl.rectX, fl.rectX + gfx.width());
+      }
     }
     if (!inAttract_ && sy >= by && sy < by + 15) {
       const int ballY = sy - by;
@@ -428,6 +488,7 @@ void Table::render(u8* data, Rgb* pal) const {
         if (x < 0 || x >= 320) continue;
         if (sy < 576 && assets_.occmaps[static_cast<std::size_t>(ball_.layer)](x, sy) != 0) continue;
         row[x] = pix;
+        if (hd) hd->map[static_cast<std::size_t>(y) * 320 + x].picture = 0;
       }
     }
   }

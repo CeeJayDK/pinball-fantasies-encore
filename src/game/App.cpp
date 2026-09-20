@@ -251,14 +251,14 @@ void App::update(double dt) {
 void App::render(double now) {
   std::array<Rgb, 256> colors{};
   if (table_)
-    table_->render(frame_.data(), colors.data());
+    table_->render(frame_.data(), colors.data(), renderer_.hasHdPictures() ? &hd_ : nullptr);
   else if (intro_)
     intro_->render(frame_.data(), colors.data(), renderer_.hasHdPictures() ? &hd_ : nullptr);
   palette_.set(0, std::vector<Rgb>(colors.begin(), colors.end()));
   int w = 0, h = 0;
   window_.drawableSize(w, h);
   renderer_.setPalette(palette_);
-  renderer_.draw(frame_, w, h, now, intro_ && !table_ ? &hd_ : nullptr);
+  renderer_.draw(frame_, w, h, now, &hd_);
   if (options_.screenshot && ++frameCounter_ >= options_.screenshotFrame) {
     std::vector<u8> rgb(static_cast<std::size_t>(w) * h * 3);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);

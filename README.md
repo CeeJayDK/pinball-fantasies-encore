@@ -64,7 +64,7 @@ The original layout.
 | Left and right Shift, Ctrl or Alt | flippers |
 | Down arrow | pull the plunger, release to shoot |
 | Space | nudge the table (too often tilts it) |
-| P | pause; while paused, A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
+| P | pause; while paused, F7 cycles every lamp on, off and back to normal, and the arrows scroll the table (for checking artwork); A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
 | M | music on or off |
 | F9 | CRT look on or off |
 | F10 | high-resolution pictures in the intro and menu, or the originals |

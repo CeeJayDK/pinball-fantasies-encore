@@ -269,7 +269,7 @@ void Intro::hdUse(HdPicture p, const IntroImage& img) const {
   if (!hd_) return;
   const auto i = static_cast<std::size_t>(p);
   hd_->size[i] = {static_cast<u16>(img.data.width()), static_cast<u16>(img.data.height())};
-  hd_->used = static_cast<u16>(hd_->used | (1u << i));
+  hd_->used |= 1u << i;
 }
 
 void Intro::hdMark(int pos, HdPicture p, int x8, int y8, u16 flags) const {
