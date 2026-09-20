@@ -7,8 +7,9 @@ The game draws a lamp that is off at half brightness, so the unlit picture is th
 with every lamp dimmed by half. Which pixels belong to a lamp comes from the original
 playfield: the ones that differ between `playfield_lights_on.png` and
 `playfield_lights_off.png`, as written by `pfr-extract`. Holes inside a lamp (a monster's
-eyes, the middle of a letter) count as part of it, and single stray pixels of a lamp colour
-are left out.
+eyes, the middle of a letter) count as part of it, a lamp dithered against what is behind it
+(the criss-cross rail on Stones n Bones) is closed up, and single stray pixels of a lamp
+colour are left out. The game does the same when it draws the picture.
 
 A redrawn playfield puts the same shapes in slightly different places, so the mask is fitted
 to the picture's own edges before it is used; otherwise the dimmed area cuts across the new
@@ -47,6 +48,7 @@ def lamp_mask(table_dir):
     w, h = on.size
     a, b = on.load(), off.load()
     mask = [[a[x, y] != b[x, y] for x in range(w)] for y in range(h)]
+    close_dither(mask)
     fill_holes(mask)
     drop_specks(mask)
     return mask
@@ -61,6 +63,21 @@ def neighbours(x, y, w, h):
         yield x, y - 1
     if y + 1 < h:
         yield x, y + 1
+
+
+def close_dither(mask):
+    """Takes in a gap with three or four lamp pixels around it, closing a dithered lamp.
+
+    An edge pixel has one or two such neighbours, so the lamp does not spill past its edge.
+    """
+    h, w = len(mask), len(mask[0])
+    filled = [row[:] for row in mask]
+    for y in range(1, h - 1):
+        for x in range(1, w - 1):
+            if not mask[y][x] and mask[y][x - 1] + mask[y][x + 1] + mask[y - 1][x] + mask[y + 1][x] >= 3:
+                filled[y][x] = True
+    for y in range(h):
+        mask[y] = filled[y]
 
 
 def fill_holes(mask):

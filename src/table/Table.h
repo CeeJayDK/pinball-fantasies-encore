@@ -450,6 +450,8 @@ class Table {
   enum class LampOverride : u8 { None, AllOn, AllOff };
   LampOverride lampOverride_ = LampOverride::None;
   int scrollKey_ = 0;  ///< -1 up, 1 down, while the arrow is held
+  void buildLampAreas() const;
+  mutable std::vector<u8> lampAreas_;  ///< per playfield pixel: the lamp it belongs to, plus 1
   bool optionChanged_ = false;
   std::array<bool, 2> flipperState_{};
   bool flipperPressed_ = false, flippersEnabled_ = false, spaceState_ = false, spacePressed_ = false;

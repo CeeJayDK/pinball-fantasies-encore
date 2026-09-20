@@ -162,6 +162,43 @@ void Table::pauseConfirmQuit() {
   kbdState_ = KbdState::PausedConfirmQuit;
 }
 
+/// Which lamp each playfield pixel belongs to, for the replacement pictures.
+///
+/// A lamp is a few palette colours, so its pixels are the ones drawn in them. Where the
+/// artwork dithers a lamp against what is behind it (the criss-cross rail on Stones n Bones
+/// lays a checkerboard over the green lamps), the lamp only owns every other pixel, which a
+/// high-resolution picture would show as a coarse checkerboard of lit and unlit. So a gap
+/// with three or four neighbours of one lamp is taken into it: that closes a dither without
+/// spilling past an edge, where a pixel has one or two such neighbours.
+void Table::buildLampAreas() const {
+  const int w = assets_.mainBoard.width(), h = assets_.mainBoard.height();
+  lampAreas_.assign(static_cast<std::size_t>(w) * h, 0);
+  std::array<u8, 256> ofColor{};
+  for (std::size_t l = 0; l < assets_.lights.size() && l < 255; ++l)
+    for (std::size_t i = 0; i < assets_.lights[l].colors.size(); ++i)
+      ofColor[assets_.lights[l].baseIndex + i] = static_cast<u8>(l + 1);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) lampAreas_[static_cast<std::size_t>(y) * w + x] = ofColor[assets_.mainBoard(x, y)];
+
+  std::vector<u8> filled = lampAreas_;
+  for (int y = 1; y < h - 1; ++y)
+    for (int x = 1; x < w - 1; ++x) {
+      const std::size_t p = static_cast<std::size_t>(y) * w + x;
+      if (lampAreas_[p]) continue;
+      const u8 around[4] = {lampAreas_[p - 1], lampAreas_[p + 1], lampAreas_[p - w], lampAreas_[p + w]};
+      for (const u8 lamp : around) {
+        if (!lamp) continue;
+        int same = 0;
+        for (const u8 other : around) same += other == lamp;
+        if (same >= 3) {
+          filled[p] = lamp;
+          break;
+        }
+      }
+    }
+  lampAreas_ = std::move(filled);
+}
+
 // ---- the frame ---------------------------------------------------------------------------
 
 TableAction Table::runFrame() {
@@ -429,15 +466,11 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
   // Only in colour: the mono mode greys the palette, which the pictures do not follow.
   if (hd) hd->reset(320, screenHeight());
   if (options_.mono) hd = nullptr;
-  std::array<u16, 256> hdPicture{};
+  const auto hdOn = static_cast<u16>(static_cast<int>(HdPicture::Playfield1On) + assets_.table);
+  const auto hdOff = static_cast<u16>(static_cast<int>(HdPicture::Playfield1Off) + assets_.table);
   if (hd) {
-    const auto on = static_cast<u16>(static_cast<int>(HdPicture::Playfield1On) + assets_.table);
-    const auto off = static_cast<u16>(static_cast<int>(HdPicture::Playfield1Off) + assets_.table);
-    hdPicture.fill(off);
-    for (std::size_t l = 0; l < assets_.lights.size(); ++l)
-      if (lampLit(l))
-        for (std::size_t i = 0; i < assets_.lights[l].colors.size(); ++i) hdPicture[assets_.lights[l].baseIndex + i] = on;
-    for (const u16 p : {on, off}) {
+    if (lampAreas_.empty()) buildLampAreas();
+    for (const u16 p : {hdOn, hdOff}) {
       hd->size[p] = {320, 576};
       hd->used |= 1u << p;
     }
@@ -460,9 +493,11 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
     else
       for (int x = 0; x < 320; ++x) {
         row[x] = assets_.mainBoard(x, sy);
-        if (hd)
+        if (hd) {
+          const u8 lamp = lampAreas_[static_cast<std::size_t>(sy) * 320 + x];
           hd->map[static_cast<std::size_t>(y) * 320 + x] = {static_cast<u16>(x * 8), static_cast<u16>(sy * 8),
-                                                             hdPicture[row[x]], 0};
+                                                             lamp && lampLit(lamp - 1) ? hdOn : hdOff, 0};
+        }
       }
     if (sy >= 556 && sy < 556 + 17) {
       const int springY = sy - 553;
