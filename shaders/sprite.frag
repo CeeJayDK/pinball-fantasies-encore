@@ -14,6 +14,7 @@ uniform float uAngle;        // radians away from the resting position
 uniform float uTint;         // the table's fade
 uniform vec2 uClip;          // the screen rows it may be drawn in
 uniform uint uHiddenBy;      // pixels whose flags match these are left alone (the ball only)
+uniform float uOpacity;      // 1 for the ball itself, less for the ghosts behind it
 
 void main() {
   vec2 f = vec2(vUv.x, 1.0 - vUv.y) * uFrameSize;  // screen rows are top-down
@@ -39,7 +40,7 @@ void main() {
   vec2 sp = vec2(c * d.x + s * d.y, -s * d.x + c * d.y) * uScale + uPivotSprite;
   if (any(lessThan(sp, vec2(0.0))) || any(greaterThanEqual(sp, vec2(1.0)))) discard;
   vec4 t = texture(uSprite, sp);
-  float alpha = t.a * (1.0 - cover);
+  float alpha = t.a * (1.0 - cover) * uOpacity;
   if (alpha < 0.02) discard;
   fragColor = vec4(t.rgb * uTint, alpha);
 }

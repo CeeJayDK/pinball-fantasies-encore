@@ -763,11 +763,27 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
                              static_cast<float>(fl.originY - fl.rectY) / rectH, 1.0f / rectW, 1.0f / rectH,
                              flipperAngle(f), 0.0f, static_cast<float>(height), 0});
     }
-  // The ball goes last, so it passes in front of the flippers.
-  if (hd && !inAttract_)
-    hd->sprites.push_back({HdSprite::kBall, static_cast<float>(bx) + 7.5f,
-                           static_cast<float>(by - scroll_.pos - push_.offset()) + 7.5f, 0.5f, 0.5f, 1.0f / 15.0f,
-                           1.0f / 15.0f, 0.0f, 0.0f, static_cast<float>(height), HdPixel::kHidesBall});
+  // The ball goes last, so it passes in front of the flippers, and a faint trail of where it
+  // has just been goes immediately before it. The trail follows the physics steps rather than
+  // the frames, which is what makes it flow rather than step.
+  if (hd && !inAttract_) {
+    const float top = static_cast<float>(scroll_.pos + push_.offset());
+    auto ball = [&](float x, float y, float opacity) {
+      hd->sprites.push_back({HdSprite::kBall, x + 7.5f, y - top + 7.5f, 0.5f, 0.5f, 1.0f / 15.0f, 1.0f / 15.0f, 0.0f,
+                             0.0f, static_cast<float>(height), HdPixel::kHidesBall, opacity});
+    };
+    for (std::size_t i = 0; i < trailLength_; ++i) {
+      const auto& p = ballTrail_[(trailNext_ + kTrail - trailLength_ + i) % kTrail];
+      // Strongest just behind the ball, fading away towards the oldest step.
+      const float recent = static_cast<float>(i + 1) / static_cast<float>(trailLength_);
+      const float away = std::hypot(p[0] - static_cast<float>(bx), p[1] - static_cast<float>(by));
+      // Nothing where the ball has hardly moved, so that a ball at rest keeps to itself, and
+      // the faster it goes the more of a trail it leaves.
+      if (away < 0.4f) continue;
+      ball(p[0], p[1], 0.22f * recent * recent * std::min(away / 2.5f, 1.0f));
+    }
+    ball(static_cast<float>(bx), static_cast<float>(by), 1.0f);
+  }
   const int fullHeight = height + 33;
   for (int y = height; y < fullHeight; ++y) std::fill(data + static_cast<std::size_t>(y) * 320, data + static_cast<std::size_t>(y + 1) * 320, 0);
   for (int y = 0; y < 16; ++y) {

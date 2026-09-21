@@ -56,6 +56,7 @@ struct HdSprite {
   float angle = 0;                           ///< radians away from the resting position
   float clipTop = 0, clipBottom = 0;         ///< the screen rows it may be drawn in
   u16 hiddenBy = 0;                          ///< HdPixel flags that keep it from being drawn
+  float opacity = 1;                         ///< 1 = solid; less for the ball's trail
 };
 
 struct HdFrame {

@@ -40,6 +40,14 @@ void Table::ballTeleport(Layer layer, std::array<i16, 2> pos, std::array<i16, 2>
 }
 
 void Table::physicsFrame() {
+  if (!ball_.frozen && !inAttract_) {
+    ballTrail_[trailNext_] = {static_cast<float>(ball_.posHires[0]) / 1024.0f,
+                              static_cast<float>(ball_.posHires[1]) / 1024.0f};
+    trailNext_ = (trailNext_ + 1) % kTrail;
+    if (trailLength_ < kTrail) ++trailLength_;
+  } else {
+    trailLength_ = 0;
+  }
   if (ball_.frozen) {
     push_.frame(spaceState_);
     flippersMove();

@@ -120,6 +120,7 @@ void Renderer::drawSprites(const HdFrame& hd) {
     glUniform1f(spritePass_.uniform("uAngle"), s.angle);
     glUniform2f(spritePass_.uniform("uClip"), s.clipTop, s.clipBottom);
     glUniform1ui(spritePass_.uniform("uHiddenBy"), s.hiddenBy);
+    glUniform1f(spritePass_.uniform("uOpacity"), s.opacity);
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glDisable(GL_BLEND);

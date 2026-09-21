@@ -108,6 +108,12 @@ class Table {
     std::array<i16, 2> pos() const { return {static_cast<i16>(posHires[0] >> 10), static_cast<i16>(posHires[1] >> 10)}; }
     void setPos(std::array<i16, 2> p) { posHires = {i32{p[0]} << 10, i32{p[1]} << 10}; }
   };
+  /// Where the ball was at each physics step just gone, for the trail behind it. The physics
+  /// moves the ball four times a frame, so these are finer than the frames the screen shows.
+  static constexpr std::size_t kTrail = 14;
+  std::array<std::array<float, 2>, kTrail> ballTrail_{};
+  std::size_t trailNext_ = 0, trailLength_ = 0;
+
   struct Push {
     i16 offsetF9 = 0, speed = 0, speedAttack = 0, speedRelease = 0;
     void frame(bool state);
