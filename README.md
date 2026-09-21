@@ -86,6 +86,7 @@ The original layout.
 | `--square-pixels` | show the picture unstretched instead of filling a 4:3 screen |
 | `--fullscreen`, `--scale <n>` | window options |
 | `--screenshot <file>`, `--screenshot-frame <n>` | render one frame to a PNG and quit |
+| `--stats` | log, once a second, how long each frame takes |
 
 ## Tools
 

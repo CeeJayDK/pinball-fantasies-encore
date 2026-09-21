@@ -311,6 +311,7 @@ void App::render(double now) {
   int w = 0, h = 0;
   window_.drawableSize(w, h);
   renderer_.setPalette(palette_);
+  const auto beforeDraw = std::chrono::steady_clock::now();
   renderer_.draw(frame_, w, h, now, &hd_);
   if (options_.screenshot && ++frameCounter_ >= options_.screenshotFrame) {
     std::vector<u8> rgb(static_cast<std::size_t>(w) * h * 3);
@@ -320,7 +321,13 @@ void App::render(double now) {
     log::info("screenshot written to " + options_.screenshot->string());
     running_ = false;
   }
+  const auto beforeSwap = std::chrono::steady_clock::now();
   window_.swap();
+  if (options_.stats) {
+    using ms = std::chrono::duration<double, std::milli>;
+    stats_.draw += ms(beforeSwap - beforeDraw).count();
+    stats_.wait += ms(std::chrono::steady_clock::now() - beforeSwap).count();
+  }
 }
 
 int App::run() {
@@ -339,7 +346,23 @@ int App::run() {
       const auto nowT = clock::now();
       const double dt = std::min(0.1, std::chrono::duration<double>(nowT - last).count());
       last = nowT;
+      const auto beforeUpdate = clock::now();
       update(dt);
+      if (options_.stats) {
+        using ms = std::chrono::duration<double, std::milli>;
+        stats_.update += ms(clock::now() - beforeUpdate).count();
+        stats_.worst = std::max(stats_.worst, dt * 1000);
+        stats_.seconds += dt;
+        if (++stats_.frames >= 60 && stats_.seconds > 0) {
+          const double n = stats_.frames;
+          log::info("stats: " + std::to_string(n / stats_.seconds).substr(0, 5) + " frames a second, update " +
+                    std::to_string(stats_.update / n).substr(0, 4) + " ms, draw " +
+                    std::to_string(stats_.draw / n).substr(0, 4) + " ms, waiting for the screen " +
+                    std::to_string(stats_.wait / n).substr(0, 4) + " ms, longest frame " +
+                    std::to_string(stats_.worst).substr(0, 5) + " ms");
+          stats_ = {};
+        }
+      }
       reloadTimer += dt;
       if (reloadTimer > 1.0) {
         reloadTimer = 0;

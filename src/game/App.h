@@ -31,6 +31,7 @@ struct AppOptions {
   std::optional<bool> hd;                ///< overrides the saved choice of replacement pictures
   std::optional<std::filesystem::path> hdDir;  ///< where replacement pictures are read from
   int windowScale = 3;
+  bool stats = false;                    ///< log how long each frame takes
   std::optional<std::filesystem::path> screenshot;  ///< render one frame, save it, quit
   int screenshotFrame = 30;
 };
@@ -67,6 +68,10 @@ class App {
   bool ownFlipperPictures_ = false;  ///< every flipper has a picture of its own
   std::unique_ptr<Intro> intro_;
   std::unique_ptr<Table> table_;
+  struct Stats {
+    double update = 0, draw = 0, wait = 0, worst = 0, seconds = 0;
+    int frames = 0;
+  } stats_;
   double clock_ = 0;
   int frameCounter_ = 0;
   bool running_ = true;

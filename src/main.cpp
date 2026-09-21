@@ -23,6 +23,7 @@ void usage() {
             "  --scale <n>      window scale factor (default 3)\n"
             "  --screenshot <f> render a frame to a PNG file and quit\n"
             "  --screenshot-frame <n>  which frame to capture (default 30)\n"
+            "  --stats          log how long each frame takes\n"
             "  --verbose        debug logging\n");
 }
 
@@ -51,6 +52,7 @@ int main(int argc, char** argv) {
     else if (a == "--scale") options.windowScale = std::max(1, std::atoi(next()));
     else if (a == "--screenshot") options.screenshot = next();
     else if (a == "--screenshot-frame") options.screenshotFrame = std::max(1, std::atoi(next()));
+    else if (a == "--stats") options.stats = true;
     else if (a == "--verbose") pfr::log::setMinimumLevel(pfr::log::Level::Debug);
     else if (a == "--help" || a == "-h") { usage(); return 0; }
     else if (a.rfind("-psn", 0) == 0) { /* macOS launch services */ }
