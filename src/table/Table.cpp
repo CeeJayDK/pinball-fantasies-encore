@@ -222,6 +222,62 @@ void Table::buildLampAreas() const {
       }
     }
   lampAreas_ = std::move(filled);
+
+  // What a lamp encloses belongs to it, whatever colour it is drawn in: the words and numbers
+  // inside an insert are not in the lamp's colours, but they light and go out with it. Only
+  // what a lamp really encloses, and only small enough to be part of one.
+  constexpr std::size_t kLargestInside = 600;
+  std::vector<u8> outside(lampAreas_.size(), 0);
+  std::vector<int> queue;
+  auto flood = [&](int x, int y) {
+    const std::size_t p = static_cast<std::size_t>(y) * w + x;
+    if (lampAreas_[p] || outside[p]) return;
+    outside[p] = 1;
+    queue.push_back(static_cast<int>(p));
+  };
+  for (int x = 0; x < w; ++x) flood(x, 0), flood(x, h - 1);
+  for (int y = 0; y < h; ++y) flood(0, y), flood(w - 1, y);
+  while (!queue.empty()) {
+    const int p = queue.back();
+    queue.pop_back();
+    const int x = p % w, y = p / w;
+    if (x > 0) flood(x - 1, y);
+    if (x + 1 < w) flood(x + 1, y);
+    if (y > 0) flood(x, y - 1);
+    if (y + 1 < h) flood(x, y + 1);
+  }
+  std::vector<u8> seen(lampAreas_.size(), 0);
+  std::vector<int> inside;
+  for (int sy = 0; sy < h; ++sy)
+    for (int sx = 0; sx < w; ++sx) {
+      const std::size_t start = static_cast<std::size_t>(sy) * w + sx;
+      if (lampAreas_[start] || outside[start] || seen[start]) continue;
+      inside.clear();
+      queue.assign(1, static_cast<int>(start));
+      seen[start] = 1;
+      std::array<std::size_t, 256> around{};
+      while (!queue.empty()) {
+        const int p = queue.back();
+        queue.pop_back();
+        inside.push_back(p);
+        const int x = p % w, y = p / w;
+        const std::array<int, 4> next = {x > 0 ? p - 1 : -1, x + 1 < w ? p + 1 : -1, y > 0 ? p - w : -1,
+                                         y + 1 < h ? p + w : -1};
+        for (const int n : next) {
+          if (n < 0) continue;
+          const u8 lamp = lampAreas_[static_cast<std::size_t>(n)];
+          if (lamp) {
+            ++around[lamp];
+          } else if (!seen[static_cast<std::size_t>(n)]) {
+            seen[static_cast<std::size_t>(n)] = 1;
+            queue.push_back(n);
+          }
+        }
+      }
+      if (inside.size() > kLargestInside) continue;
+      const auto lamp = static_cast<u8>(std::max_element(around.begin() + 1, around.end()) - around.begin());
+      for (const int p : inside) lampAreas_[static_cast<std::size_t>(p)] = lamp;
+    }
 }
 
 /// Takes each flipper out of its artwork, so it can be drawn turned to any angle.
@@ -690,9 +746,13 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       for (int x = 0; x < 320; ++x) {
         row[x] = assets_.mainBoard(x, sy);
         if (hd) {
+          // The unlit picture, with how lit this pixel is alongside: the renderer blends the
+          // lit picture in by it, which keeps a lamp's edge from stepping.
           const u8 lamp = lampAreas_[static_cast<std::size_t>(sy) * 320 + x];
-          hd->map[static_cast<std::size_t>(y) * 320 + x] = {static_cast<u16>(x * 8), static_cast<u16>(sy * 8),
-                                                             lamp && lampLit(lamp - 1) ? hdOn : hdOff, 0};
+          const u16 lit = lamp && lampLit(lamp - 1) ? HdFrame::kLitMax : 0;
+          hd->map[static_cast<std::size_t>(y) * 320 + x] = {
+              static_cast<u16>(x * 8), static_cast<u16>(sy * 8),
+              static_cast<u16>(hdOff | (lit << HdFrame::kLitShift)), 0};
         }
       }
     if (sy >= 556 && sy < 556 + 17) {
@@ -715,7 +775,7 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
             row[fx + fl.rectX] = art.background(fx, fy);
             // Without a flipper picture of its own the replacement playfield still has the
             // flipper painted into it, so the artwork behind it has to show instead.
-            if (!hd->ownSprites && art.covered[static_cast<std::size_t>(fy) * gfx.width() + fx])
+            if (!(hd->ownSprites & (1u << f)) && art.covered[static_cast<std::size_t>(fy) * gfx.width() + fx])
               hd->map[static_cast<std::size_t>(y) * 320 + fx + fl.rectX].picture = 0;
           }
         } else {

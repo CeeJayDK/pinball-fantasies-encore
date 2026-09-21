@@ -61,6 +61,11 @@ struct HdSprite {
 
 struct HdFrame {
   static constexpr u16 kHalfX = 0x100, kHalfY = 0x200;
+  /// How lit a playfield pixel is, in the picture's top bits: the renderer blends between the
+  /// lit and unlit pictures by it, read smoothly between screen pixels, so a lamp's edge does
+  /// not step along the original's pixels.
+  static constexpr int kLitShift = 10;
+  static constexpr u16 kLitMax = 0x3f;
   static constexpr std::size_t kCount = static_cast<std::size_t>(HdPicture::Count);
 
   int width = 0, height = 0;
@@ -71,7 +76,7 @@ struct HdFrame {
   Rgb fadeColor{};
   std::vector<HdSprite> sprites;                  ///< drawn over the pictures, in order
   float spriteTint = 1.0f;                        ///< the screen's fade, applied to the sprites
-  bool ownSprites = false;                        ///< the sprites are pictures of their own, not cut from the artwork
+  u8 ownSprites = 0;                              ///< bit per flipper with a picture of its own, not cut from the artwork
 
   void reset(int w, int h) {
     width = w;

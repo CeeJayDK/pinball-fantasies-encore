@@ -154,8 +154,9 @@ void App::loadFlipperPictures(int table) {
   renderer_.clearSpritePictures();
   const auto cutOut = table_->flipperPictures();
   const auto sides = table_->flipperSides();
-  ownFlipperPictures_ = !cutOut.empty();
+  ownFlipperPictures_ = 0;
   std::array<int, 2> seen{};
+  int own = 0;
   for (std::size_t f = 0; f < cutOut.size(); ++f) {
     const bool left = sides[f] == FlipperSide::Left;
     const int nth = ++seen[left ? 0 : 1];
@@ -167,14 +168,15 @@ void App::loadFlipperPictures(int table) {
       picture = loadImageFile(path);
       if (!picture) log::error("cannot read " + path.string());
     }
-    if (picture)
+    if (picture) {
       renderer_.setSpritePicture(f, picture->width, picture->height, picture->pixels.data());
-    else {
+      ownFlipperPictures_ = static_cast<u8>(ownFlipperPictures_ | (1u << f));
+      ++own;
+    } else {
       renderer_.setSpritePicture(f, cutOut[f].width, cutOut[f].height, cutOut[f].rgba.data());
-      ownFlipperPictures_ = false;
     }
   }
-  if (ownFlipperPictures_) log::info("flipper pictures: " + std::to_string(cutOut.size()));
+  if (own) log::info("flipper pictures: " + std::to_string(own) + " of " + std::to_string(cutOut.size()));
 
   // The ball: its own picture if there is one, and otherwise the original's.
   std::optional<RgbaImage> ball;

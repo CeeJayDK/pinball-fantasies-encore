@@ -168,11 +168,26 @@ void Renderer::drawHd(const HdFrame& hd) {
   hdPass_.use();
   glUniform1i(hdPass_.uniform("uMap"), 2);
   glUniform1i(hdPass_.uniform("uPicture"), 3);
+  glUniform1i(hdPass_.uniform("uPictureLit"), 4);
   glUniform3f(hdPass_.uniform("uFadeColor"), hd.fadeColor.r / 255.0f, hd.fadeColor.g / 255.0f, hd.fadeColor.b / 255.0f);
   glActiveTexture(GL_TEXTURE3);
   for (std::size_t i = 1; i < HdFrame::kCount; ++i) {
     if (!(hd.used & hdLoaded_ & (1u << i))) continue;
+    // A playfield comes as a pair: the unlit picture is drawn and the lit one blended into it
+    // lamp by lamp, so the lit picture is never a pass of its own.
+    const auto picture = static_cast<HdPicture>(i);
+    if (picture >= HdPicture::Playfield1On && picture <= HdPicture::Playfield4On) continue;
+    const bool pair = picture >= HdPicture::Playfield1Off && picture <= HdPicture::Playfield4Off;
+    const std::size_t lit = i - (static_cast<std::size_t>(HdPicture::Playfield1Off) -
+                                 static_cast<std::size_t>(HdPicture::Playfield1On));
+    const bool hasLit = pair && (hdLoaded_ & (1u << lit));
+    if (hasLit) {
+      glActiveTexture(GL_TEXTURE4);
+      glBindTexture(GL_TEXTURE_2D, hdTex_[lit]);
+      glActiveTexture(GL_TEXTURE3);
+    }
     glBindTexture(GL_TEXTURE_2D, hdTex_[i]);
+    glUniform1ui(hdPass_.uniform("uHasLit"), hasLit ? 1u : 0u);
     glUniform1ui(hdPass_.uniform("uId"), static_cast<GLuint>(i));
     glUniform2f(hdPass_.uniform("uSourceSize"), hd.size[i][0], hd.size[i][1]);
     glUniform1f(hdPass_.uniform("uFade"), hd.fade[i]);

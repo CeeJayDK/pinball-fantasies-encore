@@ -65,7 +65,7 @@ class App {
   Framebuffer frame_;
   Palette palette_;
   HdFrame hd_;
-  bool ownFlipperPictures_ = false;  ///< every flipper has a picture of its own
+  u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own
   std::unique_ptr<Intro> intro_;
   std::unique_ptr<Table> table_;
   struct Stats {
