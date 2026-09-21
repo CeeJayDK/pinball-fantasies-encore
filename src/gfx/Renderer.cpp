@@ -114,13 +114,12 @@ void Renderer::drawSprites(const HdFrame& hd) {
   for (const HdSprite& s : hd.sprites) {
     if (s.picture >= kSprites || !spriteTex_[s.picture] || !spriteSize_[s.picture][0]) continue;
     glBindTexture(GL_TEXTURE_2D, spriteTex_[s.picture]);
-    glUniform2f(spritePass_.uniform("uSpriteSize"), static_cast<float>(spriteSize_[s.picture][0]),
-                static_cast<float>(spriteSize_[s.picture][1]));
     glUniform2f(spritePass_.uniform("uPivotFrame"), s.pivotFrameX, s.pivotFrameY);
     glUniform2f(spritePass_.uniform("uPivotSprite"), s.pivotSpriteX, s.pivotSpriteY);
     glUniform2f(spritePass_.uniform("uScale"), s.scaleX, s.scaleY);
     glUniform1f(spritePass_.uniform("uAngle"), s.angle);
     glUniform2f(spritePass_.uniform("uClip"), s.clipTop, s.clipBottom);
+    glUniform1ui(spritePass_.uniform("uHiddenBy"), s.hiddenBy);
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glDisable(GL_BLEND);

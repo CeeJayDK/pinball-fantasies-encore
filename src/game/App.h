@@ -50,6 +50,8 @@ class App {
   void resizeFrame(int width, int height, double pixelAspect);
   void setCrt(bool on);
   void loadHdPictures();
+  void loadFlipperPictures(int table);
+  std::filesystem::path hdPicturePath(const std::string& name) const;
   void setHd(bool on);
 
   AppOptions options_;
@@ -62,6 +64,7 @@ class App {
   Framebuffer frame_;
   Palette palette_;
   HdFrame hd_;
+  bool ownFlipperPictures_ = false;  ///< every flipper has a picture of its own
   std::unique_ptr<Intro> intro_;
   std::unique_ptr<Table> table_;
   double clock_ = 0;

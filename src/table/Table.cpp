@@ -353,13 +353,27 @@ float Table::flipperAngle(std::size_t f) const {
   return angle;
 }
 
-std::vector<Table::FlipperPicture> Table::flipperPictures() const {
+Table::SpritePicture Table::ballPicture() const {
+  SpritePicture picture{assets_.ball.width(), assets_.ball.height(), {}};
+  picture.rgba.resize(static_cast<std::size_t>(picture.width) * picture.height * 4);
+  for (std::size_t p = 0; p < assets_.ball.raw().size(); ++p) {
+    const u8 index = assets_.ball.raw()[p];
+    const Rgb c = assets_.palette[index];
+    picture.rgba[p * 4] = c.r;
+    picture.rgba[p * 4 + 1] = c.g;
+    picture.rgba[p * 4 + 2] = c.b;
+    picture.rgba[p * 4 + 3] = index ? 255 : 0;  // index 0 is what the original leaves out
+  }
+  return picture;
+}
+
+std::vector<Table::SpritePicture> Table::flipperPictures() const {
   if (flipperArt_.empty()) buildFlipperArt();
-  std::vector<FlipperPicture> out;
+  std::vector<SpritePicture> out;
   for (std::size_t f = 0; f < assets_.flippers.size(); ++f) {
     const Flipper& fl = assets_.flippers[f];
     const FlipperArt& art = flipperArt_[f];
-    FlipperPicture picture{fl.gfx[0].width(), fl.gfx[0].height(), {}};
+    SpritePicture picture{fl.gfx[0].width(), fl.gfx[0].height(), {}};
     picture.rgba.resize(static_cast<std::size_t>(picture.width) * picture.height * 4);
     for (std::size_t p = 0; p < art.rest.size(); ++p) {
       const Rgb c = assets_.palette[fl.gfx[0].raw()[p]];
@@ -370,6 +384,12 @@ std::vector<Table::FlipperPicture> Table::flipperPictures() const {
     }
     out.push_back(std::move(picture));
   }
+  return out;
+}
+
+std::vector<FlipperSide> Table::flipperSides() const {
+  std::vector<FlipperSide> out;
+  for (const Flipper& fl : assets_.flippers) out.push_back(fl.side);
   return out;
 }
 
@@ -693,7 +713,9 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
           const FlipperArt& art = flipperArt_[f];
           for (int fx = 0; fx < gfx.width(); ++fx) {
             row[fx + fl.rectX] = art.background(fx, fy);
-            if (art.covered[static_cast<std::size_t>(fy) * gfx.width() + fx])
+            // Without a flipper picture of its own the replacement playfield still has the
+            // flipper painted into it, so the artwork behind it has to show instead.
+            if (!hd->ownSprites && art.covered[static_cast<std::size_t>(fy) * gfx.width() + fx])
               hd->map[static_cast<std::size_t>(y) * 320 + fx + fl.rectX].picture = 0;
           }
         } else {
@@ -705,27 +727,47 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       const int ballY = sy - by;
       for (int ballX = 0; ballX < 15; ++ballX) {
         const u8 pix = assets_.ball(ballX, ballY);
-        if (pix == 0) continue;
         const int x = ballX + bx;
         if (x < 0 || x >= 320) continue;
-        if (sy < 576 && assets_.occmaps[static_cast<std::size_t>(ball_.layer)](x, sy) != 0) continue;
-        row[x] = pix;
+        const Grid8& occmap = assets_.occmaps[static_cast<std::size_t>(ball_.layer)];
+        const bool hidden = sy < 576 && occmap(x, sy) != 0;
+        // With replacement pictures the renderer draws the ball, so the frame only records how
+        // much of the artwork covers it: the share of the pixels around this one, so that a
+        // dithered cover comes out as transparency rather than a chequerboard of holes.
         if (hd) {
+          int covered = 0, counted = 0;
+          for (int oy = sy - 2; oy <= sy + 2; ++oy)
+            for (int ox = x - 2; ox <= x + 2; ++ox) {
+              if (ox < 0 || ox >= 320 || oy < 0 || oy >= 576) continue;
+              covered += occmap(ox, oy) != 0;
+              ++counted;
+            }
+          const int cover = counted ? covered * 255 / counted : 0;
           HdPixel& m = hd->map[static_cast<std::size_t>(y) * 320 + x];
-          m.picture = 0;
-          m.flags = HdPixel::kCovered;  // the ball passes in front of the flippers
+          m.flags = static_cast<u16>((m.flags & 0xff) | (cover << HdPixel::kCoverShift));
+          if (hidden) m.flags |= HdPixel::kHidesBall;
+          continue;
         }
+        if (pix == 0 || hidden) continue;
+        row[x] = pix;
       }
     }
   }
   if (hd)
-    for (std::size_t f = 0; f < assets_.flippers.size(); ++f) {
+    for (std::size_t f = 0; f < assets_.flippers.size() && f < HdSprite::kBall; ++f) {
       const Flipper& fl = assets_.flippers[f];
+      const float rectW = static_cast<float>(fl.gfx[0].width()), rectH = static_cast<float>(fl.gfx[0].height());
       hd->sprites.push_back({static_cast<u16>(f), static_cast<float>(fl.originX),
                              static_cast<float>(fl.originY - scroll_.pos - push_.offset()),
-                             static_cast<float>(fl.originX - fl.rectX), static_cast<float>(fl.originY - fl.rectY),
-                             1.0f, 1.0f, flipperAngle(f), 0.0f, static_cast<float>(height)});
+                             static_cast<float>(fl.originX - fl.rectX) / rectW,
+                             static_cast<float>(fl.originY - fl.rectY) / rectH, 1.0f / rectW, 1.0f / rectH,
+                             flipperAngle(f), 0.0f, static_cast<float>(height), 0});
     }
+  // The ball goes last, so it passes in front of the flippers.
+  if (hd && !inAttract_)
+    hd->sprites.push_back({HdSprite::kBall, static_cast<float>(bx) + 7.5f,
+                           static_cast<float>(by - scroll_.pos - push_.offset()) + 7.5f, 0.5f, 0.5f, 1.0f / 15.0f,
+                           1.0f / 15.0f, 0.0f, 0.0f, static_cast<float>(height), HdPixel::kHidesBall});
   const int fullHeight = height + 33;
   for (int y = height; y < fullHeight; ++y) std::fill(data + static_cast<std::size_t>(y) * 320, data + static_cast<std::size_t>(y + 1) * 320, 0);
   for (int y = 0; y < 16; ++y) {

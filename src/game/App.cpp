@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <optional>
 #include <chrono>
 
 #include "core/Error.h"
@@ -121,19 +122,20 @@ void App::setCrt(bool on) {
 /// (slide1.png ... slide5.png, left.png, table1.png ... table4.png, hiscores.png). Each file
 /// must show the whole original picture, edge to edge, at any size. The application carries
 /// its own (assets/hd); one in --hd-dir, or else in hd/ in the preferences folder, takes its place.
-void App::loadHdPictures() {
-  const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "assets" / "hd";
-  const std::filesystem::path bundled = std::filesystem::exists(source) ? source : executableDir() / "hd";
+/// Where a replacement picture comes from: the folder given with --hd-dir or hd/ in the
+/// preferences folder first, then the application's own.
+std::filesystem::path App::hdPicturePath(const std::string& name) const {
   const std::filesystem::path own = options_.hdDir.value_or(saveDir_ / "hd");
-  int count = 0, replaced = 0;
+  if (std::filesystem::exists(own / name)) return own / name;
+  const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "assets" / "hd";
+  return (std::filesystem::exists(source) ? source : executableDir() / "hd") / name;
+}
+
+void App::loadHdPictures() {
+  int count = 0;
   for (std::size_t i = 1; i < HdFrame::kCount; ++i) {
     const auto p = static_cast<HdPicture>(i);
-    const std::string name = std::string(hdPictureName(p)) + ".png";
-    auto path = own / name;
-    if (std::filesystem::exists(path))
-      ++replaced;
-    else
-      path = bundled / name;
+    const auto path = hdPicturePath(std::string(hdPictureName(p)) + ".png");
     if (!std::filesystem::exists(path)) continue;
     const auto image = loadImageFile(path);
     if (!image) {
@@ -143,7 +145,53 @@ void App::loadHdPictures() {
     renderer_.setHdPicture(p, image->width, image->height, image->pixels.data());
     ++count;
   }
-  if (count) log::info("replacement pictures: " + std::to_string(count) + ", " + std::to_string(replaced) + " of them from " + own.string());
+  if (count) log::info("replacement pictures: " + std::to_string(count));
+}
+
+/// The flippers drawn at any angle: a picture of each on its own, if there is one, and
+/// otherwise the flipper cut out of the original artwork.
+void App::loadFlipperPictures(int table) {
+  renderer_.clearSpritePictures();
+  const auto cutOut = table_->flipperPictures();
+  const auto sides = table_->flipperSides();
+  ownFlipperPictures_ = !cutOut.empty();
+  std::array<int, 2> seen{};
+  for (std::size_t f = 0; f < cutOut.size(); ++f) {
+    const bool left = sides[f] == FlipperSide::Left;
+    const int nth = ++seen[left ? 0 : 1];
+    const std::string name = "flipper" + std::to_string(table + 1) + (left ? "_left" : "_right") +
+                             (nth > 1 ? std::to_string(nth) : "") + ".png";
+    const auto path = hdPicturePath(name);
+    std::optional<RgbaImage> picture;
+    if (std::filesystem::exists(path)) {
+      picture = loadImageFile(path);
+      if (!picture) log::error("cannot read " + path.string());
+    }
+    if (picture)
+      renderer_.setSpritePicture(f, picture->width, picture->height, picture->pixels.data());
+    else {
+      renderer_.setSpritePicture(f, cutOut[f].width, cutOut[f].height, cutOut[f].rgba.data());
+      ownFlipperPictures_ = false;
+    }
+  }
+  if (ownFlipperPictures_) log::info("flipper pictures: " + std::to_string(cutOut.size()));
+
+  // The ball: its own picture if there is one, and otherwise the original's.
+  std::optional<RgbaImage> ball;
+  for (const std::string& name : {"ball" + std::to_string(table + 1) + ".png", std::string("ball.png")}) {
+    const auto path = hdPicturePath(name);
+    if (!std::filesystem::exists(path)) continue;
+    ball = loadImageFile(path);
+    if (!ball) log::error("cannot read " + path.string());
+    break;
+  }
+  if (ball) {
+    renderer_.setSpritePicture(HdSprite::kBall, ball->width, ball->height, ball->pixels.data());
+    log::info("ball picture: " + std::to_string(ball->width) + "x" + std::to_string(ball->height));
+  } else {
+    const auto original = table_->ballPicture();
+    renderer_.setSpritePicture(HdSprite::kBall, original.width, original.height, original.rgba.data());
+  }
 }
 
 /// The replacement pictures on or off, remembered for next time.
@@ -181,10 +229,7 @@ void App::openTable(int index) {
   table_ = std::make_unique<Table>(*prg, *mod, config_, index, seed);
   resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
-  renderer_.clearSpritePictures();
-  const auto flippers = table_->flipperPictures();
-  for (std::size_t f = 0; f < flippers.size(); ++f)
-    renderer_.setSpritePicture(f, flippers[f].width, flippers[f].height, flippers[f].rgba.data());
+  loadFlipperPictures(index);
   log::info("opened table " + std::to_string(index + 1));
 }
 
@@ -257,6 +302,7 @@ void App::render(double now) {
   // Only when the replacements will really be drawn: the table leaves the flippers out of the
   // frame for the renderer to put back, so with them off it must draw everything itself.
   HdFrame* const hd = renderer_.hasHdPictures() && renderer_.hdEnabled() ? &hd_ : nullptr;
+  hd_.ownSprites = ownFlipperPictures_;
   if (table_)
     table_->render(frame_.data(), colors.data(), hd);
   else if (intro_)

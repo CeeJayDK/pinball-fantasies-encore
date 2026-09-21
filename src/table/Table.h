@@ -70,12 +70,16 @@ class Table {
   /// `hd`, if given, receives where the playfield was drawn, for a replacement picture.
   void render(u8* pixels, Rgb* palette, HdFrame* hd = nullptr) const;
 
-  struct FlipperPicture {
+  struct SpritePicture {
     int width = 0, height = 0;
     Bytes rgba;
   };
   /// The flippers cut out of the artwork, for drawing them turned to their angle.
-  std::vector<FlipperPicture> flipperPictures() const;
+  std::vector<SpritePicture> flipperPictures() const;
+  /// The ball as the original draws it, for when there is no picture of its own.
+  SpritePicture ballPicture() const;
+  /// Which side each flipper is on, in the same order.
+  std::vector<FlipperSide> flipperSides() const;
 
   int screenHeight() const;
   const Options& options() const { return options_; }
