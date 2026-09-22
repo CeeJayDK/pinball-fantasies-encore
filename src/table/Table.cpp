@@ -310,6 +310,34 @@ void Table::buildLampAreas() const {
       if (!around[lamp]) continue;
       for (const int p : enclosed) lampAreas_[static_cast<std::size_t>(p)] = lamp;
     }
+
+  // Finally every lamp grows a little, so that what switches is the whole of it and a touch
+  // more. Outside a lamp the two pictures are the same, so the extra costs nothing; inside, it
+  // makes sure nothing of the lamp is left behind by an edge that does not quite line up.
+  constexpr int kGrow = 2;
+  for (int pass = 0; pass < kGrow; ++pass) {
+    std::vector<u8> wider = lampAreas_;
+    for (int y = 0; y < h; ++y)
+      for (int x = 0; x < w; ++x) {
+        if (lampAreas_[at(x, y)]) continue;
+        std::array<u8, 9> near{};
+        std::size_t count = 0;
+        for (int dy = -1; dy <= 1; ++dy)
+          for (int dx = -1; dx <= 1; ++dx) {
+            const int nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            if (const u8 lamp = lampAreas_[at(nx, ny)]) near[count++] = lamp;
+          }
+        if (!count) continue;
+        // Whichever lamp is nearest on the most sides.
+        std::array<std::size_t, 256> tally{};
+        u8 best = 0;
+        for (std::size_t i = 0; i < count; ++i)
+          if (++tally[near[i]] > tally[best]) best = near[i];
+        wider[at(x, y)] = best;
+      }
+    lampAreas_ = std::move(wider);
+  }
 }
 
 /// Takes each flipper out of its artwork, so it can be drawn turned to any angle.
