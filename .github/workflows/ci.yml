@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to a branch makes the run before it pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL3
+        run: brew install sdl3
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$(brew --prefix)"
+
+      - name: Build
+        run: cmake --build build -j3
+
+      # The tests that need the original game files skip themselves when the files are not
+      # there, which they never are here: the game's data is not redistributable.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check the application was assembled
+        run: |
+          app="build/Pinball Fantasies.app/Contents"
+          test -x "$app/MacOS/Pinball Fantasies"
+          test -f "$app/Resources/icon.icns"
+          test -f "$app/Resources/shaders/post.frag"
+          test -f "$app/Resources/hd/playfield1_on.png"
+
+      - name: Check the tools build
+        run: |
+          test -x build/pfr-play
+          test -x build/pfr-assets
+          test -x build/pfr-extract

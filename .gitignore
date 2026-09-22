@@ -3,6 +3,8 @@ build/
 *.png
 !docs/*.png
 !assets/hd/*.png
+!assets/app/*.png
+!assets/banner.png
 re/*.asm
 re/*.lst
 re/*.hex

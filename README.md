@@ -1,7 +1,12 @@
-# Pinball Fantasies Remastered
+<p align="center"><img src="assets/banner.png" alt="Pinball Fantasies: Encore!" width="820"></p>
+
+# Pinball Fantasies: Encore!
+
+[![build](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/ci.yml)
 
 A native macOS version of *Pinball Fantasies* (Digital Illusions / 21st Century Entertainment,
-1994 PC release) in C++20 on SDL3 and OpenGL.
+1994 PC release) in C++20 on SDL3 and OpenGL, with remastered artwork alongside the original
+look.
 
 The engine is a C++ translation of [wanda-phi/pfr](https://github.com/wanda-phi/pfr), a
 faithful recreation of the DOS game in Rust, whose authors gave permission to use their
@@ -9,10 +14,26 @@ work. Physics, table rules, scripts, the dot matrix, music sequencing, the intro
 all follow pfr function by function; the platform layer, renderer and shader pipeline are
 this project's own.
 
+## The remaster
+
+All four tables play exactly as the original does, and the picture on top of it can be either
+the 1994 one or a remastered one (F10 switches, at any time):
+
+- **Redrawn playfields** at high resolution for every table, with the lamps still working: the
+  game records, per screen pixel, which original pixel it drew and how lit that spot is, and
+  the renderer blends between a lit and an unlit copy of the picture there. Lamps keep their
+  own shapes, labels and all.
+- **Flippers drawn once and turned in code** instead of the original's frames, each about the
+  axis its own artwork hinges on, so they follow the table's own angles exactly.
+- **A high-resolution ball** that goes behind ramps and rails as smoothly as the artwork covers
+  it, with a subtle trail that follows the physics steps rather than the frames.
+- **A CRT look** (scanlines, shadow mask, glow) on F9, and the original crisp pixels without it.
+
+The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own instead.
+
 ## Game files
 
-Nothing from the original is included, apart from the redrawn intro and menu pictures in
-`assets/hd`. The game reads the pictures, collision maps, scripts, music and effects from your
+Nothing from the original is included, apart from the redrawn pictures in `assets/hd`. The game reads the pictures, collision maps, scripts, music and effects from your
 own copy of the DOS files, and it needs **exactly** the release pfr supports, because it reads
 the data at fixed addresses. At start-up every file is checked
 against these SHA-256 sums, and a folder holding any other release is refused:
@@ -67,7 +88,7 @@ The original layout.
 | P | pause; while paused, F7 cycles every lamp on, off and back to normal, and the arrows scroll the table (for checking artwork); A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
 | M | music on or off |
 | F9 | CRT look on or off |
-| F10 | high-resolution pictures in the intro and menu, or the originals |
+| F10 | the remastered pictures, or the originals |
 | Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
 | Command+F | fullscreen |
 
@@ -80,7 +101,7 @@ The original layout.
 | `--skip-intro` | go straight to the table menu |
 | `--res normal\|high\|full` | screen mode: 320x240, 320x350, or the whole table at once |
 | `--crt`, `--no-crt` | CRT look (scanlines, shadow mask, glow); remembered |
-| `--hd`, `--no-hd` | high-resolution pictures in the intro and menu, or the originals; remembered |
+| `--hd`, `--no-hd` | the remastered pictures, or the originals; remembered |
 | `--hd-dir <dir>` | pictures to use instead of the application's own |
 | `--smooth` | soften the one pixel that straddles two source pixels; steadies scrolling |
 | `--square-pixels` | show the picture unstretched instead of filling a 4:3 screen |
@@ -93,8 +114,10 @@ The original layout.
 | Tool | Purpose |
 | --- | --- |
 | `pfr-play <dir> <table> [frames] [seed] [out.png]` | plays a game headlessly with a simple autopilot and prints the ball, the score, every trigger and (with `PFR_DM=1`) the dot matrix |
-| `pfr-assets <dir>` | loads every table and prints what was extracted |
-| `tools/hd_import.py <name>=<picture> ...` | prepares redrawn intro and menu pictures (trims, resizes to 3x the original) into `assets/hd` |
+| `pfr-assets <dir>` | loads every table and prints what was extracted, including each flipper's rectangle, hinge and sweep |
+| `pfr-extract <dir> <out>` | writes every table's artwork, collision maps, flipper frames, ball and plunger out as PNGs |
+| `tools/hd_import.py <name>=<picture> ...` | prepares redrawn pictures (trims, resizes to 3x the original) into `assets/hd` |
+| `tools/hd_unlit.py <lit.png> <unlit.png> <table dir>` | derives a playfield's lights-off picture from its lights-on one, using the original's lamps (needs `pfr-extract` output) |
 | `tools/gen_pfr_tables.py <pfr> <out>` | regenerates `src/assets/PfrTables.inc`, the lookup tables copied mechanically from pfr's source |
 
 ## Layout
@@ -106,9 +129,11 @@ The original layout.
 | `src/intro` | The slideshow and the table menu with its text, high-score and options pages (pfr's `intro`) |
 | `src/sound` | The four-channel module player and the jingle sequencer (pfr's `sound`) |
 | `src/game` | Application shell and the options and high-score files |
-| `assets/hd` | Redrawn, high-resolution versions of the intro's slides, the menu's side panel, table banners and high-score heading, drawn in place of the originals |
+| `assets/hd` | Redrawn, high-resolution pictures drawn in place of the originals: the intro's slides, the menu's side panel, table banners and high-score heading, each table's playfield lit and unlit, the flippers and the ball |
+| `assets/app` | The application icon, built into `icon.icns` at build time |
 | `src/gfx`, `shaders` | Indexed framebuffer, palette, OpenGL renderer; `post.frag` is the hook for CRT-style effects and is hot-reloaded |
 | `src/platform` | SDL3 window, audio device, finding the game files |
 | `src/core`, `src/data` | Types, files, PNG and SHA-256, IFF pictures, the game-version check |
+| `tests` | Pure-logic tests, and tests that play full games when the game files are present |
 | `docs` | Notes from the reverse-engineering work |
 | `re/legacy-engine` | The earlier engine this translation replaced, kept for reference; not built |

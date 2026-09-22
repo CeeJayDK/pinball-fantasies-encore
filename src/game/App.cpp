@@ -85,7 +85,7 @@ bool App::init() {
   const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "shaders";
   shaderDir_ = std::filesystem::exists(source) ? source : executableDir() / "shaders";
 
-  if (!window_.create("Pinball Fantasies", 640 * std::max(1, options_.windowScale) / 2,
+  if (!window_.create("Pinball Fantasies: Encore!", 640 * std::max(1, options_.windowScale) / 2,
                       480 * std::max(1, options_.windowScale) / 2))
     return false;
   if (options_.fullscreen) window_.setFullscreen(true);
