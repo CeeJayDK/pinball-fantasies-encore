@@ -851,32 +851,16 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
         }
       }
     }
-    if (!inAttract_ && sy >= by && sy < by + 15) {
+    // With replacement pictures the renderer draws the ball, and the cover over it is recorded
+    // afterwards, for the trail as well as for the ball.
+    if (!inAttract_ && !hd && sy >= by && sy < by + 15) {
       const int ballY = sy - by;
       for (int ballX = 0; ballX < 15; ++ballX) {
         const u8 pix = assets_.ball(ballX, ballY);
         const int x = ballX + bx;
         if (x < 0 || x >= 320) continue;
         const Grid8& occmap = assets_.occmaps[static_cast<std::size_t>(ball_.layer)];
-        const bool hidden = sy < 576 && occmap(x, sy) != 0;
-        // With replacement pictures the renderer draws the ball, so the frame only records how
-        // much of the artwork covers it: the share of the pixels around this one, so that a
-        // dithered cover comes out as transparency rather than a chequerboard of holes.
-        if (hd) {
-          int covered = 0, counted = 0;
-          for (int oy = sy - 2; oy <= sy + 2; ++oy)
-            for (int ox = x - 2; ox <= x + 2; ++ox) {
-              if (ox < 0 || ox >= 320 || oy < 0 || oy >= 576) continue;
-              covered += occmap(ox, oy) != 0;
-              ++counted;
-            }
-          const int cover = counted ? covered * 255 / counted : 0;
-          HdPixel& m = hd->map[static_cast<std::size_t>(y) * 320 + x];
-          m.flags = static_cast<u16>((m.flags & 0xff) | (cover << HdPixel::kCoverShift));
-          if (hidden) m.flags |= HdPixel::kHidesBall;
-          continue;
-        }
-        if (pix == 0 || hidden) continue;
+        if (pix == 0 || (sy < 576 && occmap(x, sy) != 0)) continue;
         row[x] = pix;
       }
     }
@@ -896,6 +880,32 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
   // the frames, which is what makes it flow rather than step.
   if (hd && !inAttract_) {
     const float top = static_cast<float>(scroll_.pos + push_.offset());
+    // What the artwork covers of the ball, as the share of the pixels around each one: a
+    // dithered cover then comes out as transparency rather than a chequerboard of holes. It is
+    // recorded wherever the ball is drawn, the trail included, so that a ghost passing under a
+    // ramp goes behind it exactly as the ball does.
+    const Grid8& occmap = assets_.occmaps[static_cast<std::size_t>(ball_.layer)];
+    auto cover = [&](float fx, float fy) {
+      const int px = static_cast<int>(std::lround(fx)), py = static_cast<int>(std::lround(fy));
+      for (int oy = 0; oy < 15; ++oy) {
+        const int sy = py + oy, y = sy - static_cast<int>(top);
+        if (y < 0 || y >= height || sy < 0 || sy >= 576) continue;
+        for (int ox = 0; ox < 15; ++ox) {
+          const int x = px + ox;
+          if (x < 0 || x >= 320) continue;
+          int covered = 0, counted = 0;
+          for (int ny = sy - 2; ny <= sy + 2; ++ny)
+            for (int nx = x - 2; nx <= x + 2; ++nx) {
+              if (nx < 0 || nx >= 320 || ny < 0 || ny >= 576) continue;
+              covered += occmap(nx, ny) != 0;
+              ++counted;
+            }
+          HdPixel& m = hd->map[static_cast<std::size_t>(y) * 320 + x];
+          m.flags = static_cast<u16>((m.flags & 0xff) | ((covered * 255 / counted) << HdPixel::kCoverShift));
+          if (occmap(x, sy)) m.flags |= HdPixel::kHidesBall;
+        }
+      }
+    };
     auto ball = [&](float x, float y, float opacity) {
       hd->sprites.push_back({HdSprite::kBall, x + 7.5f, y - top + 7.5f, 0.5f, 0.5f, 1.0f / 15.0f, 1.0f / 15.0f, 0.0f,
                              0.0f, static_cast<float>(height), HdPixel::kHidesBall, opacity});
@@ -908,8 +918,10 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       // Nothing where the ball has hardly moved, so that a ball at rest keeps to itself, and
       // the faster it goes the more of a trail it leaves.
       if (away < 0.4f) continue;
+      cover(p[0], p[1]);
       ball(p[0], p[1], 0.22f * recent * recent * std::min(away / 2.5f, 1.0f));
     }
+    cover(static_cast<float>(bx), static_cast<float>(by));
     ball(static_cast<float>(bx), static_cast<float>(by), 1.0f);
   }
   const int fullHeight = height + 33;
