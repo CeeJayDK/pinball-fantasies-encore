@@ -473,6 +473,7 @@ class Table {
     std::vector<u8> covered;   ///< per pixel: the flipper reaches it at some angle
     std::vector<u8> rest;      ///< per pixel: the flipper covers it at rest
     std::vector<float> angle;  ///< radians, per step
+    float axisX = 0, axisY = 0;  ///< what it turns about, in the rect's pixels
   };
   void buildFlipperArt() const;
   float flipperAngle(std::size_t f) const;

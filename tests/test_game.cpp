@@ -116,3 +116,29 @@ TEST(games_are_deterministic) {
   CHECK(a.best == b.best);
   CHECK(a.triggers == b.triggers);
 }
+
+// A flipper's replacement picture turns about the point its own artwork hinges on, which is
+// not always the origin the table gives for it: the upper bats of Party Land and Speed Devils
+// draw the main bats' frames, hinged several pixels away from where their ball bounces off.
+TEST(flipper_sprites_turn_about_the_artwork_hinge) {
+  if (!haveData()) return;
+  struct Expected { int table, flipper; float x, y; };
+  // Fractions of the flipper's rectangle, measured from the tables' own flipper frames.
+  for (const Expected& e : {Expected{0, 0, 15.14f / 64, 26.17f / 53}, Expected{0, 2, 6.23f / 48, 7.53f / 51},
+                            Expected{1, 1, 43.86f / 64, 26.17f / 53}, Expected{1, 2, 43.60f / 64, 26.00f / 53},
+                            Expected{3, 0, 15.14f / 64, 26.17f / 53}}) {
+    Table t(read("TABLE" + std::to_string(e.table + 1) + ".PRG"), read("TABLE" + std::to_string(e.table + 1) + ".MOD"),
+            Config::defaults(), e.table, 7);
+    std::vector<u8> pixels(320 * (576 + 33));
+    std::vector<Rgb> pal(256);
+    HdFrame hd;
+    t.render(pixels.data(), pal.data(), &hd);
+    CHECK(hd.sprites.size() > static_cast<std::size_t>(e.flipper));
+    if (hd.sprites.size() <= static_cast<std::size_t>(e.flipper)) continue;
+    const HdSprite& s = hd.sprites[static_cast<std::size_t>(e.flipper)];
+    std::printf("  table %d flipper %d turns about (%.3f, %.3f) of its rectangle\n", e.table + 1, e.flipper,
+                s.pivotSpriteX, s.pivotSpriteY);
+    CHECK(std::abs(s.pivotSpriteX - e.x) < 0.02f);
+    CHECK(std::abs(s.pivotSpriteY - e.y) < 0.02f);
+  }
+}

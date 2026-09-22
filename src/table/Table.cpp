@@ -430,14 +430,57 @@ void Table::buildFlipperArt() const {
       }
     }
 
-    const int ox = fl.originX - fl.rectX, oy = fl.originY - fl.rectY;
+    // What the flipper turns about. The table's own origin for it is where the ball is made
+    // to bounce, which for the upper bats is a few pixels from where their artwork hinges, so
+    // the artwork's own axis is taken from the pictures: two steps of one rigid shape, the turn
+    // between them is the difference of their principal axes, and the axis is its fixed point.
+    auto moments = [&](const u8* mask) {
+      double cx = 0, cy = 0;
+      int n = 0;
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+          if (mask[static_cast<std::size_t>(y) * w + x]) { cx += x; cy += y; ++n; }
+      if (!n) return std::array<double, 3>{0, 0, 0};
+      cx /= n;
+      cy /= n;
+      double xx = 0, yy = 0, xy = 0;
+      for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+          if (mask[static_cast<std::size_t>(y) * w + x]) {
+            xx += (x - cx) * (x - cx);
+            yy += (y - cy) * (y - cy);
+            xy += (x - cx) * (y - cy);
+          }
+      return std::array<double, 3>{cx, cy, 0.5 * std::atan2(2 * xy, xx - yy)};
+    };
+    double ox = fl.originX - fl.rectX, oy = fl.originY - fl.rectY;
+    if (steps > 1) {
+      const auto m0 = moments(&coveredAt[0]), m1 = moments(&coveredAt[(steps - 1) * pixels]);
+      double turn = m1[2] - m0[2];
+      while (turn > 1.57079633) turn -= 3.14159265;
+      while (turn < -1.57079633) turn += 3.14159265;
+      // A shape that hardly turns says little about where its axis is; then the origin stands.
+      if (std::abs(turn) > 0.17453293) {  // ten degrees
+        const double c = std::cos(turn), s = std::sin(turn);
+        const double bx = m1[0] - (c * m0[0] - s * m0[1]), by = m1[1] - (s * m0[0] + c * m0[1]);
+        const double d = (1 - c) * (1 - c) + s * s;
+        const double ax = ((1 - c) * bx - s * by) / d, ay = (s * bx + (1 - c) * by) / d;
+        // ... and neither does a fit that lands somewhere the hinge cannot be.
+        if (std::hypot(ax - ox, ay - oy) < 8 && ax >= 0 && ay >= 0 && ax < w && ay < h) {
+          ox = ax;
+          oy = ay;
+        }
+      }
+    }
+    art.axisX = static_cast<float>(ox);
+    art.axisY = static_cast<float>(oy);
     for (std::size_t q = 0; q < steps; ++q) {
       const u8* covered = &coveredAt[q * pixels];
       double far = 0;
       for (int y = 0; y < h; ++y)
         for (int x = 0; x < w; ++x)
           if (covered[static_cast<std::size_t>(y) * w + x]) far = std::max(far, std::hypot(x - ox, y - oy));
-      // The direction of the flipper's far end from its hinge, which is its angle.
+      // The direction of the flipper's far end from its axis, which is its angle.
       double sx = 0, sy = 0;
       for (int y = 0; y < h; ++y)
         for (int x = 0; x < w; ++x) {
@@ -868,11 +911,11 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
   if (hd)
     for (std::size_t f = 0; f < assets_.flippers.size() && f < HdSprite::kBall; ++f) {
       const Flipper& fl = assets_.flippers[f];
+      const FlipperArt& art = flipperArt_[f];
       const float rectW = static_cast<float>(fl.gfx[0].width()), rectH = static_cast<float>(fl.gfx[0].height());
-      hd->sprites.push_back({static_cast<u16>(f), static_cast<float>(fl.originX),
-                             static_cast<float>(fl.originY - scroll_.pos - push_.offset()),
-                             static_cast<float>(fl.originX - fl.rectX) / rectW,
-                             static_cast<float>(fl.originY - fl.rectY) / rectH, 1.0f / rectW, 1.0f / rectH,
+      hd->sprites.push_back({static_cast<u16>(f), static_cast<float>(fl.rectX) + art.axisX,
+                             static_cast<float>(fl.rectY - scroll_.pos - push_.offset()) + art.axisY,
+                             art.axisX / rectW, art.axisY / rectH, 1.0f / rectW, 1.0f / rectH,
                              flipperAngle(f), 0.0f, static_cast<float>(height), 0});
     }
   // The ball goes last, so it passes in front of the flippers, and a faint trail of where it
