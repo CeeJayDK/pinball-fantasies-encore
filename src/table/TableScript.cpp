@@ -244,7 +244,8 @@ bool Table::runScriptTask(ScriptTask& t) {
               playJingleBindForce(JingleBind::GameOverHighScore);
               gotHighScore_ = true;
             }
-            std::vector<u8> msg = bytes("HIGHSCORE PL \x94 ( )");
+            // The name goes in the three cells between the brackets, drawn over them below.
+            std::vector<u8> msg = bytes("HIGHSCORE PL \x94 (   )");
             dmPuts(DmFont::H13, {0, 1}, msg);
             t = ScriptTask{};
             t.kind = S::RecordHighScoresGetName;
