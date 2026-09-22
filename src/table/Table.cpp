@@ -224,16 +224,28 @@ void Table::buildLampAreas() const {
   lampAreas_ = std::move(filled);
 
   // What a lamp encloses belongs to it, whatever colour it is drawn in: the words and numbers
-  // inside an insert are not in the lamp's colours, but they light and go out with it. Only
-  // what a lamp really encloses, and only small enough to be part of one.
+  // inside an insert are not in the lamp's colours, but they light and go out with it.
+  //
+  // A lamp's ring is often a pixel short here and there, which would let the outside leak into
+  // the middle of it, so what is outside is found against the lamps grown by a pixel all round.
+  // That grown edge is then peeled off again, leaving what a lamp really encloses.
   constexpr std::size_t kLargestInside = 600;
+  const auto at = [&](int x, int y) { return static_cast<std::size_t>(y) * w + x; };
+  std::vector<u8> grown(lampAreas_.size(), 0);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      if (!lampAreas_[at(x, y)]) continue;
+      for (int dy = -1; dy <= 1; ++dy)
+        for (int dx = -1; dx <= 1; ++dx)
+          if (x + dx >= 0 && y + dy >= 0 && x + dx < w && y + dy < h) grown[at(x + dx, y + dy)] = 1;
+    }
+
   std::vector<u8> outside(lampAreas_.size(), 0);
   std::vector<int> queue;
   auto flood = [&](int x, int y) {
-    const std::size_t p = static_cast<std::size_t>(y) * w + x;
-    if (lampAreas_[p] || outside[p]) return;
-    outside[p] = 1;
-    queue.push_back(static_cast<int>(p));
+    if (grown[at(x, y)] || outside[at(x, y)]) return;
+    outside[at(x, y)] = 1;
+    queue.push_back(static_cast<int>(at(x, y)));
   };
   for (int x = 0; x < w; ++x) flood(x, 0), flood(x, h - 1);
   for (int y = 0; y < h; ++y) flood(0, y), flood(w - 1, y);
@@ -246,37 +258,57 @@ void Table::buildLampAreas() const {
     if (y > 0) flood(x, y - 1);
     if (y + 1 < h) flood(x, y + 1);
   }
+
+  // Inside a lamp: not the lamp itself, not outside it, and not the pixel of slack that
+  // growing the lamps left around them.
+  std::vector<u8> inside(lampAreas_.size(), 0);
+  for (int y = 0; y < h; ++y)
+    for (int x = 0; x < w; ++x) {
+      if (lampAreas_[at(x, y)] || outside[at(x, y)]) continue;
+      bool touchesOutside = false;
+      for (int dy = -1; dy <= 1 && !touchesOutside; ++dy)
+        for (int dx = -1; dx <= 1; ++dx) {
+          const int nx = x + dx, ny = y + dy;
+          if (nx >= 0 && ny >= 0 && nx < w && ny < h && outside[at(nx, ny)]) {
+            touchesOutside = true;
+            break;
+          }
+        }
+      if (!touchesOutside) inside[at(x, y)] = 1;
+    }
+
   std::vector<u8> seen(lampAreas_.size(), 0);
-  std::vector<int> inside;
+  std::vector<int> enclosed;
   for (int sy = 0; sy < h; ++sy)
     for (int sx = 0; sx < w; ++sx) {
-      const std::size_t start = static_cast<std::size_t>(sy) * w + sx;
-      if (lampAreas_[start] || outside[start] || seen[start]) continue;
-      inside.clear();
-      queue.assign(1, static_cast<int>(start));
-      seen[start] = 1;
+      if (!inside[at(sx, sy)] || seen[at(sx, sy)]) continue;
+      enclosed.clear();
+      queue.assign(1, static_cast<int>(at(sx, sy)));
+      seen[at(sx, sy)] = 1;
       std::array<std::size_t, 256> around{};
       while (!queue.empty()) {
         const int p = queue.back();
         queue.pop_back();
-        inside.push_back(p);
+        enclosed.push_back(p);
         const int x = p % w, y = p / w;
-        const std::array<int, 4> next = {x > 0 ? p - 1 : -1, x + 1 < w ? p + 1 : -1, y > 0 ? p - w : -1,
-                                         y + 1 < h ? p + w : -1};
-        for (const int n : next) {
-          if (n < 0) continue;
-          const u8 lamp = lampAreas_[static_cast<std::size_t>(n)];
-          if (lamp) {
-            ++around[lamp];
-          } else if (!seen[static_cast<std::size_t>(n)]) {
-            seen[static_cast<std::size_t>(n)] = 1;
-            queue.push_back(n);
+        for (int dy = -1; dy <= 1; ++dy)
+          for (int dx = -1; dx <= 1; ++dx) {
+            const int nx = x + dx, ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+            const u8 lamp = lampAreas_[at(nx, ny)];
+            if (lamp) {
+              ++around[lamp];
+            } else if (inside[at(nx, ny)] && !seen[at(nx, ny)]) {
+              seen[at(nx, ny)] = 1;
+              queue.push_back(static_cast<int>(at(nx, ny)));
+            }
           }
-        }
       }
-      if (inside.size() > kLargestInside) continue;
+      if (enclosed.size() > kLargestInside) continue;
+      // Whichever lamp surrounds it most.
       const auto lamp = static_cast<u8>(std::max_element(around.begin() + 1, around.end()) - around.begin());
-      for (const int p : inside) lampAreas_[static_cast<std::size_t>(p)] = lamp;
+      if (!around[lamp]) continue;
+      for (const int p : enclosed) lampAreas_[static_cast<std::size_t>(p)] = lamp;
     }
 }
 
@@ -746,10 +778,18 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       for (int x = 0; x < 320; ++x) {
         row[x] = assets_.mainBoard(x, sy);
         if (hd) {
-          // The unlit picture, with how lit this pixel is alongside: the renderer blends the
-          // lit picture in by it, which keeps a lamp's edge from stepping.
-          const u8 lamp = lampAreas_[static_cast<std::size_t>(sy) * 320 + x];
-          const u16 lit = lamp && lampLit(lamp - 1) ? HdFrame::kLitMax : 0;
+          // The unlit picture, with how lit this spot is alongside: the renderer blends the lit
+          // picture in by it. What a lamp covers on screen is decided by the pictures, which
+          // differ only where the lamp is, so this only has to say how lit the place is -- and
+          // it is taken over the pixels around, because the original's own edge is a staircase
+          // and a sharp reading of it would show through as a jagged rim.
+          int around = 0;
+          for (int ny = std::max(sy - 1, 0); ny <= std::min(sy + 1, 575); ++ny)
+            for (int nx = std::max(x - 1, 0); nx <= std::min(x + 1, 319); ++nx) {
+              const u8 near = lampAreas_[static_cast<std::size_t>(ny) * 320 + nx];
+              around += near && lampLit(near - 1);
+            }
+          const u16 lit = static_cast<u16>(around * HdFrame::kLitMax / 9);
           hd->map[static_cast<std::size_t>(y) * 320 + x] = {
               static_cast<u16>(x * 8), static_cast<u16>(sy * 8),
               static_cast<u16>(hdOff | (lit << HdFrame::kLitShift)), 0};
