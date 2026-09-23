@@ -1,7 +1,7 @@
 #pragma once
 // OpenGL renderer: indexed framebuffer -> palette pass -> replacement pictures (at window
 // resolution, when a screen has any) -> post-process or CRT pass -> window.
-#include <OpenGL/gl3.h>
+#include "gfx/Gl.h"
 
 #include <filesystem>
 

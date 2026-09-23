@@ -64,7 +64,11 @@ Fantasies/`; the first time, they are imported from the game folder, which is ne
 
 ## Building
 
-Requirements: Xcode command-line tools, CMake 3.24 or later, SDL3 (`brew install sdl3`).
+The game needs CMake 3.24 or later, a C++20 compiler, SDL3 and OpenGL 4.1. Nothing else: the
+pictures are decoded by this project's own PNG reader, and every OpenGL function past 1.1 is
+asked of the driver through SDL, so there is no image library and no loader to install.
+
+**macOS** (Xcode command-line tools, `brew install sdl3`):
 
 ```bash
 cmake -S . -B build
@@ -72,6 +76,26 @@ cmake --build build -j
 ./build/pfr-tests
 open "build/Pinball Fantasies.app"
 ```
+
+**Linux** (SDL3 from your distribution, or built from source, plus `libgl1-mesa-dev`):
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build -j
+"./build/Pinball Fantasies" --data /path/to/FANTASY
+```
+
+**Windows** (Visual Studio 2022, and the SDL3 development files unpacked somewhere):
+
+```bat
+cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH=C:\SDL3-3.4.16\cmake
+cmake --build build --config RelWithDebInfo
+```
+
+On macOS the shaders and pictures go inside the application bundle; elsewhere they are copied
+next to the executable, which is where the game looks for them. Settings and high scores live
+in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.local/share`,
+`%APPDATA%`).
 
 ## Controls
 

@@ -11,8 +11,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The tests that need the original game files skip themselves when the files are not there,
+# which they never are here: the game's data is not redistributable.
+env:
+  SDL_VERSION: 3.4.16
+
 jobs:
-  build:
+  macos:
     name: macOS
     runs-on: macos-15
     steps:
@@ -27,8 +32,6 @@ jobs:
       - name: Build
         run: cmake --build build -j3
 
-      # The tests that need the original game files skip themselves when the files are not
-      # there, which they never are here: the game's data is not redistributable.
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
@@ -39,9 +42,88 @@ jobs:
           test -f "$app/Resources/icon.icns"
           test -f "$app/Resources/shaders/post.frag"
           test -f "$app/Resources/hd/playfield1_on.png"
+          test -x build/pfr-play && test -x build/pfr-assets && test -x build/pfr-extract
 
-      - name: Check the tools build
+  linux:
+    name: Linux
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install what SDL3 and OpenGL need
         run: |
-          test -x build/pfr-play
-          test -x build/pfr-assets
-          test -x build/pfr-extract
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config libgl1-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
+            libxkbcommon-dev libwayland-dev wayland-protocols libegl1-mesa-dev
+
+      # Ubuntu has no SDL3 package yet, so it is built once and kept for later runs.
+      - name: Cache SDL3
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/sdl3-install
+          key: sdl3-${{ env.SDL_VERSION }}-ubuntu-24.04
+
+      - name: Build SDL3
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL "https://github.com/libsdl-org/SDL/releases/download/release-${SDL_VERSION}/SDL3-${SDL_VERSION}.tar.gz" | tar xz
+          cmake -S "SDL3-${SDL_VERSION}" -B sdl-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-install" \
+            -DSDL_TEST_LIBRARY=OFF -DSDL_EXAMPLES=OFF
+          cmake --build sdl-build -j3
+          cmake --install sdl-build
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$HOME/sdl3-install"
+
+      - name: Build
+        run: cmake --build build -j3
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check what was built
+        run: |
+          test -x "build/Pinball Fantasies"
+          test -f build/shaders/post.frag
+          test -f build/hd/playfield1_on.png
+          test -x build/pfr-play && test -x build/pfr-assets && test -x build/pfr-extract
+
+  windows:
+    name: Windows
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the SDL3 development files
+        shell: pwsh
+        run: |
+          $url = "https://github.com/libsdl-org/SDL/releases/download/release-$env:SDL_VERSION/SDL3-devel-$env:SDL_VERSION-VC.zip"
+          Invoke-WebRequest -Uri $url -OutFile sdl3.zip
+          Expand-Archive sdl3.zip -DestinationPath sdl3
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH="$pwd/sdl3/SDL3-$env:SDL_VERSION/cmake"
+
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo -j3
+
+      - name: Test
+        run: ctest --test-dir build -C RelWithDebInfo --output-on-failure
+
+      - name: Check what was built
+        shell: pwsh
+        run: |
+          foreach ($f in @(
+            "build/RelWithDebInfo/Pinball Fantasies.exe",
+            "build/RelWithDebInfo/shaders/post.frag",
+            "build/RelWithDebInfo/hd/playfield1_on.png",
+            "build/RelWithDebInfo/pfr-play.exe",
+            "build/RelWithDebInfo/pfr-assets.exe",
+            "build/RelWithDebInfo/pfr-extract.exe")) {
+            if (-not (Test-Path $f)) { throw "missing $f" }
+          }

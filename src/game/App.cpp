@@ -89,6 +89,11 @@ bool App::init() {
                       480 * std::max(1, options_.windowScale) / 2))
     return false;
   if (options_.fullscreen) window_.setFullscreen(true);
+  // The window's context is current from here, so the driver can be asked for its functions.
+  if (!loadGlFunctions()) {
+    log::error("this computer's OpenGL is missing what the renderer needs (4.1 core)");
+    return false;
+  }
   if (!renderer_.init(shaderDir_, 640, 480, 1.0)) return false;
   renderer_.setSmoothEdges(options_.smoothEdges);
   {

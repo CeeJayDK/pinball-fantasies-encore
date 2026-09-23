@@ -1,5 +1,6 @@
 #pragma once
-// Reads PNG, JPEG and other common picture files through macOS ImageIO.
+// Reads a picture file for the renderer. PNG only, through this project's own reader, so
+// that it works the same on every platform.
 #include <filesystem>
 #include <optional>
 

@@ -1,3 +1,5 @@
+#include <SDL3/SDL_main.h>  // on Windows this turns main() into the entry point SDL wants
+
 #include <cstdio>
 #include <cstring>
 #include <string>

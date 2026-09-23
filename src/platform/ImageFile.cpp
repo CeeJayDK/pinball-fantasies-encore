@@ -1,41 +1,22 @@
 #include "platform/ImageFile.h"
 
-#include <CoreGraphics/CoreGraphics.h>
-#include <ImageIO/ImageIO.h>
+#include "core/Png.h"
 
 namespace pfr {
 
 std::optional<RgbaImage> loadImageFile(const std::filesystem::path& path) {
-  const std::string s = path.string();
-  CFURLRef url = CFURLCreateFromFileSystemRepresentation(nullptr, reinterpret_cast<const UInt8*>(s.data()),
-                                                         static_cast<CFIndex>(s.size()), false);
-  if (!url) return std::nullopt;
-  CGImageSourceRef source = CGImageSourceCreateWithURL(url, nullptr);
-  CFRelease(url);
-  if (!source) return std::nullopt;
-  CGImageRef image = CGImageSourceCreateImageAtIndex(source, 0, nullptr);
-  CFRelease(source);
-  if (!image) return std::nullopt;
-
+  auto png = readPng(path);
+  if (!png) return std::nullopt;
   RgbaImage out;
-  out.width = static_cast<int>(CGImageGetWidth(image));
-  out.height = static_cast<int>(CGImageGetHeight(image));
-  out.pixels.resize(static_cast<std::size_t>(out.width) * out.height * 4);
-  // Drawing into a premultiplied sRGB bitmap leaves transparent areas black, which is what
-  // the screens around the pictures are.
-  CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-  CGContextRef context = CGBitmapContextCreate(out.pixels.data(), static_cast<size_t>(out.width),
-                                               static_cast<size_t>(out.height), 8,
-                                               static_cast<size_t>(out.width) * 4, space,
-                                               static_cast<CGBitmapInfo>(kCGImageAlphaPremultipliedLast) | kCGBitmapByteOrder32Big);
-  CGColorSpaceRelease(space);
-  if (!context) {
-    CGImageRelease(image);
-    return std::nullopt;
+  out.width = png->width;
+  out.height = png->height;
+  out.pixels = std::move(png->pixels);
+  // The renderer blends with the colours already multiplied by alpha.
+  for (std::size_t i = 0; i < out.pixels.size(); i += 4) {
+    const u32 a = out.pixels[i + 3];
+    for (int c = 0; c < 3; ++c)
+      out.pixels[i + static_cast<std::size_t>(c)] = static_cast<u8>((out.pixels[i + static_cast<std::size_t>(c)] * a + 127) / 255);
   }
-  CGContextDrawImage(context, CGRectMake(0, 0, out.width, out.height), image);
-  CGContextRelease(context);
-  CGImageRelease(image);
   return out;
 }
 

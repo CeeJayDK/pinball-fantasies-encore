@@ -45,67 +45,84 @@ add_library(pfr_core STATIC
   src/gfx/Palette.cpp
 )
 target_include_directories(pfr_core PUBLIC src)
-target_compile_options(pfr_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
+if(MSVC)
+  target_compile_options(pfr_core PUBLIC /W4 /permissive- /utf-8 /EHsc)
+  target_compile_definitions(pfr_core PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX)
+else()
+  target_compile_options(pfr_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
+endif()
 
 # ---------------------------------------------------------------------------
 # Executable: SDL3 window, OpenGL renderer, audio device, game loop.
 # ---------------------------------------------------------------------------
-add_executable(pinball-fantasies MACOSX_BUNDLE
+add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
   src/main.cpp
   src/platform/Window.cpp
   src/platform/DataLocator.cpp
   src/platform/AudioDevice.cpp
   src/platform/ImageFile.cpp
+  src/gfx/Gl.cpp
   src/gfx/Renderer.cpp
   src/gfx/ShaderProgram.cpp
   src/game/App.cpp
 )
-target_link_libraries(pinball-fantasies PRIVATE pfr_core SDL3::SDL3 OpenGL::GL
-  "-framework ImageIO" "-framework CoreGraphics" "-framework CoreFoundation")
+# Pictures are decoded by this project's own PNG reader, and every OpenGL function past 1.1
+# is fetched from the driver, so nothing here is platform-specific but the library names.
+target_link_libraries(pinball-fantasies PRIVATE pfr_core SDL3::SDL3 OpenGL::GL)
 target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 PFR_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-set_target_properties(pinball-fantasies PROPERTIES
-  OUTPUT_NAME "Pinball Fantasies"
-  MACOSX_BUNDLE_BUNDLE_NAME "Pinball Fantasies"
-  MACOSX_BUNDLE_GUI_IDENTIFIER "org.pfr.pinball-fantasies"
-  MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-  MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-  MACOSX_BUNDLE_ICON_FILE "icon")
+set_target_properties(pinball-fantasies PROPERTIES OUTPUT_NAME "Pinball Fantasies")
 
-# The application's icon, built from the one picture into the sizes the Finder asks for.
-set(ICON_SET "${CMAKE_BINARY_DIR}/icon.iconset")
-set(ICON_FILE "${CMAKE_BINARY_DIR}/icon.icns")
-add_custom_command(OUTPUT "${ICON_FILE}"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${ICON_SET}"
-  COMMAND sips -z 16 16     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_16x16.png" > /dev/null
-  COMMAND sips -z 32 32     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_16x16@2x.png" > /dev/null
-  COMMAND sips -z 32 32     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_32x32.png" > /dev/null
-  COMMAND sips -z 64 64     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_32x32@2x.png" > /dev/null
-  COMMAND sips -z 128 128   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_128x128.png" > /dev/null
-  COMMAND sips -z 256 256   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_128x128@2x.png" > /dev/null
-  COMMAND sips -z 256 256   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_256x256.png" > /dev/null
-  COMMAND sips -z 512 512   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_256x256@2x.png" > /dev/null
-  COMMAND sips -z 512 512   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_512x512.png" > /dev/null
-  COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/app/icon.png" "${ICON_SET}/icon_512x512@2x.png"
-  COMMAND iconutil -c icns "${ICON_SET}" -o "${ICON_FILE}"
-  DEPENDS "${CMAKE_SOURCE_DIR}/assets/app/icon.png"
-  COMMENT "Building the application icon")
-add_custom_target(pfr_icon DEPENDS "${ICON_FILE}")
-add_dependencies(pinball-fantasies pfr_icon)
+if(APPLE)
+  set_target_properties(pinball-fantasies PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME "Pinball Fantasies"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "org.pfr.pinball-fantasies"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_ICON_FILE "icon")
 
-# Shaders and the intro's high-resolution pictures travel with the bundle. This runs on every build, not only when the executable
-# is relinked, so editing a shader alone still reaches the application.
+  # The application's icon, built from the one picture into the sizes the Finder asks for.
+  set(ICON_SET "${CMAKE_BINARY_DIR}/icon.iconset")
+  set(ICON_FILE "${CMAKE_BINARY_DIR}/icon.icns")
+  add_custom_command(OUTPUT "${ICON_FILE}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${ICON_SET}"
+    COMMAND sips -z 16 16     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_16x16.png" > /dev/null
+    COMMAND sips -z 32 32     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_16x16@2x.png" > /dev/null
+    COMMAND sips -z 32 32     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_32x32.png" > /dev/null
+    COMMAND sips -z 64 64     "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_32x32@2x.png" > /dev/null
+    COMMAND sips -z 128 128   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_128x128.png" > /dev/null
+    COMMAND sips -z 256 256   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_128x128@2x.png" > /dev/null
+    COMMAND sips -z 256 256   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_256x256.png" > /dev/null
+    COMMAND sips -z 512 512   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_256x256@2x.png" > /dev/null
+    COMMAND sips -z 512 512   "${CMAKE_SOURCE_DIR}/assets/app/icon.png" --out "${ICON_SET}/icon_512x512.png" > /dev/null
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/assets/app/icon.png" "${ICON_SET}/icon_512x512@2x.png"
+    COMMAND iconutil -c icns "${ICON_SET}" -o "${ICON_FILE}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/assets/app/icon.png"
+    COMMENT "Building the application icon")
+  add_custom_target(pfr_icon DEPENDS "${ICON_FILE}")
+  add_dependencies(pinball-fantasies pfr_icon)
+endif()
+
+# Shaders and the replacement pictures travel with the application: inside the bundle on
+# macOS, beside the executable elsewhere. This runs on every build, not only when the
+# executable is relinked, so editing a shader alone still reaches the application.
+if(APPLE)
+  set(PFR_RESOURCE_DIR "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources")
+else()
+  set(PFR_RESOURCE_DIR "$<TARGET_FILE_DIR:pinball-fantasies>")
+endif()
+
 add_custom_target(pfr_shaders ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/shaders"
-          "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources/shaders"
+          "${CMAKE_SOURCE_DIR}/shaders" "${PFR_RESOURCE_DIR}/shaders"
   COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/assets/hd"
-          "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources/hd"
-  COMMAND ${CMAKE_COMMAND} -E copy
-          "${ICON_FILE}"
-          "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources/icon.icns"
+          "${CMAKE_SOURCE_DIR}/assets/hd" "${PFR_RESOURCE_DIR}/hd"
   DEPENDS pinball-fantasies
-  COMMENT "Copying shaders and pictures into the application bundle")
+  COMMENT "Copying shaders and pictures next to the application")
+
+if(APPLE)
+  add_custom_command(TARGET pfr_shaders POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${PFR_RESOURCE_DIR}/icon.icns")
+endif()
 
 # ---------------------------------------------------------------------------
 # Command-line tools (asset inspection, no SDL).
