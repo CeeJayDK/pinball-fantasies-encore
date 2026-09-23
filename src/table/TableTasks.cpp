@@ -2,6 +2,8 @@
 // run in that table's file.
 #include "table/Table.h"
 
+#include <utility>
+
 namespace pfr {
 
 void Table::addTask(TaskKind kind, u16 a, u16 b, bool flag) { tasks_.push_back(Task{kind, a, b, flag, 0}); }

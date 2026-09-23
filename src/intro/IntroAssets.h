@@ -1,6 +1,7 @@
 #pragma once
 // Pictures, text and timing tables for the opening slideshow and the table chooser, read
 // from INTRO.PRG (translated from pfr's src/assets/intro.rs).
+#include <array>
 #include <variant>
 #include <vector>
 

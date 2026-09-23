@@ -1,5 +1,8 @@
 #include "platform/ImageFile.h"
 
+#include <optional>
+#include <utility>
+
 #include "core/Png.h"
 
 namespace pfr {

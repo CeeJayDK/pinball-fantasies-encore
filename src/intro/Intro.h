@@ -2,7 +2,9 @@
 // The opening slideshow and the table chooser with its text, high-score and options pages
 // (translated from pfr's src/intro.rs). Drawn on a 640x480 palette screen, or 640x960
 // when the full-height table mode is chosen.
+#include <functional>
 #include <memory>
+#include <optional>
 
 #include "game/Config.h"
 #include "gfx/HdLayer.h"

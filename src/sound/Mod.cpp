@@ -1,5 +1,9 @@
 #include "sound/Mod.h"
 
+#include <algorithm>
+#include <optional>
+#include <utility>
+
 #include "core/Error.h"
 #include "sound/Periods.h"
 

@@ -6,6 +6,7 @@
 // The player runs on the audio thread and the game on the main thread, so the whole
 // state lives in one atomic word updated by compare-and-swap, as in pfr.
 #include <atomic>
+#include <optional>
 
 #include "assets/TableAssets.h"
 

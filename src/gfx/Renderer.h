@@ -3,6 +3,7 @@
 // resolution, when a screen has any) -> post-process or CRT pass -> window.
 #include "gfx/Gl.h"
 
+#include <array>
 #include <filesystem>
 
 #include "gfx/Framebuffer.h"

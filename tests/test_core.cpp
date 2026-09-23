@@ -1,5 +1,7 @@
 // Pure-logic tests that need no game files.
 #include "Test.h"
+
+#include <optional>
 #include "assets/Bcd.h"
 #include "core/Sha256.h"
 #include "sound/Sequencer.h"

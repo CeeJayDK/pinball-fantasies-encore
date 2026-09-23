@@ -1,11 +1,12 @@
 #include "game/App.h"
 
 #include <SDL3/SDL.h>
-
 #include <algorithm>
 #include <array>
-#include <optional>
 #include <chrono>
+#include <memory>
+#include <optional>
+#include <utility>
 
 #include "core/Error.h"
 #include "core/File.h"

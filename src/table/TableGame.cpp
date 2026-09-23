@@ -2,6 +2,9 @@
 // src/table/{game,player,triggers}.rs).
 #include "table/Table.h"
 
+#include <array>
+#include <optional>
+
 namespace pfr {
 
 // ---- game flow ------------------------------------------------------------------------------

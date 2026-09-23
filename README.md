@@ -2,7 +2,9 @@
 
 # Pinball Fantasies: Encore!
 
-[![build](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/ci.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/ci.yml)
+[![macOS](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/macos.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/macos.yml)
+[![Linux](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/linux.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/linux.yml)
+[![Windows](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/windows.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/windows.yml)
 
 A native macOS version of *Pinball Fantasies* (Digital Illusions / 21st Century Entertainment,
 1994 PC release) in C++20 on SDL3 and OpenGL, with remastered artwork alongside the original

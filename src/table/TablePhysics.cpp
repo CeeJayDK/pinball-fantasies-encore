@@ -1,6 +1,10 @@
 // Ball, flipper and collision physics (translated from pfr's src/table/physics.rs and ball.rs).
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdlib>
+#include <optional>
+#include <utility>
 
 #include "table/Table.h"
 

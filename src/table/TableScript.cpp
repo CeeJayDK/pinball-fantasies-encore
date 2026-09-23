@@ -1,6 +1,7 @@
 // The table script interpreter, dot-matrix drawing and mode timers (translated from pfr's
 // src/table/{script,dm,mode}.rs and the script tasks in game.rs).
 #include <algorithm>
+#include <optional>
 
 #include "table/Table.h"
 

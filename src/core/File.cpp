@@ -2,41 +2,43 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdio>
+#include <fstream>
+#include <optional>
 #include <system_error>
 
 namespace pfr::file {
 
 std::optional<Bytes> readAll(const std::filesystem::path& path) {
-  std::FILE* f = std::fopen(path.c_str(), "rb");
-  if (!f) return std::nullopt;
+  // Streams take the path as it is; stdio would need it narrowed, which loses names on Windows.
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return std::nullopt;
   Bytes out;
   u8 buffer[1 << 16];
-  for (;;) {
-    const std::size_t n = std::fread(buffer, 1, sizeof buffer, f);
-    out.insert(out.end(), buffer, buffer + n);
-    if (n < sizeof buffer) break;
-  }
-  const bool ok = std::ferror(f) == 0;
-  std::fclose(f);
-  if (!ok) return std::nullopt;
+  while (in.read(reinterpret_cast<char*>(buffer), sizeof buffer) || in.gcount())
+    out.insert(out.end(), buffer, buffer + in.gcount());
+  if (in.bad()) return std::nullopt;
   return out;
 }
 
 bool writeAll(const std::filesystem::path& path, ByteView data) {
   std::filesystem::path temp = path;
   temp += ".tmp";
-  std::FILE* f = std::fopen(temp.c_str(), "wb");
-  if (!f) return false;
-  const bool ok = std::fwrite(data.data(), 1, data.size(), f) == data.size();
-  std::fclose(f);
-  if (!ok) {
-    std::remove(temp.c_str());
-    return false;
-  }
   std::error_code ec;
+  {
+    std::ofstream out(temp, std::ios::binary);
+    if (!out) return false;
+    out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+    if (!out) {
+      out.close();
+      std::filesystem::remove(temp, ec);
+      return false;
+    }
+  }
   std::filesystem::rename(temp, path, ec);
-  if (ec) std::remove(temp.c_str());
+  if (ec) {
+    std::error_code ignored;
+    std::filesystem::remove(temp, ignored);
+  }
   return !ec;
 }
 

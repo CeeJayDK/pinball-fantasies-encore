@@ -1,5 +1,7 @@
 #include "Test.h"
 
+#include <cstdio>
+
 namespace test {
 std::vector<Case>& registry() { static std::vector<Case> r; return r; }
 int& failures() { static int f = 0; return f; }

@@ -1,5 +1,7 @@
 #include "sound/Sequencer.h"
 
+#include <optional>
+
 namespace pfr {
 
 u8 SimpleSequencer::nextPosition() {

@@ -1,0 +1,72 @@
+name: Linux
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SDL_VERSION: 3.4.16
+
+jobs:
+  build:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-24.04, arch: x86_64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install what SDL3 and OpenGL need
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build pkg-config \
+            libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
+            libxss-dev libxtst-dev libxkbcommon-dev libxinerama-dev \
+            libwayland-dev wayland-protocols libdecor-0-dev \
+            libasound2-dev libpulse-dev libdbus-1-dev libudev-dev libibus-1.0-dev
+
+      # Ubuntu has no SDL3 package yet, so it is built once and kept for later runs.
+      - name: Cache SDL3
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/sdl3-install
+          key: sdl3-${{ env.SDL_VERSION }}-${{ matrix.runner }}
+
+      - name: Build SDL3
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL "https://github.com/libsdl-org/SDL/releases/download/release-${SDL_VERSION}/SDL3-${SDL_VERSION}.tar.gz" | tar xz
+          cmake -S "SDL3-${SDL_VERSION}" -B sdl-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/sdl3-install" \
+            -DSDL_TEST_LIBRARY=OFF
+          cmake --build sdl-build -j3
+          cmake --install sdl-build
+
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$HOME/sdl3-install"
+
+      - name: Build
+        run: cmake --build build -j3
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check what was built
+        run: |
+          test -x "build/Pinball Fantasies"
+          test -f build/shaders/post.frag
+          test -f build/hd/playfield1_on.png
+          test -x build/pfr-play && test -x build/pfr-assets && test -x build/pfr-extract

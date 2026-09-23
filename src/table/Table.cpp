@@ -1,6 +1,11 @@
 #include "table/Table.h"
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <memory>
+#include <optional>
+#include <utility>
 
 namespace pfr {
 

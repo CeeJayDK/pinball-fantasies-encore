@@ -1,5 +1,8 @@
 #include "data/GameVersion.h"
 
+#include <optional>
+#include <utility>
+
 #include "core/File.h"
 #include "core/Sha256.h"
 

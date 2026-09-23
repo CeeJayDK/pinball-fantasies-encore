@@ -2,6 +2,7 @@
 // ball, score and dot matrix, to check the rules and physics without a window.
 //
 //   pfr-play <game folder> <table 1-4> [frames] [seed] [out.png]
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <string>

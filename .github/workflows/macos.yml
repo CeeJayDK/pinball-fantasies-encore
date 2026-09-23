@@ -1,0 +1,47 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false     # one architecture failing must not cancel the other
+      matrix:
+        include:
+          - { runner: macos-15, arch: arm64 }
+          - { runner: macos-13, arch: x86_64 }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install SDL3
+        run: brew install sdl3
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$(brew --prefix)"
+
+      - name: Build
+        run: cmake --build build -j3
+
+      # The tests that need the original game files skip themselves when the files are not
+      # there, which they never are here: the game's data is not redistributable.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Check the application was assembled
+        run: |
+          app="build/Pinball Fantasies.app/Contents"
+          test -x "$app/MacOS/Pinball Fantasies"
+          test -f "$app/Resources/icon.icns"
+          test -f "$app/Resources/shaders/post.frag"
+          test -f "$app/Resources/hd/playfield1_on.png"
+          test -x build/pfr-play && test -x build/pfr-assets && test -x build/pfr-extract

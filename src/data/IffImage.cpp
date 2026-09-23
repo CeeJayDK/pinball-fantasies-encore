@@ -1,6 +1,8 @@
 #include "data/IffImage.h"
 
+#include <algorithm>
 #include <cstring>
+#include <optional>
 
 #include "core/Error.h"
 

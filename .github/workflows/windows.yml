@@ -1,0 +1,51 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SDL_VERSION: 3.4.16
+
+jobs:
+  build:
+    name: Windows (x64)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch the SDL3 development files
+        shell: pwsh
+        run: |
+          $url = "https://github.com/libsdl-org/SDL/releases/download/release-$env:SDL_VERSION/SDL3-devel-$env:SDL_VERSION-VC.zip"
+          Invoke-WebRequest -Uri $url -OutFile sdl3.zip
+          Expand-Archive sdl3.zip -DestinationPath sdl3
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH="$pwd/sdl3/SDL3-$env:SDL_VERSION/cmake"
+
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo -j3
+
+      - name: Test
+        run: ctest --test-dir build -C RelWithDebInfo --output-on-failure
+
+      - name: Check what was built
+        shell: pwsh
+        run: |
+          foreach ($f in @(
+            "build/RelWithDebInfo/Pinball Fantasies.exe",
+            "build/RelWithDebInfo/shaders/post.frag",
+            "build/RelWithDebInfo/hd/playfield1_on.png",
+            "build/RelWithDebInfo/pfr-play.exe",
+            "build/RelWithDebInfo/pfr-assets.exe",
+            "build/RelWithDebInfo/pfr-extract.exe")) {
+            if (-not (Test-Path $f)) { throw "missing $f" }
+          }

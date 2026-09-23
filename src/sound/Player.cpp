@@ -1,6 +1,8 @@
 #include "sound/Player.h"
 
 #include <algorithm>
+#include <memory>
+#include <utility>
 
 #include "sound/Periods.h"
 

@@ -1,5 +1,8 @@
 // Tests against the real game files. They look for the supported version in PFR_DATA, or
 // in the FANTASY folder beside the project, and are skipped when neither is present.
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <string>
 

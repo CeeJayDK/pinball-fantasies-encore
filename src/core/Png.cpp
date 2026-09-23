@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <cstring>
 #include <iterator>
+#include <optional>
+#include <utility>
 
 #include "core/File.h"
 
@@ -84,11 +86,7 @@ bool writeIndexedPng(const std::filesystem::path& path, const u8* pixels, int wi
   }
   chunk(png, "IDAT", storedDeflate(raw));
   chunk(png, "IEND", {});
-  std::FILE* f = std::fopen(path.c_str(), "wb");
-  if (!f) return false;
-  const bool ok = std::fwrite(png.data(), 1, png.size(), f) == png.size();
-  std::fclose(f);
-  return ok;
+  return file::writeAll(path, png);
 }
 
 bool writeRgbPng(const std::filesystem::path& path, const u8* rgb, int width, int height, bool flipVertically) {
@@ -106,11 +104,7 @@ bool writeRgbPng(const std::filesystem::path& path, const u8* rgb, int width, in
   }
   chunk(png, "IDAT", storedDeflate(raw));
   chunk(png, "IEND", {});
-  std::FILE* f = std::fopen(path.c_str(), "wb");
-  if (!f) return false;
-  const bool ok = std::fwrite(png.data(), 1, png.size(), f) == png.size();
-  std::fclose(f);
-  return ok;
+  return file::writeAll(path, png);
 }
 
 // ---- reading ----------------------------------------------------------------------------

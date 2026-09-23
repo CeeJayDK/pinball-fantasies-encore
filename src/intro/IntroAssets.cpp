@@ -1,5 +1,8 @@
 #include "intro/IntroAssets.h"
 
+#include <algorithm>
+#include <utility>
+
 #include "assets/Exe.h"
 #include "data/IffImage.h"
 

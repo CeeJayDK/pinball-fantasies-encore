@@ -1,6 +1,9 @@
 #include "assets/TableAssets.h"
 
 #include <algorithm>
+#include <array>
+#include <map>
+#include <utility>
 
 #include "data/IffImage.h"
 

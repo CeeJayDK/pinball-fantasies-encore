@@ -1,6 +1,8 @@
 // Billion Dollar Gameshow rules (translated from pfr's src/table/show.rs and its tasks).
 #include "table/Table.h"
 
+#include <utility>
+
 namespace pfr {
 
 void Table::showFrame() {

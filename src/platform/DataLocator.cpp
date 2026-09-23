@@ -1,9 +1,9 @@
 #include "platform/DataLocator.h"
 
 #include <SDL3/SDL.h>
-
 #include <cstdio>
 #include <fstream>
+#include <optional>
 
 #include "core/File.h"
 #include "core/Log.h"

@@ -1,8 +1,11 @@
 #include <SDL3/SDL_main.h>  // on Windows this turns main() into the entry point SDL wants
 
+#include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
 
 #include "core/Log.h"
 #include "game/App.h"

@@ -2,8 +2,10 @@
 // The game's four-channel module player (translated from pfr's sound/player.rs). The main
 // thread talks to it only through atomics: sound effects, master volume, pause, and the
 // sequencer that chooses song positions.
+#include <array>
 #include <atomic>
 #include <memory>
+#include <optional>
 
 #include "sound/Mod.h"
 #include "sound/Sequencer.h"

@@ -1,6 +1,8 @@
 // Speed Devils rules (translated from pfr's src/table/speed.rs and its tasks).
 #include "table/Table.h"
 
+#include <algorithm>
+
 namespace pfr {
 
 void Table::speedFrame() {
