@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <fstream>
 #include <optional>
+#include <system_error>
 
 #include "core/File.h"
 #include "core/Log.h"

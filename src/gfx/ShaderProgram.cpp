@@ -1,7 +1,9 @@
 #include "gfx/ShaderProgram.h"
 
+#include <cstddef>
 #include <fstream>
 #include <sstream>
+#include <system_error>
 #include <vector>
 
 #include "core/Log.h"

@@ -1,6 +1,7 @@
 #include "Test.h"
 
 #include <cstdio>
+#include <vector>
 
 namespace test {
 std::vector<Case>& registry() { static std::vector<Case> r; return r; }

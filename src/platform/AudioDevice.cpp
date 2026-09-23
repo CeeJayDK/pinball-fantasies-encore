@@ -1,6 +1,8 @@
 #include "platform/AudioDevice.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <string>
 #include <utility>
 
 #include "core/Log.h"
