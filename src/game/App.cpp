@@ -107,6 +107,11 @@ bool App::init() {
     renderer_.setHdEnabled(options_.hd.value_or(!saved || saved->empty() || (*saved)[0] != '0'));
     if (options_.hd) setHd(*options_.hd);
   }
+  {
+    const auto saved = file::readAll(saveDir_ / "trail.txt");
+    ballTrail_ = options_.trail.value_or(!saved || saved->empty() || (*saved)[0] != '0');
+    if (options_.trail) setBallTrail(*options_.trail);
+  }
   audio_.open(48000);
 
   if (options_.table >= 1 && options_.table <= 4)
@@ -210,6 +215,14 @@ void App::setHd(bool on) {
   log::info(std::string("replacement pictures ") + (on ? "on" : "off"));
 }
 
+/// The ball's trail on or off, remembered for next time.
+void App::setBallTrail(bool on) {
+  ballTrail_ = on;
+  const char c = on ? '1' : '0';
+  file::writeAll(saveDir_ / "trail.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
+  log::info(std::string("ball trail ") + (on ? "on" : "off"));
+}
+
 void App::resizeFrame(int width, int height, double pixelAspect) {
   if (frame_.width() != width || frame_.height() != height) frame_ = Framebuffer(width, height);
   renderer_.setPixelAspect(options_.squarePixels ? 1.0 : pixelAspect);
@@ -254,6 +267,11 @@ void App::handleKey(const SDL_Event& e) {
   }
   if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F10) {
     if (renderer_.hasHdPictures()) setHd(!renderer_.hdEnabled());
+    return;
+  }
+  // While paused, beside the lamps on F7: the ball's trail, for looking at it either way.
+  if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F8 && table_ && table_->paused()) {
+    setBallTrail(!ballTrail_);
     return;
   }
   const Key k = keyFor(e.key.key);
@@ -311,6 +329,7 @@ void App::render(double now) {
   // frame for the renderer to put back, so with them off it must draw everything itself.
   HdFrame* const hd = renderer_.hasHdPictures() && renderer_.hdEnabled() ? &hd_ : nullptr;
   hd_.ownSprites = ownFlipperPictures_;
+  hd_.ballTrail = ballTrail_;
   if (table_)
     table_->render(frame_.data(), colors.data(), hd);
   else if (intro_)

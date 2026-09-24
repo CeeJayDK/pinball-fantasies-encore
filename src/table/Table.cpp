@@ -933,23 +933,43 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
     // recorded wherever the ball is drawn, the trail included, so that a ghost passing under a
     // ramp goes behind it exactly as the ball does.
     const Grid8& occmap = assets_.occmaps[static_cast<std::size_t>(ball_.layer)];
+    // A pixel's cover is read smoothly, from the four around it, so it has to be recorded a
+    // little wider than the ball itself: without that the outermost ring of the ball reads
+    // half its cover from pixels nothing was written to, and a thin rim of it shows through
+    // whatever is in front.
+    constexpr int kMargin = 3;
     auto cover = [&](float fx, float fy) {
       const int px = static_cast<int>(std::lround(fx)), py = static_cast<int>(std::lround(fy));
-      for (int oy = 0; oy < 15; ++oy) {
+      for (int oy = -kMargin; oy < 15 + kMargin; ++oy) {
         const int sy = py + oy, y = sy - static_cast<int>(top);
         if (y < 0 || y >= height || sy < 0 || sy >= 576) continue;
-        for (int ox = 0; ox < 15; ++ox) {
+        for (int ox = -kMargin; ox < 15 + kMargin; ++ox) {
           const int x = px + ox;
           if (x < 0 || x >= 320) continue;
-          int covered = 0, counted = 0;
-          for (int ny = sy - 2; ny <= sy + 2; ++ny)
-            for (int nx = x - 2; nx <= x + 2; ++nx) {
-              if (nx < 0 || nx >= 320 || ny < 0 || ny >= 576) continue;
-              covered += occmap(nx, ny) != 0;
-              ++counted;
-            }
+          // Artwork that covers this spot and the ones around it is solid, and hides the ball
+          // outright, as the original does. Only where the cover is dithered against what is
+          // behind it -- the criss-cross rail on Stones n Bones -- does the share of the
+          // pixels around decide how much shows through. Averaging everywhere would leave a
+          // rim of the ball visible wherever a solid cover ends, since a pixel within two of
+          // that edge averages below its own value.
+          int near = 0;
+          if (x > 0) near += occmap(x - 1, sy) != 0;
+          if (x < 319) near += occmap(x + 1, sy) != 0;
+          if (sy > 0) near += occmap(x, sy - 1) != 0;
+          if (sy < 575) near += occmap(x, sy + 1) != 0;
+          int cover = 255;
+          if (!occmap(x, sy) || near < 3) {
+            int covered = 0, counted = 0;
+            for (int ny = sy - 2; ny <= sy + 2; ++ny)
+              for (int nx = x - 2; nx <= x + 2; ++nx) {
+                if (nx < 0 || nx >= 320 || ny < 0 || ny >= 576) continue;
+                covered += occmap(nx, ny) != 0;
+                ++counted;
+              }
+            cover = covered * 255 / counted;
+          }
           HdPixel& m = hd->map[static_cast<std::size_t>(y) * 320 + x];
-          m.flags = static_cast<u16>((m.flags & 0xff) | ((covered * 255 / counted) << HdPixel::kCoverShift));
+          m.flags = static_cast<u16>((m.flags & 0xff) | (cover << HdPixel::kCoverShift));
           if (occmap(x, sy)) m.flags |= HdPixel::kHidesBall;
         }
       }
@@ -958,7 +978,7 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       hd->sprites.push_back({HdSprite::kBall, x + 7.5f, y - top + 7.5f, 0.5f, 0.5f, 1.0f / 15.0f, 1.0f / 15.0f, 0.0f,
                              0.0f, static_cast<float>(height), HdPixel::kHidesBall, opacity});
     };
-    for (std::size_t i = 0; i < trailLength_; ++i) {
+    for (std::size_t i = 0; hd->ballTrail && i < trailLength_; ++i) {
       const auto& p = ballTrail_[(trailNext_ + kTrail - trailLength_ + i) % kTrail];
       // Strongest just behind the ball, fading away towards the oldest step.
       const float recent = static_cast<float>(i + 1) / static_cast<float>(trailLength_);

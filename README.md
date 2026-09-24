@@ -111,7 +111,7 @@ The original layout.
 | Left and right Shift, Ctrl or Alt | flippers |
 | Down arrow | pull the plunger, release to shoot |
 | Space | nudge the table (too often tilts it) |
-| P | pause; while paused, F7 cycles every lamp on, off and back to normal, and the arrows scroll the table (for checking artwork); A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
+| P | pause; while paused, F7 cycles every lamp on, off and back to normal, F8 switches the ball's trail, and the arrows scroll the table (for checking artwork); A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
 | M | music on or off |
 | F9 | CRT look on or off |
 | F10 | the remastered pictures, or the originals |
@@ -128,6 +128,7 @@ The original layout.
 | `--res normal\|high\|full` | screen mode: 320x240, 320x350, or the whole table at once |
 | `--crt`, `--no-crt` | CRT look (scanlines, shadow mask, glow); remembered |
 | `--hd`, `--no-hd` | the remastered pictures, or the originals; remembered |
+| `--trail`, `--no-trail` | the fading ghosts behind the ball; remembered |
 | `--hd-dir <dir>` | pictures to use instead of the application's own |
 | `--smooth` | soften the one pixel that straddles two source pixels; steadies scrolling |
 | `--square-pixels` | show the picture unstretched instead of filling a 4:3 screen |

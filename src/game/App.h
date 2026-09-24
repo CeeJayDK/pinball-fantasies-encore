@@ -29,6 +29,7 @@ struct AppOptions {
   std::optional<Resolution> resolution;  ///< overrides the saved screen mode
   std::optional<bool> crt;               ///< overrides the saved CRT look
   std::optional<bool> hd;                ///< overrides the saved choice of replacement pictures
+  std::optional<bool> trail;             ///< overrides the saved choice of the ball's trail
   std::optional<std::filesystem::path> hdDir;  ///< where replacement pictures are read from
   int windowScale = 3;
   bool stats = false;                    ///< log how long each frame takes
@@ -54,6 +55,7 @@ class App {
   void loadFlipperPictures(int table);
   std::filesystem::path hdPicturePath(const std::string& name) const;
   void setHd(bool on);
+  void setBallTrail(bool on);
 
   AppOptions options_;
   std::filesystem::path shaderDir_, saveDir_;
@@ -66,6 +68,7 @@ class App {
   Palette palette_;
   HdFrame hd_;
   u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own
+  bool ballTrail_ = true;      ///< the fading ghosts behind the ball
   std::unique_ptr<Intro> intro_;
   std::unique_ptr<Table> table_;
   struct Stats {

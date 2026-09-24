@@ -77,6 +77,7 @@ struct HdFrame {
   std::vector<HdSprite> sprites;                  ///< drawn over the pictures, in order
   float spriteTint = 1.0f;                        ///< the screen's fade, applied to the sprites
   u8 ownSprites = 0;                              ///< bit per flipper with a picture of its own, not cut from the artwork
+  bool ballTrail = true;                          ///< draw the fading ghosts behind the ball
 
   void reset(int w, int h) {
     width = w;

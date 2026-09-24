@@ -93,6 +93,7 @@ class Table {
   bool ballOverhead() const { return ball_.layer == Layer::Overhead; }
   const Bcd& scoreMain() const { return scoreMain_; }
   bool inAttract() const { return inAttract_; }
+  bool paused() const { return kbdState_ == KbdState::Paused || kbdState_ == KbdState::PausedConfirmQuit; }
   const TableAssets& assets() const { return assets_; }
   const std::array<std::array<bool, 160>, 16>& dotMatrix() const { return dm_.pixels; }
   u8 currentBall() const { return curBall_; }
