@@ -35,6 +35,12 @@ void Window::swap() { SDL_GL_SwapWindow(window_); }
 void Window::setFullscreen(bool on) {
   fullscreen_ = on;
   SDL_SetWindowFullscreen(window_, on);
+  // Fullscreen, the keys go to the game rather than to the system: no window switching on
+  // Alt-Tab, no menu on the Windows or Super key. Alt-Tab still works, so nobody is trapped,
+  // and in a window the system keeps its shortcuts, where the player expects them.
+  SDL_SetWindowKeyboardGrab(window_, on);
+  // Fullscreen there is nothing else on the screen for the pointer to do.
+  if (on) SDL_HideCursor();
 }
 
 void Window::drawableSize(int& w, int& h) const { SDL_GetWindowSizeInPixels(window_, &w, &h); }

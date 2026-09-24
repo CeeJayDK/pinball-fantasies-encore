@@ -6,9 +6,9 @@
 [![Linux](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/linux.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/linux.yml)
 [![Windows](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/windows.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/windows.yml)
 
-A native macOS version of *Pinball Fantasies* (Digital Illusions / 21st Century Entertainment,
-1994 PC release) in C++20 on SDL3 and OpenGL, with remastered artwork alongside the original
-look.
+A native version of *Pinball Fantasies* (Digital Illusions / 21st Century Entertainment, 1994
+PC release) for macOS, Linux and Windows, in C++20 on SDL3 and OpenGL, with remastered artwork
+alongside the original look.
 
 The engine is a C++ translation of [wanda-phi/pfr](https://github.com/wanda-phi/pfr), a
 faithful recreation of the DOS game in Rust, whose authors gave permission to use their
@@ -28,7 +28,8 @@ the 1994 one or a remastered one (F10 switches, at any time):
 - **Flippers drawn once and turned in code** instead of the original's frames, each about the
   axis its own artwork hinges on, so they follow the table's own angles exactly.
 - **A high-resolution ball** that goes behind ramps and rails as smoothly as the artwork covers
-  it, with a subtle trail that follows the physics steps rather than the frames.
+  it, with a subtle trail that follows the physics steps rather than the frames (F8 while
+  paused turns the trail off).
 - **A CRT look** (scanlines, shadow mask, glow) on F9, and the original crisp pixels without it.
 
 The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own instead.
@@ -61,8 +62,9 @@ particular has a different `INTRO.PRG`, `TABLE1.PRG` and `TABLE2.PRG`.
 The app finds the files by itself when they are in a folder near it (the folder given with
 `--data`, the one used last time, the working folder, the folders around the application, and
 their subfolders), and otherwise asks for the folder. Options and high scores are kept in the
-DOS formats (`PINBALL.CFG`, `TABLEn.HI`) under `~/Library/Application Support/pfr/Pinball
-Fantasies/`; the first time, they are imported from the game folder, which is never written to.
+DOS formats (`PINBALL.CFG`, `TABLEn.HI`) in the folder SDL keeps for the platform — under
+`~/Library/Application Support`, `~/.local/share` or `%APPDATA%`, in `pfr/Pinball Fantasies/`;
+the first time, they are imported from the game folder, which is never written to.
 
 ## Building
 
@@ -111,12 +113,30 @@ The original layout.
 | Left and right Shift, Ctrl or Alt | flippers |
 | Down arrow | pull the plunger, release to shoot |
 | Space | nudge the table (too often tilts it) |
-| P | pause; while paused, F7 cycles every lamp on, off and back to normal, F8 switches the ball's trail, and the arrows scroll the table (for checking artwork); A angle (low, high, or higher: a steeper table with stronger flippers), S scrolling, M music, R resolution |
+| P | pause (see below) |
 | M | music on or off |
+| Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
+| Command+F | fullscreen (the Windows or Super key elsewhere) |
+
+While paused, the original's own options, and two of this version's for looking at the artwork:
+
+| Key | Action |
+| --- | --- |
+| A | angle: low, high, or higher — a steeper table with stronger flippers |
+| S | scrolling: hard, medium or soft |
+| M, R | music on or off; resolution |
+| F7 | every lamp on, then every lamp off, then as the game has them |
+| F8 | the ball's trail on or off |
+| Up and down arrows | scroll the table by hand |
+| P | back to the game |
+| Escape | abandon the game (Y to confirm) |
+
+These two work at any time, in the menu or in play:
+
+| Key | Action |
+| --- | --- |
 | F9 | CRT look on or off |
 | F10 | the remastered pictures, or the originals |
-| Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
-| Command+F | fullscreen |
 
 ## Command line
 

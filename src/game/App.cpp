@@ -368,6 +368,10 @@ int App::run() {
       SDL_Event e;
       while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_QUIT) running_ = false;
+        // Nothing in the game is played with the mouse, so the pointer keeps out of the way
+        // while it is over the window, and comes back when it leaves or the window does.
+        if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_WINDOW_FOCUS_GAINED) SDL_HideCursor();
+        if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) SDL_ShowCursor();
         handleKey(e);
       }
       const auto nowT = clock::now();
