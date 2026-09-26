@@ -34,17 +34,17 @@ The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own
 
 ### The same screens, either way
 
-Each picture is split down the middle: the 1994 artwork on the left, the remastered one on
-the right, with everything else -- the geometry, the lamps, the scrolling, the physics --
-the same on both sides.
+Each picture is one frame drawn twice, and the line sweeps across it: the 1994 artwork on
+the left of the line, the remastered one on the right. Everything else -- the geometry, the
+lamps, the scrolling, the physics -- is the same on both sides.
 
-![The opening slide](docs/split-intro.png)
+![The opening slide](docs/sweep-intro.png)
 
-![The table chooser](docs/split-menu.png)
+![The table chooser](docs/sweep-menu.png)
 
-![Party Land](docs/split-party.png)
+![Party Land](docs/sweep-party.png)
 
-![Stones n Bones](docs/split-stones.png)
+![Stones n Bones](docs/sweep-stones.png)
 
 ## Game files
 
