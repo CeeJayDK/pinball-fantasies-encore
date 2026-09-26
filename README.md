@@ -17,7 +17,14 @@ of the original is emulated, and nothing of it is included here.
 ## The remaster
 
 All four tables play exactly as the original does, and the picture on top of it can be either
-the 1994 one or a remastered one (F10 switches, at any time):
+the 1994 one or a remastered one (F10 switches, at any time).
+
+**None of it is an upscale.** No filter was run over the original pictures, nothing was
+enlarged and smoothed, and no machine guessed at the missing detail. Every playfield, slide,
+banner, flipper and ball was made again at high resolution, drawn to the original's own
+shapes, colours, lamps and lettering, so that what is on screen keeps the feel of the table
+as it was rather than becoming a blurred blow-up of it. That is also why the two pictures sit
+on each other exactly, pixel area for pixel area, and why F10 can swap them mid-ball:
 
 - **Redrawn playfields** at high resolution for every table, with the lamps still working: the
   game records, per screen pixel, which original pixel it drew and how lit that spot is, and
@@ -36,22 +43,27 @@ The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own
 
 Each picture is one frame drawn twice, and the line sweeps across it: the 1994 artwork on
 the left of the line, the remastered one on the right. Everything else -- the geometry, the
-lamps, the scrolling, the physics -- is the same on both sides.
+lamps, the scrolling, the physics -- is the same on both sides. The right-hand half is not
+the left one enlarged: it is its own picture, drawn to sit over the original's shapes.
 
-![The opening slide](docs/sweep-intro.png)
-
-![The table chooser](docs/sweep-menu.png)
-
-![Party Land](docs/sweep-party.png)
-
-![Stones n Bones](docs/sweep-stones.png)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/sweep-intro.png" alt="The opening slide" width="100%"></td>
+    <td width="50%"><img src="docs/sweep-menu.png" alt="The table chooser" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/sweep-party.png" alt="Party Land" width="100%"></td>
+    <td width="50%"><img src="docs/sweep-stones.png" alt="Stones n Bones" width="100%"></td>
+  </tr>
+</table>
 
 ## Game files
 
-Nothing from the original is included, apart from the redrawn pictures in `assets/hd`. The game reads the pictures, collision maps, scripts, music and effects from your
-own copy of the DOS files, and it needs **exactly** the release below, because it reads the
-data at fixed addresses. At start-up every file is checked
-against these SHA-256 sums, and a folder holding any other release is refused:
+Nothing from the original is included here, apart from the redrawn pictures in `assets/hd`.
+The game reads the pictures, collision maps, scripts, music and effects from a copy of the
+DOS files, and it needs **exactly** the 1994 disk release, because it takes the data from
+fixed addresses. At start-up every file is checked against these SHA-256 sums, and a folder
+holding any other release is refused:
 
 ```
 619723e39acc003c64ae5f10159ae9da6192a28642c348f455bac447a1184967  INTRO.PRG
@@ -66,19 +78,19 @@ fb7bfd1c96a462cb03999d2e6f843a20d3de69ba05fcbd384a9f1c131b9a563a  TABLE3.MOD
 31ad7e671ae77c07c3d075e2f1fecd3d918fd921fa23acd9a1b0b6fc07fbbcea  TABLE4.MOD
 ```
 
-`INTRO.MOD` is also needed but not checked: the DOS game rewrites it as part of its copy
-protection. The supported release is the original disk version, archived at
-<https://archive.org/details/000323-PinballFantasies>. Re-releases differ; a cracked copy in
-particular has a different `INTRO.PRG`, `TABLE1.PRG` and `TABLE2.PRG`.
+As long as you confirm you legally own a copy of the game, the correct files will be downloaded and unpacked automatically the first time you run it. 
 
-The app finds the files by itself: a `game` folder beside it (or in this project's folder when
-built from source) comes first, then the folder given with `--data`, the one used last time,
-the working folder, the folders around the application and their subfolders; failing all that
-it asks. A build copies the project's `game` folder into the application, so a copy put there
-travels with it. Options and high scores are kept in the
-DOS formats (`PINBALL.CFG`, `TABLEn.HI`) in the folder SDL keeps for the platform — under
-`~/Library/Application Support`, `~/.local/share` or `%APPDATA%`, in `Encore/Pinball Fantasies/`;
-the first time, they are imported from the game folder, which is never written to.
+The files are then read from one place and one only: a `FANTASY` folder inside the folder this
+version keeps its own things in, which is the folder SDL gives it for the platform —
+`~/Library/Application Support/Encore/Pinball Fantasies/FANTASY` on macOS,
+`~/.local/share/Encore/Pinball Fantasies/FANTASY` on Linux,
+`%APPDATA%\Encore\Pinball Fantasies\FANTASY` on Windows.
+
+You can also put the files there yourself, or start the game with `--data <dir>` to read
+another folder for that run.
+
+Options and high scores are kept beside it, in the DOS formats
+(`PINBALL.CFG`, `TABLEn.HI`).
 
 ## Building
 
@@ -185,6 +197,8 @@ These two work at any time, in the menu or in play:
 | `--fullscreen`, `--scale <n>` | window options |
 | `--screenshot <file>`, `--screenshot-frame <n>` | render one frame to a PNG and quit |
 | `--stats` | log, once a second, how long each frame takes |
+| `--verbose` | log every step, not only what matters |
+| `--help` | the options, and what they do |
 
 ## Tools
 
@@ -208,8 +222,8 @@ These two work at any time, in the menu or in play:
 | `assets/hd` | Redrawn, high-resolution pictures drawn in place of the originals: the intro's slides, the menu's side panel, table banners and high-score heading, each table's playfield lit and unlit, the flippers and the ball |
 | `assets/app` | The application icon, built into `icon.icns` at build time |
 | `src/gfx`, `shaders` | Indexed framebuffer, palette, OpenGL renderer; `post.frag` is the hook for CRT-style effects and is hot-reloaded |
-| `src/platform` | SDL3 window, audio device, finding the game files |
-| `src/core`, `src/data` | Types, files, PNG and SHA-256, IFF pictures, the game-version check |
+| `src/platform` | SDL3 window, audio device, finding the game files, fetching over HTTP |
+| `src/core`, `src/data` | Types, files, PNG, deflate and zip, SHA-256, IFF pictures, the game-version check |
 | `tests` | Pure-logic tests, and tests that play full games when the game files are present |
 | `docs` | Notes from the reverse-engineering work |
 | `re/legacy-engine` | The earlier engine this translation replaced, kept for reference; not built |
