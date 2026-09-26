@@ -14,7 +14,7 @@
 #include "core/File.h"
 #include "core/Log.h"
 #include "core/Png.h"
-#include "game/Skins.h"
+#include "game/Fantasy.h"
 #include "platform/DataLocator.h"
 #include "platform/ImageFile.h"
 
@@ -162,8 +162,8 @@ bool App::init() {
     // Without letters there is no way to put the question, and no question means no offer:
     // the game starts with the pictures it already has.
     if (askFont_.data.width() == 0) log::error("the intro's font could not be read; not offering the pictures");
-    if (askFont_.data.width() != 0 && !downloadSkinOnce(
-            into, [this] { return askForSkin(); },
+    if (askFont_.data.width() != 0 && !downloadFantasyOnce(
+            into, [this] { return askToDownload(); },
             [this](double seconds) { drawWaiting(seconds, "DOWNLOADING THE HD GRAPHICS"); }))
       return false;
   }
@@ -392,7 +392,7 @@ void App::update(double dt) {
 /// The offer of the pictures, put in the game's own window rather than in a box of the
 /// system's: two lines and a choice, answered with the arrow keys and enter, or with Y and
 /// N, or turned down with escape.
-bool App::askForSkin() {
+bool App::askToDownload() {
   bool yes = true;
   for (;;) {
     SDL_Event event;

@@ -46,7 +46,7 @@ class App {
   bool init();
   void update(double dt);
   void render(double now);
-  bool askForSkin();
+  bool askToDownload();
   void drawWaiting(double seconds, std::string_view line);
   void openIntro(int returningFrom);
   void openTable(int index);
