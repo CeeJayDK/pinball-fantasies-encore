@@ -1,4 +1,4 @@
-// Tests against the real game files. They look for the supported version in PFR_DATA, or
+// Tests against the real game files. They look for the supported version in ENCORE_DATA, or
 // in the FANTASY folder beside the project, and are skipped when neither is present.
 #include <algorithm>
 #include <cmath>
@@ -18,8 +18,8 @@ using namespace pfr;
 namespace {
 
 std::filesystem::path dataDir() {
-  if (const char* d = std::getenv("PFR_DATA")) return d;
-  return std::filesystem::path(PFR_SOURCE_DIR) / ".." / ".." / "FANTASY";
+  if (const char* d = std::getenv("ENCORE_DATA")) return d;
+  return std::filesystem::path(ENCORE_SOURCE_DIR) / ".." / ".." / "FANTASY";
 }
 
 bool haveData() {

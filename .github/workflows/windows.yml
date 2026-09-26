@@ -44,8 +44,8 @@ jobs:
             "build/RelWithDebInfo/Pinball Fantasies.exe",
             "build/RelWithDebInfo/shaders/post.frag",
             "build/RelWithDebInfo/hd/playfield1_on.png",
-            "build/RelWithDebInfo/pfr-play.exe",
-            "build/RelWithDebInfo/pfr-assets.exe",
-            "build/RelWithDebInfo/pfr-extract.exe")) {
+            "build/RelWithDebInfo/encore-play.exe",
+            "build/RelWithDebInfo/encore-assets.exe",
+            "build/RelWithDebInfo/encore-extract.exe")) {
             if (-not (Test-Path $f)) { throw "missing $f" }
           }

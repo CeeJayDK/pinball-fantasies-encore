@@ -83,7 +83,7 @@ bool App::init() {
   if (options_.resolution) config_.options.resolution = *options_.resolution;
 
   // Prefer the shaders in the source tree while developing, so edits take effect at once.
-  const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "shaders";
+  const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "shaders";
   shaderDir_ = std::filesystem::exists(source) ? source : executableDir() / "shaders";
 
   if (!window_.create("Pinball Fantasies: Encore!", 640 * std::max(1, options_.windowScale) / 2,
@@ -138,7 +138,7 @@ void App::setCrt(bool on) {
 std::filesystem::path App::hdPicturePath(const std::string& name) const {
   const std::filesystem::path own = options_.hdDir.value_or(saveDir_ / "hd");
   if (std::filesystem::exists(own / name)) return own / name;
-  const std::filesystem::path source = std::filesystem::path(PFR_SOURCE_DIR) / "assets" / "hd";
+  const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "assets" / "hd";
   return (std::filesystem::exists(source) ? source : executableDir() / "hd") / name;
 }
 

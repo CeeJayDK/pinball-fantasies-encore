@@ -28,7 +28,7 @@ inline int dmFontHeight(DmFont f) {
   return 13;
 }
 
-#include "assets/PfrTables.inc"
+#include "assets/GameTables.inc"
 
 enum class Layer : u8 { Ground, Overhead };
 enum class FlipperSide : u8 { Left, Right };

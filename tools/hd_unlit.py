@@ -6,7 +6,7 @@
 The game draws a lamp that is off at half brightness, so the unlit picture is the lit one
 with every lamp dimmed by half. Which pixels belong to a lamp comes from the original
 playfield: the ones that differ between `playfield_lights_on.png` and
-`playfield_lights_off.png`, as written by `pfr-extract`. Holes inside a lamp (a monster's
+`playfield_lights_off.png`, as written by `encore-extract`. Holes inside a lamp (a monster's
 eyes, the middle of a letter) count as part of it, a lamp dithered against what is behind it
 (the criss-cross rail on Stones n Bones) is closed up, and single stray pixels of a lamp
 colour are left out. The game does the same when it draws the picture.

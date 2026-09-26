@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Generates src/assets/PfrTables.inc from a checkout of https://github.com/wanda-phi/pfr.
+"""Generates src/assets/GameTables.inc from a checkout of https://github.com/wanda-phi/pfr.
 
 pfr's authors gave permission to reuse their work. Its asset extraction contains long
 per-table lookup tables (handler addresses, script opcodes, effects, bindings); copying
 them mechanically avoids transcription mistakes. Logic is translated by hand elsewhere.
 
-usage: gen_pfr_tables.py <pfr-checkout> <output.inc>
+usage: gen_game_tables.py <checkout> <output.inc>
 """
 import re
 import sys

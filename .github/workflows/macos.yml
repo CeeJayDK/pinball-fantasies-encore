@@ -44,4 +44,4 @@ jobs:
           test -f "$app/Resources/icon.icns"
           test -f "$app/Resources/shaders/post.frag"
           test -f "$app/Resources/hd/playfield1_on.png"
-          test -x build/pfr-play && test -x build/pfr-assets && test -x build/pfr-extract
+          test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract

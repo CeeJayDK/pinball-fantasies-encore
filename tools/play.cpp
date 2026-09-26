@@ -1,7 +1,7 @@
-// pfr-play: plays a game headlessly on one table with a simple autopilot, printing the
+// encore-play: plays a game headlessly on one table with a simple autopilot, printing the
 // ball, score and dot matrix, to check the rules and physics without a window.
 //
-//   pfr-play <game folder> <table 1-4> [frames] [seed] [out.png]
+//   encore-play <game folder> <table 1-4> [frames] [seed] [out.png]
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -37,7 +37,7 @@ std::string score(const pfr::Table& t) {
 
 int main(int argc, char** argv) {
   if (argc < 3) {
-    std::puts("usage: pfr-play <game folder> <table 1-4> [frames] [seed] [out.png]");
+    std::puts("usage: encore-play <game folder> <table 1-4> [frames] [seed] [out.png]");
     return 2;
   }
   const std::filesystem::path dir = argv[1];
@@ -109,9 +109,9 @@ int main(int argc, char** argv) {
                   s.c_str(), t.inAttract() ? " [attract]" : "");
       lastScore = s;
     }
-    if (std::getenv("PFR_DM") && f % 500 == 499) printDm(t);
+    if (std::getenv("ENCORE_DM") && f % 500 == 499) printDm(t);
   }
-  if (std::getenv("PFR_DM")) printDm(t);
+  if (std::getenv("ENCORE_DM")) printDm(t);
   if (shots) std::printf("flipper shots reaching the upper table: %d, average top y %ld\n", shots, sumTop / shots);
   if (png) {
     std::vector<pfr::u8> pixels(320 * static_cast<std::size_t>(t.screenHeight()));

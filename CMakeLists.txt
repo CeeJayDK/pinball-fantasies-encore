@@ -14,9 +14,9 @@ find_package(SDL3 REQUIRED CONFIG)
 find_package(OpenGL REQUIRED)
 
 # ---------------------------------------------------------------------------
-# pfr_core: everything that does not touch SDL or OpenGL. Unit-testable.
+# encore_core: everything that does not touch SDL or OpenGL. Unit-testable.
 # ---------------------------------------------------------------------------
-add_library(pfr_core STATIC
+add_library(encore_core STATIC
   src/core/Log.cpp
   src/core/File.cpp
   src/core/Png.cpp
@@ -44,12 +44,12 @@ add_library(pfr_core STATIC
   src/gfx/Framebuffer.cpp
   src/gfx/Palette.cpp
 )
-target_include_directories(pfr_core PUBLIC src)
+target_include_directories(encore_core PUBLIC src)
 if(MSVC)
-  target_compile_options(pfr_core PUBLIC /W4 /permissive- /utf-8 /EHsc)
-  target_compile_definitions(pfr_core PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX)
+  target_compile_options(encore_core PUBLIC /W4 /permissive- /utf-8 /EHsc)
+  target_compile_definitions(encore_core PUBLIC _CRT_SECURE_NO_WARNINGS NOMINMAX)
 else()
-  target_compile_options(pfr_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
+  target_compile_options(encore_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -68,14 +68,14 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
 )
 # Pictures are decoded by this project's own PNG reader, and every OpenGL function past 1.1
 # is fetched from the driver, so nothing here is platform-specific but the library names.
-target_link_libraries(pinball-fantasies PRIVATE pfr_core SDL3::SDL3 OpenGL::GL)
-target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 PFR_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(pinball-fantasies PRIVATE encore_core SDL3::SDL3 OpenGL::GL)
+target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 set_target_properties(pinball-fantasies PROPERTIES OUTPUT_NAME "Pinball Fantasies")
 
 if(APPLE)
   set_target_properties(pinball-fantasies PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Pinball Fantasies"
-    MACOSX_BUNDLE_GUI_IDENTIFIER "org.pfr.pinball-fantasies"
+    MACOSX_BUNDLE_GUI_IDENTIFIER "org.encore.pinball-fantasies"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     MACOSX_BUNDLE_ICON_FILE "icon")
@@ -98,8 +98,8 @@ if(APPLE)
     COMMAND iconutil -c icns "${ICON_SET}" -o "${ICON_FILE}"
     DEPENDS "${CMAKE_SOURCE_DIR}/assets/app/icon.png"
     COMMENT "Building the application icon")
-  add_custom_target(pfr_icon DEPENDS "${ICON_FILE}")
-  add_dependencies(pinball-fantasies pfr_icon)
+  add_custom_target(encore_icon DEPENDS "${ICON_FILE}")
+  add_dependencies(pinball-fantasies encore_icon)
 endif()
 
 # Shaders and the replacement pictures travel with the application: inside the bundle on
@@ -111,7 +111,7 @@ else()
   set(PFR_RESOURCE_DIR "$<TARGET_FILE_DIR:pinball-fantasies>")
 endif()
 
-add_custom_target(pfr_shaders ALL
+add_custom_target(encore_shaders ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/shaders" "${PFR_RESOURCE_DIR}/shaders"
   COMMAND ${CMAKE_COMMAND} -E copy_directory
@@ -120,7 +120,7 @@ add_custom_target(pfr_shaders ALL
   COMMENT "Copying shaders and pictures next to the application")
 
 if(APPLE)
-  add_custom_command(TARGET pfr_shaders POST_BUILD
+  add_custom_command(TARGET encore_shaders POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${PFR_RESOURCE_DIR}/icon.icns")
 endif()
 
@@ -133,20 +133,20 @@ endif()
 # Tests
 # ---------------------------------------------------------------------------
 enable_testing()
-add_executable(pfr-tests
+add_executable(encore-tests
   tests/main.cpp
   tests/test_core.cpp
   tests/test_game.cpp
 )
-target_compile_definitions(pfr-tests PRIVATE PFR_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-target_link_libraries(pfr-tests PRIVATE pfr_core)
-add_test(NAME unit COMMAND pfr-tests)
+target_compile_definitions(encore-tests PRIVATE ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(encore-tests PRIVATE encore_core)
+add_test(NAME unit COMMAND encore-tests)
 
-add_executable(pfr-assets tools/assets_check.cpp)
-target_link_libraries(pfr-assets PRIVATE pfr_core)
+add_executable(encore-assets tools/assets_check.cpp)
+target_link_libraries(encore-assets PRIVATE encore_core)
 
-add_executable(pfr-play tools/play.cpp)
-target_link_libraries(pfr-play PRIVATE pfr_core)
+add_executable(encore-play tools/play.cpp)
+target_link_libraries(encore-play PRIVATE encore_core)
 
-add_executable(pfr-extract tools/extract.cpp)
-target_link_libraries(pfr-extract PRIVATE pfr_core)
+add_executable(encore-extract tools/extract.cpp)
+target_link_libraries(encore-extract PRIVATE encore_core)

@@ -1,6 +1,6 @@
-// pfr-extract: saves the game's graphics as PNG files, to look at or edit.
+// encore-extract: saves the game's graphics as PNG files, to look at or edit.
 //
-//   pfr-extract <game folder> <output folder>
+//   encore-extract <game folder> <output folder>
 //
 // Everything is read from your own game files; the output is for your use only.
 #include <cstdio>
@@ -94,7 +94,7 @@ void extractIntro(const fs::path& game, const fs::path& out) {
 
 int main(int argc, char** argv) {
   if (argc < 3) {
-    std::puts("usage: pfr-extract <game folder> <output folder>");
+    std::puts("usage: encore-extract <game folder> <output folder>");
     return 2;
   }
   try {

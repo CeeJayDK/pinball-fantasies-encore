@@ -10,11 +10,9 @@ A native version of *Pinball Fantasies* (Digital Illusions / 21st Century Entert
 PC release) for macOS, Linux and Windows, in C++20 on SDL3 and OpenGL, with remastered artwork
 alongside the original look.
 
-The engine is a C++ translation of [wanda-phi/pfr](https://github.com/wanda-phi/pfr), a
-faithful recreation of the DOS game in Rust, whose authors gave permission to use their
-work. Physics, table rules, scripts, the dot matrix, music sequencing, the intro and the menu
-all follow pfr function by function; the platform layer, renderer and shader pipeline are
-this project's own.
+The engine is written from the game's own data: it reads the original DOS files and runs the
+physics, the table rules and scripts, the dot matrix, the music and the menus itself. Nothing
+of the original is emulated, and nothing of it is included here.
 
 ## The remaster
 
@@ -37,8 +35,8 @@ The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own
 ## Game files
 
 Nothing from the original is included, apart from the redrawn pictures in `assets/hd`. The game reads the pictures, collision maps, scripts, music and effects from your
-own copy of the DOS files, and it needs **exactly** the release pfr supports, because it reads
-the data at fixed addresses. At start-up every file is checked
+own copy of the DOS files, and it needs **exactly** the release below, because it reads the
+data at fixed addresses. At start-up every file is checked
 against these SHA-256 sums, and a folder holding any other release is refused:
 
 ```
@@ -63,7 +61,7 @@ The app finds the files by itself when they are in a folder near it (the folder 
 `--data`, the one used last time, the working folder, the folders around the application, and
 their subfolders), and otherwise asks for the folder. Options and high scores are kept in the
 DOS formats (`PINBALL.CFG`, `TABLEn.HI`) in the folder SDL keeps for the platform — under
-`~/Library/Application Support`, `~/.local/share` or `%APPDATA%`, in `pfr/Pinball Fantasies/`;
+`~/Library/Application Support`, `~/.local/share` or `%APPDATA%`, in `Encore/Pinball Fantasies/`;
 the first time, they are imported from the game folder, which is never written to.
 
 ## Building
@@ -77,7 +75,7 @@ asked of the driver through SDL, so there is no image library and no loader to i
 ```bash
 cmake -S . -B build
 cmake --build build -j
-./build/pfr-tests
+./build/encore-tests
 open "build/Pinball Fantasies.app"
 ```
 
@@ -160,21 +158,20 @@ These two work at any time, in the menu or in play:
 
 | Tool | Purpose |
 | --- | --- |
-| `pfr-play <dir> <table> [frames] [seed] [out.png]` | plays a game headlessly with a simple autopilot and prints the ball, the score, every trigger and (with `PFR_DM=1`) the dot matrix |
-| `pfr-assets <dir>` | loads every table and prints what was extracted, including each flipper's rectangle, hinge and sweep |
-| `pfr-extract <dir> <out>` | writes every table's artwork, collision maps, flipper frames, ball and plunger out as PNGs |
+| `encore-play <dir> <table> [frames] [seed] [out.png]` | plays a game headlessly with a simple autopilot and prints the ball, the score, every trigger and (with `ENCORE_DM=1`) the dot matrix |
+| `encore-assets <dir>` | loads every table and prints what was extracted, including each flipper's rectangle, hinge and sweep |
+| `encore-extract <dir> <out>` | writes every table's artwork, collision maps, flipper frames, ball and plunger out as PNGs |
 | `tools/hd_import.py <name>=<picture> ...` | prepares redrawn pictures (trims, resizes to 3x the original) into `assets/hd` |
-| `tools/hd_unlit.py <lit.png> <unlit.png> <table dir>` | derives a playfield's lights-off picture from its lights-on one, using the original's lamps (needs `pfr-extract` output) |
-| `tools/gen_pfr_tables.py <pfr> <out>` | regenerates `src/assets/PfrTables.inc`, the lookup tables copied mechanically from pfr's source |
+| `tools/hd_unlit.py <lit.png> <unlit.png> <table dir>` | derives a playfield's lights-off picture from its lights-on one, using the original's lamps (needs `encore-extract` output) |
 
 ## Layout
 
 | Path | Purpose |
 | --- | --- |
-| `src/assets` | Reading a table executable: artwork, collision maps, gates, triggers, lights, sounds, fonts and the table script (pfr's `assets/table`) |
-| `src/table` | A table in play: physics, script interpreter, tasks, game flow, and one file per table's rules (pfr's `table`) |
-| `src/intro` | The slideshow and the table menu with its text, high-score and options pages (pfr's `intro`) |
-| `src/sound` | The four-channel module player and the jingle sequencer (pfr's `sound`) |
+| `src/assets` | Reading a table executable: artwork, collision maps, gates, triggers, lights, sounds, fonts and the table script |
+| `src/table` | A table in play: physics, script interpreter, tasks, game flow, and one file per table's rules |
+| `src/intro` | The slideshow and the table menu with its text, high-score and options pages |
+| `src/sound` | The four-channel module player and the jingle sequencer |
 | `src/game` | Application shell and the options and high-score files |
 | `assets/hd` | Redrawn, high-resolution pictures drawn in place of the originals: the intro's slides, the menu's side panel, table banners and high-score heading, each table's playfield lit and unlit, the flippers and the ball |
 | `assets/app` | The application icon, built into `icon.icns` at build time |

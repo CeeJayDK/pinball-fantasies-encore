@@ -1,4 +1,4 @@
-// pfr-assets: loads every table's assets and prints a summary, as a quick integrity check.
+// encore-assets: loads every table's assets and prints a summary, as a quick integrity check.
 #include <cstdio>
 
 #include "assets/TableAssets.h"
@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::puts("usage: pfr-assets <game folder>");
+    std::puts("usage: encore-assets <game folder>");
     return 2;
   }
   int failures = 0;
