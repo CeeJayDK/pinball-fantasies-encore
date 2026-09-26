@@ -32,6 +32,20 @@ the 1994 one or a remastered one (F10 switches, at any time):
 
 The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own instead.
 
+### The same screens, either way
+
+Each picture is split down the middle: the 1994 artwork on the left, the remastered one on
+the right, with everything else -- the geometry, the lamps, the scrolling, the physics --
+the same on both sides.
+
+![The opening slide](docs/split-intro.png)
+
+![The table chooser](docs/split-menu.png)
+
+![Party Land](docs/split-party.png)
+
+![Stones n Bones](docs/split-stones.png)
+
 ## Game files
 
 Nothing from the original is included, apart from the redrawn pictures in `assets/hd`. The game reads the pictures, collision maps, scripts, music and effects from your
