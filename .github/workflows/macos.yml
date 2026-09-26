@@ -27,7 +27,7 @@ jobs:
         run: brew install sdl3
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$(brew --prefix)"
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$(brew --prefix)" -DENCORE_BUNDLE_GAME=OFF
 
       - name: Build
         run: cmake --build build -j3
@@ -45,3 +45,28 @@ jobs:
           test -f "$app/Resources/shaders/post.frag"
           test -f "$app/Resources/hd/playfield1_on.png"
           test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract
+
+      # SDL is linked from wherever Homebrew put it, so a copy travels inside the application
+      # and the binary is pointed at it. Modifying the binary voids its signature, so it is
+      # signed again, without a certificate, which is all an unsigned application needs.
+      - name: Bundle SDL into the application
+        run: |
+          app="build/Pinball Fantasies.app"
+          bin="$app/Contents/MacOS/Pinball Fantasies"
+          mkdir -p "$app/Contents/Frameworks"
+          sdl=$(otool -L "$bin" | awk '/libSDL3/ {print $1}')
+          cp "$sdl" "$app/Contents/Frameworks/"
+          install_name_tool -change "$sdl" "@executable_path/../Frameworks/$(basename "$sdl")" "$bin"
+          codesign --force --sign - --deep "$app"
+          otool -L "$bin" | head -3
+
+      - name: Package
+        run: |
+          cd build
+          ditto -c -k --sequesterRsrc --keepParent "Pinball Fantasies.app" "../pinball-fantasies-encore-macos-${{ matrix.arch }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinball-fantasies-encore-macos-${{ matrix.arch }}
+          path: pinball-fantasies-encore-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error

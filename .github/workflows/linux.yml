@@ -30,7 +30,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build pkg-config \
+            build-essential cmake ninja-build pkg-config patchelf \
             libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
             libxss-dev libxtst-dev libxkbcommon-dev libxinerama-dev \
@@ -56,7 +56,7 @@ jobs:
           cmake --install sdl-build
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$HOME/sdl3-install"
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$HOME/sdl3-install" -DENCORE_BUNDLE_GAME=OFF
 
       - name: Build
         run: cmake --build build -j3
@@ -70,3 +70,22 @@ jobs:
           test -f build/shaders/post.frag
           test -f build/hd/playfield1_on.png
           test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract
+
+      # SDL travels in lib/ beside the binary, which is told to look there first, so the
+      # package runs on a machine that has no SDL3 of its own.
+      - name: Package
+        run: |
+          dist="pinball-fantasies-encore"
+          mkdir -p "$dist/lib"
+          cp "build/Pinball Fantasies" "$dist/"
+          cp -r build/shaders build/hd "$dist/"
+          cp -L "$(ldd "build/Pinball Fantasies" | awk '/libSDL3/ {print $3}')" "$dist/lib/"
+          patchelf --set-rpath '$ORIGIN/lib' "$dist/Pinball Fantasies"
+          tar czf "pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz" "$dist"
+          ldd "$dist/Pinball Fantasies" | grep -i sdl
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinball-fantasies-encore-linux-${{ matrix.arch }}
+          path: pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error

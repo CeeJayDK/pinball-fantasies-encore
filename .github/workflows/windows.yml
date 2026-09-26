@@ -29,7 +29,7 @@ jobs:
 
       - name: Configure
         shell: pwsh
-        run: cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH="$pwd/sdl3/SDL3-$env:SDL_VERSION/cmake"
+        run: cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH="$pwd/sdl3/SDL3-$env:SDL_VERSION/cmake" -DENCORE_BUNDLE_GAME=OFF
 
       - name: Build
         run: cmake --build build --config RelWithDebInfo -j3
@@ -49,3 +49,21 @@ jobs:
             "build/RelWithDebInfo/encore-extract.exe")) {
             if (-not (Test-Path $f)) { throw "missing $f" }
           }
+
+      # SDL3.dll goes beside the executable, where Windows looks for it first.
+      - name: Package
+        shell: pwsh
+        run: |
+          $dist = "pinball-fantasies-encore"
+          New-Item -ItemType Directory -Path $dist | Out-Null
+          Copy-Item "build/RelWithDebInfo/Pinball Fantasies.exe" $dist
+          Copy-Item -Recurse "build/RelWithDebInfo/shaders" $dist
+          Copy-Item -Recurse "build/RelWithDebInfo/hd" $dist
+          Copy-Item "sdl3/SDL3-$env:SDL_VERSION/lib/x64/SDL3.dll" $dist
+          Compress-Archive -Path $dist -DestinationPath "pinball-fantasies-encore-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinball-fantasies-encore-windows-x64
+          path: pinball-fantasies-encore-windows-x64.zip
+          if-no-files-found: error
