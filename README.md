@@ -72,7 +72,9 @@ The game needs CMake 3.24 or later, a C++20 compiler, SDL3 and OpenGL 4.1. Nothi
 pictures are decoded by this project's own PNG reader, and every OpenGL function past 1.1 is
 asked of the driver through SDL, so there is no image library and no loader to install.
 
-**macOS** (Xcode command-line tools, `brew install sdl3`):
+**macOS** (Xcode command-line tools, `brew install sdl3`; for a build that runs on both Apple
+Silicon and Intel, point `-DENCORE_SDL3_FRAMEWORK=` at the official universal `SDL3.framework`
+and set `-DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"`):
 
 ```bash
 cmake -S . -B build
@@ -100,6 +102,20 @@ On macOS the shaders and pictures go inside the application bundle; elsewhere th
 next to the executable, which is where the game looks for them. Settings and high scores live
 in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.local/share`,
 `%APPDATA%`).
+
+## A downloaded build on macOS
+
+The application is signed without a certificate, so macOS quarantines it like anything else
+from the internet and refuses to open it — from the Finder it does nothing at all, while the
+binary inside still runs from a terminal. Either right-click it and choose Open, and then Open
+again, or clear the flag:
+
+```bash
+xattr -dr com.apple.quarantine "Pinball Fantasies.app"
+```
+
+Signing it properly, so that nobody has to do this, needs an Apple Developer certificate and
+notarisation.
 
 ## Controls
 

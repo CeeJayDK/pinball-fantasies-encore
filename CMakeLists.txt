@@ -10,7 +10,21 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
-find_package(SDL3 REQUIRED CONFIG)
+# SDL comes from the system (Homebrew, a distribution's package, the Windows development
+# files). On macOS it can instead be the official universal framework, which is what a build
+# for both Apple Silicon and Intel needs: -DENCORE_SDL3_FRAMEWORK=<path to SDL3.framework>.
+set(ENCORE_SDL3_FRAMEWORK "" CACHE PATH "SDL3.framework to build against instead of the system's SDL3")
+if(ENCORE_SDL3_FRAMEWORK)
+  get_filename_component(_sdl3_dir "${ENCORE_SDL3_FRAMEWORK}" DIRECTORY)
+  add_library(encore_sdl3 INTERFACE)
+  target_include_directories(encore_sdl3 INTERFACE "${ENCORE_SDL3_FRAMEWORK}/Headers")
+  target_compile_options(encore_sdl3 INTERFACE "-F${_sdl3_dir}")
+  target_link_options(encore_sdl3 INTERFACE "-F${_sdl3_dir}" "-framework" "SDL3"
+                      "-Wl,-rpath,@executable_path/../Frameworks")
+  add_library(SDL3::SDL3 ALIAS encore_sdl3)
+else()
+  find_package(SDL3 REQUIRED CONFIG)
+endif()
 find_package(OpenGL REQUIRED)
 
 # ---------------------------------------------------------------------------

@@ -10,24 +10,32 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  SDL_VERSION: 3.4.16
+
 jobs:
   build:
-    name: macOS (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false     # one architecture failing must not cancel the other
-      matrix:
-        include:
-          - { runner: macos-15, arch: arm64 }
-          - { runner: macos-15-intel, arch: x86_64 }
+    name: macOS (universal)
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install SDL3
-        run: brew install sdl3
+      # The official framework carries both architectures, which Homebrew's SDL does not, so
+      # one build runs on Apple Silicon and Intel alike.
+      - name: Fetch the SDL3 framework
+        run: |
+          curl -fsSL -o sdl3.dmg "https://github.com/libsdl-org/SDL/releases/download/release-$SDL_VERSION/SDL3-$SDL_VERSION.dmg"
+          hdiutil attach -nobrowse -quiet sdl3.dmg -mountpoint /tmp/sdl3
+          cp -R /tmp/sdl3/SDL3.xcframework/macos-arm64_x86_64/SDL3.framework .
+          hdiutil detach -quiet /tmp/sdl3
+          lipo -archs SDL3.framework/SDL3
 
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$(brew --prefix)" -DENCORE_BUNDLE_GAME=OFF
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DENCORE_SDL3_FRAMEWORK="$PWD/SDL3.framework" \
+            -DENCORE_BUNDLE_GAME=OFF
 
       - name: Build
         run: cmake --build build -j3
@@ -45,28 +53,23 @@ jobs:
           test -f "$app/Resources/shaders/post.frag"
           test -f "$app/Resources/hd/playfield1_on.png"
           test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract
+          lipo -archs "$app/MacOS/Pinball Fantasies" | tee /dev/stderr | grep -q x86_64
+          lipo -archs "$app/MacOS/Pinball Fantasies" | grep -q arm64
 
-      # SDL is linked from wherever Homebrew put it, so a copy travels inside the application
-      # and the binary is pointed at it. Modifying the binary voids its signature, so it is
-      # signed again, without a certificate, which is all an unsigned application needs.
-      - name: Bundle SDL into the application
-        run: |
-          app="build/Pinball Fantasies.app"
-          bin="$app/Contents/MacOS/Pinball Fantasies"
-          mkdir -p "$app/Contents/Frameworks"
-          sdl=$(otool -L "$bin" | awk '/libSDL3/ {print $1}')
-          cp "$sdl" "$app/Contents/Frameworks/"
-          install_name_tool -change "$sdl" "@executable_path/../Frameworks/$(basename "$sdl")" "$bin"
-          codesign --force --sign - --deep "$app"
-          otool -L "$bin" | head -3
-
+      # SDL travels inside the application, which was linked to look for it there. Changing
+      # anything in a bundle voids its signature, so it is signed again without a certificate.
       - name: Package
         run: |
+          app="build/Pinball Fantasies.app"
+          mkdir -p "$app/Contents/Frameworks"
+          cp -R SDL3.framework "$app/Contents/Frameworks/"
+          codesign --force --sign - --deep "$app"
+          codesign --verify --deep --strict "$app"
           cd build
-          ditto -c -k --sequesterRsrc --keepParent "Pinball Fantasies.app" "../pinball-fantasies-encore-macos-${{ matrix.arch }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "Pinball Fantasies.app" ../pinball-fantasies-encore-macos-universal.zip
 
       - uses: actions/upload-artifact@v4
         with:
-          name: pinball-fantasies-encore-macos-${{ matrix.arch }}
-          path: pinball-fantasies-encore-macos-${{ matrix.arch }}.zip
+          name: pinball-fantasies-encore-macos-universal
+          path: pinball-fantasies-encore-macos-universal.zip
           if-no-files-found: error
