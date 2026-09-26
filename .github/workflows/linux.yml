@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install what SDL3 and OpenGL need
+      - name: Install what SDL3, OpenGL and the downloader need
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -35,7 +35,8 @@ jobs:
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
             libxss-dev libxtst-dev libxkbcommon-dev libxinerama-dev \
             libwayland-dev wayland-protocols libdecor-0-dev \
-            libasound2-dev libpulse-dev libdbus-1-dev libudev-dev libibus-1.0-dev
+            libasound2-dev libpulse-dev libdbus-1-dev libudev-dev libibus-1.0-dev \
+            libcurl4-openssl-dev
 
       # Ubuntu has no SDL3 package yet, so it is built once and kept for later runs.
       - name: Cache SDL3
