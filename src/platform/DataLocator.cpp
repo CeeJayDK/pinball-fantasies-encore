@@ -75,6 +75,10 @@ std::optional<std::filesystem::path> locateGameData(const std::optional<std::fil
   if (explicitDir) addWithParents(candidates, *explicitDir);
   if (auto remembered = rememberedFolder()) candidates.push_back(*remembered);
   std::error_code ec;
+  // The copy that travels with this project, when there is one: beside the application, or in
+  // the source folder while building from it.
+  if (const char* base = SDL_GetBasePath()) candidates.push_back(std::filesystem::path(base) / "game");
+  candidates.push_back(std::filesystem::path(ENCORE_SOURCE_DIR) / "game");
   addWithParents(candidates, std::filesystem::current_path(ec));
   if (const char* base = SDL_GetBasePath()) addWithParents(candidates, std::filesystem::path(base));
 

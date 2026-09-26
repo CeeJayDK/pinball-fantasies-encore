@@ -19,6 +19,8 @@ namespace {
 
 std::filesystem::path dataDir() {
   if (const char* d = std::getenv("ENCORE_DATA")) return d;
+  const std::filesystem::path inProject = std::filesystem::path(ENCORE_SOURCE_DIR) / "game";
+  if (std::filesystem::exists(inProject / "INTRO.PRG")) return inProject;
   return std::filesystem::path(ENCORE_SOURCE_DIR) / ".." / ".." / "FANTASY";
 }
 

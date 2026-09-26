@@ -119,6 +119,13 @@ add_custom_target(encore_shaders ALL
   DEPENDS pinball-fantasies
   COMMENT "Copying shaders and pictures next to the application")
 
+# The original's files, when a copy of them sits in the project: the application finds them
+# beside itself, so a build needs nothing else to run.
+if(EXISTS "${CMAKE_SOURCE_DIR}/game/INTRO.PRG")
+  add_custom_command(TARGET encore_shaders POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/game" "${PFR_RESOURCE_DIR}/game")
+endif()
+
 if(APPLE)
   add_custom_command(TARGET encore_shaders POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${PFR_RESOURCE_DIR}/icon.icns")

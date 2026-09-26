@@ -57,9 +57,11 @@ protection. The supported release is the original disk version, archived at
 <https://archive.org/details/000323-PinballFantasies>. Re-releases differ; a cracked copy in
 particular has a different `INTRO.PRG`, `TABLE1.PRG` and `TABLE2.PRG`.
 
-The app finds the files by itself when they are in a folder near it (the folder given with
-`--data`, the one used last time, the working folder, the folders around the application, and
-their subfolders), and otherwise asks for the folder. Options and high scores are kept in the
+The app finds the files by itself: a `game` folder beside it (or in this project's folder when
+built from source) comes first, then the folder given with `--data`, the one used last time,
+the working folder, the folders around the application and their subfolders; failing all that
+it asks. A build copies the project's `game` folder into the application, so a copy put there
+travels with it. Options and high scores are kept in the
 DOS formats (`PINBALL.CFG`, `TABLEn.HI`) in the folder SDL keeps for the platform — under
 `~/Library/Application Support`, `~/.local/share` or `%APPDATA%`, in `Encore/Pinball Fantasies/`;
 the first time, they are imported from the game folder, which is never written to.
