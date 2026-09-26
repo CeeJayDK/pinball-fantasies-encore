@@ -50,9 +50,10 @@ std::optional<std::filesystem::path> findCaseInsensitive(const std::filesystem::
              return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
            });
   };
-  for (const auto& entry : std::filesystem::directory_iterator(dir, ec)) {
-    if (equalsIgnoreCase(entry.path().filename().string(), name)) return entry.path();
-  }
+  // Asked not to throw at every step, not only at the first: a folder that cannot be read all
+  // the way through is answered with "not here" rather than an exception.
+  for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
+    if (equalsIgnoreCase(it->path().filename().string(), name)) return it->path();
   return std::nullopt;
 }
 

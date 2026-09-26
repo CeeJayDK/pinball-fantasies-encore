@@ -401,8 +401,10 @@ int App::run() {
       }
       render(std::chrono::duration<double>(nowT - start).count());
     }
-  } catch (const DataError& e) {
+  } catch (const std::exception& e) {
+    // Whatever went wrong, it is said out loud rather than ending the program in silence.
     log::error(e.what());
+    reportError(e.what());
     audio_.close();
     SDL_Quit();
     return 1;

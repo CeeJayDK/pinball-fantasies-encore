@@ -3,6 +3,7 @@
 // double-clicking it rather than only from a terminal with an argument.
 #include <filesystem>
 #include <optional>
+#include <string>
 
 namespace pfr {
 
@@ -22,5 +23,8 @@ void rememberGameData(const std::filesystem::path& dir);
 
 /// Tells the player what is missing.
 void reportMissingGameData();
+
+/// Says what went wrong, for a failure that would otherwise end the program in silence.
+void reportError(const std::string& message);
 
 }  // namespace pfr

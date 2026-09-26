@@ -49,9 +49,13 @@ void addWithParents(std::vector<std::filesystem::path>& out, std::filesystem::pa
   dir = std::filesystem::weakly_canonical(dir, ec);
   for (int i = 0; i <= kParentLevels && !dir.empty(); ++i) {
     out.push_back(dir);
-    // Sibling installs, such as a second copy of the game next to this one.
-    for (const auto& child : std::filesystem::directory_iterator(dir, ec))
-      if (child.is_directory(ec)) out.push_back(child.path());
+    // Sibling installs, such as a second copy of the game next to this one. Stepping through
+    // a folder has to be asked not to throw at every step, not only at the first: a folder
+    // that cannot be read all the way -- the read-only mount macOS gives a downloaded
+    // application is one -- would otherwise end the program before it has a window.
+    std::error_code walk;
+    for (std::filesystem::directory_iterator it(dir, walk), end; !walk && it != end; it.increment(walk))
+      if (it->is_directory(walk)) out.push_back(it->path());
     if (!dir.has_parent_path() || dir.parent_path() == dir) break;
     dir = dir.parent_path();
   }
@@ -155,6 +159,10 @@ void reportMissingGameData() {
                            "1994 MS-DOS release. Put this application in the folder holding INTRO.PRG\n"
                            "and TABLE1.PRG, or start it with:  --data /path/to/pinball",
                            nullptr);
+}
+
+void reportError(const std::string& message) {
+  SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Pinball Fantasies: Encore!", message.c_str(), nullptr);
 }
 
 }  // namespace pfr
