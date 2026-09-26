@@ -148,22 +148,20 @@ bool App::init() {
     const auto saved = file::readAll(saveDir_ / "crt.txt");
     setCrt(options_.crt.value_or(saved && !saved->empty() && (*saved)[0] == '1'));
   }
-  // A trial: a set of pictures offered on the first run, not yet used for anything. They go
-  // in the project's own game folder -- the source tree's while developing, the one beside
-  // the application otherwise -- never in the folder the DOS files happened to be found in.
-  // The offer and the waiting both belong to the window that is now up. Turning the offer
-  // down ends the game.
+  // A trial: files offered on the first run and unpacked where this version keeps what is
+  // its own -- the same folder as PINBALL.CFG, the high scores and the remembered settings,
+  // whatever the platform calls it. The archive holds an hd folder, which is the first place
+  // the replacement pictures are looked for, so what is fetched now is used by the loading
+  // below. Turning the offer down ends the game.
   {
-    const std::filesystem::path sourceGame = std::filesystem::path(ENCORE_SOURCE_DIR) / "game";
-    const std::filesystem::path into = std::filesystem::exists(sourceGame) ? sourceGame : executableDir() / "game";
     // The offer is written with the intro's own letters, so INTRO.PRG is read for its font
     // before anything else needs it.
     if (const auto prg = file::readAll(files_.intro)) askFont_ = IntroAssets::load(*prg).fontLq;
     // Without letters there is no way to put the question, and no question means no offer:
     // the game starts with the pictures it already has.
-    if (askFont_.data.width() == 0) log::error("the intro's font could not be read; not offering the pictures");
+    if (askFont_.data.width() == 0) log::error("the intro's font could not be read; not offering the download");
     if (askFont_.data.width() != 0 && !downloadFantasyOnce(
-            into, [this] { return askToDownload(); },
+            saveDir_, [this] { return askToDownload(); },
             [this](double seconds) { drawWaiting(seconds, "DOWNLOADING THE HD GRAPHICS"); }))
       return false;
   }
@@ -198,12 +196,11 @@ void App::setCrt(bool on) {
 /// High-resolution replacements for the intro's pictures, named after HdPicture
 /// (slide1.png ... slide5.png, left.png, table1.png ... table4.png, hiscores.png). Each file
 /// must show the whole original picture, edge to edge, at any size. The application carries
-/// its own (assets/hd); one in --hd-dir, or else in hd/ in the preferences folder, takes its place.
-/// Where a replacement picture comes from: the folder given with --hd-dir or hd/ in the
-/// preferences folder first, then the application's own.
+/// its own (assets/hd), and only --hd-dir puts another set in their place. What the download
+/// leaves in the preferences folder is not read: fetching it is the experiment for now, and
+/// choosing between sets comes later.
 std::filesystem::path App::hdPicturePath(const std::string& name) const {
-  const std::filesystem::path own = options_.hdDir.value_or(saveDir_ / "hd");
-  if (std::filesystem::exists(own / name)) return own / name;
+  if (options_.hdDir && std::filesystem::exists(*options_.hdDir / name)) return *options_.hdDir / name;
   const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "assets" / "hd";
   return (std::filesystem::exists(source) ? source : executableDir() / "hd") / name;
 }

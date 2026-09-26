@@ -38,8 +38,8 @@ bool safeName(const std::string& name) {
 /// that a later archive at a different address is fetched even though this one is unpacked.
 constexpr const char* kDoneFile = "downloaded.txt";
 
-bool alreadyHere(const std::filesystem::path& gameDir) {
-  const auto done = file::readAll(gameDir / kDoneFile);
+bool alreadyHere(const std::filesystem::path& into) {
+  const auto done = file::readAll(into / kDoneFile);
   return done && std::string(done->begin(), done->end()).find(kFantasyUrl) != std::string::npos;
 }
 
@@ -65,9 +65,9 @@ std::optional<Bytes> fetchWhileWaiting(const std::string& url, std::string& erro
 
 }  // namespace
 
-bool downloadFantasyOnce(const std::filesystem::path& gameDir, const FantasyAsk& ask, const FantasyWaitTick& tick) {
+bool downloadFantasyOnce(const std::filesystem::path& into, const FantasyAsk& ask, const FantasyWaitTick& tick) {
   std::error_code ec;
-  if (alreadyHere(gameDir)) return true;
+  if (alreadyHere(into)) return true;
   if (!ask || !ask()) {
     log::info("the download was not wanted; leaving");
     return false;
@@ -87,12 +87,12 @@ bool downloadFantasyOnce(const std::filesystem::path& gameDir, const FantasyAsk&
     log::error("the archive holds nothing this reader can unpack");
     return true;
   }
-  // Whatever the archive holds, where it says to put it, under the game folder.
-  std::filesystem::create_directories(gameDir, ec);
+  // Whatever the archive holds, where it says to put it, under the folder given.
+  std::filesystem::create_directories(into, ec);
   int written = 0;
   for (const auto& entry : entries) {
     if (!safeName(entry.name)) continue;
-    const std::filesystem::path path = gameDir / entry.name;
+    const std::filesystem::path path = into / entry.name;
     std::filesystem::create_directories(path.parent_path(), ec);
     if (!file::writeAll(path, entry.data)) {
       log::error("cannot write " + path.string());
@@ -100,10 +100,10 @@ bool downloadFantasyOnce(const std::filesystem::path& gameDir, const FantasyAsk&
     }
     ++written;
   }
-  log::info(std::to_string(written) + " files unpacked into " + gameDir.string());
+  log::info(std::to_string(written) + " files unpacked into " + into.string());
   // Only now, with everything written: a run that stops halfway asks again next time.
   const std::string done = std::string(kFantasyUrl) + "\n";
-  file::writeAll(gameDir / kDoneFile, ByteView(reinterpret_cast<const u8*>(done.data()), done.size()));
+  file::writeAll(into / kDoneFile, ByteView(reinterpret_cast<const u8*>(done.data()), done.size()));
   return true;
 }
 
