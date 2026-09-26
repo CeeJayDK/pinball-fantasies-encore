@@ -46,6 +46,8 @@ class App {
   bool init();
   void update(double dt);
   void render(double now);
+  bool askForSkin();
+  void drawWaiting(double seconds, std::string_view line);
   void openIntro(int returningFrom);
   void openTable(int index);
   void handleKey(const SDL_Event& e);
@@ -65,6 +67,7 @@ class App {
   Renderer renderer_;
   AudioDevice audio_;
   Framebuffer frame_;
+  IntroImage askFont_;  ///< the intro's own letters, for the screens shown before the game
   Palette palette_;
   HdFrame hd_;
   u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own

@@ -4,14 +4,17 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <optional>
+#include <string_view>
 #include <utility>
 
 #include "core/Error.h"
 #include "core/File.h"
 #include "core/Log.h"
 #include "core/Png.h"
+#include "game/Skins.h"
 #include "platform/DataLocator.h"
 #include "platform/ImageFile.h"
 
@@ -25,6 +28,50 @@ constexpr double kFrame = 1.0 / 60.0;  ///< both screens run 60 frames a second,
 double tablePixelAspect(int height) {
   const int shaped = height > 350 ? 350 : height;
   return (4.0 / 3.0) / (320.0 / shaped);
+}
+
+
+/// One letter of the intro's font, whose cells are 18 x 14 and are shown twice as tall.
+/// It holds capitals, digits and four marks, and nothing else is drawn.
+void putChar(Framebuffer& fb, const IntroImage& font, u8 chr, int x, int y, u8 bank) {
+  int idx = -1;
+  if (chr >= '0' && chr <= '9') idx = chr - '0';
+  else if (chr >= 'A' && chr <= 'Z') idx = chr - 'A' + 10;
+  else if (chr == '.') idx = 36;
+  else if (chr == ':') idx = 37;
+  else if (chr == '-') idx = 38;
+  else if (chr == '>') idx = 39;
+  if (idx < 0) return;
+  const int fx = idx % 20 * 32, fy = idx / 20 * 14;
+  for (int cy = 0; cy < 14; ++cy)
+    for (int cx = 0; cx < 18; ++cx) {
+      if (fx + cx >= font.data.width() || fy + cy >= font.data.height()) continue;
+      const u8 v = static_cast<u8>(font.data(fx + cx, fy + cy) | bank);
+      fb.put(x + cx, y + cy * 2, v);
+      fb.put(x + cx, y + cy * 2 + 1, v);
+    }
+}
+
+constexpr int kLetterW = 18, kLetterH = 28;
+
+void putText(Framebuffer& fb, const IntroImage& font, std::string_view text, int x, int y, u8 bank = 0x10) {
+  for (std::size_t i = 0; i < text.size(); ++i)
+    putChar(fb, font, static_cast<u8>(text[i]), x + static_cast<int>(i) * kLetterW, y, bank);
+}
+
+/// Middled in the frame, so a line reads the same whatever the window is doing.
+void putTextCentred(Framebuffer& fb, const IntroImage& font, std::string_view text, int y, u8 bank = 0x10) {
+  putText(fb, font, text, (fb.width() - static_cast<int>(text.size()) * kLetterW) / 2, y, bank);
+}
+
+/// A solid arrow pointing at what is chosen, in one colour of its own: the font's own marks
+/// are as dark as the letters and go unseen on a dark screen.
+void putArrow(Framebuffer& fb, int x, int y, u8 index) {
+  constexpr int kHeight = 20, kWidth = 12;
+  for (int row = 0; row < kHeight; ++row) {
+    const int from = row < kHeight / 2 ? row : kHeight - 1 - row;  // narrowing to the point
+    fb.fillRect(Rect{x, y + row, kWidth * from * 2 / kHeight + 1, 1}, index);
+  }
 }
 
 std::filesystem::path executableDir() {
@@ -100,6 +147,25 @@ bool App::init() {
   {
     const auto saved = file::readAll(saveDir_ / "crt.txt");
     setCrt(options_.crt.value_or(saved && !saved->empty() && (*saved)[0] == '1'));
+  }
+  // A trial: a set of pictures offered on the first run, not yet used for anything. They go
+  // in the project's own game folder -- the source tree's while developing, the one beside
+  // the application otherwise -- never in the folder the DOS files happened to be found in.
+  // The offer and the waiting both belong to the window that is now up. Turning the offer
+  // down ends the game.
+  {
+    const std::filesystem::path sourceGame = std::filesystem::path(ENCORE_SOURCE_DIR) / "game";
+    const std::filesystem::path into = std::filesystem::exists(sourceGame) ? sourceGame : executableDir() / "game";
+    // The offer is written with the intro's own letters, so INTRO.PRG is read for its font
+    // before anything else needs it.
+    if (const auto prg = file::readAll(files_.intro)) askFont_ = IntroAssets::load(*prg).fontLq;
+    // Without letters there is no way to put the question, and no question means no offer:
+    // the game starts with the pictures it already has.
+    if (askFont_.data.width() == 0) log::error("the intro's font could not be read; not offering the pictures");
+    if (askFont_.data.width() != 0 && !downloadSkinOnce(
+            into, [this] { return askForSkin(); },
+            [this](double seconds) { drawWaiting(seconds, "DOWNLOADING THE HD GRAPHICS"); }))
+      return false;
   }
   loadHdPictures();
   {
@@ -321,6 +387,83 @@ void App::update(double dt) {
       if (table_) resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
     }
   }
+}
+
+/// The offer of the pictures, put in the game's own window rather than in a box of the
+/// system's: two lines and a choice, answered with the arrow keys and enter, or with Y and
+/// N, or turned down with escape.
+bool App::askForSkin() {
+  bool yes = true;
+  for (;;) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_EVENT_QUIT) return false;
+      if (event.type != SDL_EVENT_KEY_DOWN) continue;
+      switch (event.key.key) {
+        case SDLK_LEFT: case SDLK_RIGHT: case SDLK_UP: case SDLK_DOWN: case SDLK_TAB: yes = !yes; break;
+        case SDLK_Y: return true;
+        case SDLK_N: case SDLK_ESCAPE: return false;
+        case SDLK_RETURN: case SDLK_KP_ENTER: case SDLK_SPACE: return yes;
+        default: break;
+      }
+    }
+    frame_.clear(0);
+    palette_[0] = Rgb{0x10, 0x10, 0x18};
+    palette_[1] = Rgb{0xff, 0xc8, 0x50};  // the arrow
+    // Three banks of the font's own colours: as they are for the question, lifted towards
+    // white for what is chosen, sunk towards the background for what is not. The first
+    // colour is what fills a letter's cell, and it stays the screen's own: lifting it too
+    // would put a pale block behind the word instead of leaving letters on a dark screen.
+    for (std::size_t i = 0; i < 16 && i < askFont_.cmap.size(); ++i) {
+      const Rgb c = askFont_.cmap[i];
+      const auto lift = [](u8 v) { return static_cast<u8>(v + (0xff - v) * 3 / 5); };
+      const auto sink = [](u8 v) { return static_cast<u8>(v * 2 / 5); };
+      palette_[0x10 + i] = c;
+      palette_[0x20 + i] = i == 0 ? palette_[0] : Rgb{lift(c.r), lift(c.g), lift(c.b)};
+      palette_[0x30 + i] = i == 0 ? palette_[0] : Rgb{sink(c.r), sink(c.g), sink(c.b)};
+    }
+    const int top = frame_.height() / 2 - 3 * kLetterH;
+    putTextCentred(frame_, askFont_, "IF YOU WANT I CAN DOWNLOAD", top);
+    putTextCentred(frame_, askFont_, "THE HD GRAPHICS FOR YOU", top + kLetterH + 6);
+    const int row = top + 3 * (kLetterH + 6);
+    const int left = (frame_.width() - 11 * kLetterW) / 2;
+    putText(frame_, askFont_, "YES", left, row, yes ? 0x20 : 0x30);
+    putText(frame_, askFont_, "NO", left + 7 * kLetterW, row, yes ? 0x30 : 0x20);
+    putArrow(frame_, (yes ? left : left + 7 * kLetterW) - kLetterW - 6, row + kLetterH / 2 - 10, 1);
+    int w = 0, h = 0;
+    window_.drawableSize(w, h);
+    renderer_.setPalette(palette_);
+    renderer_.draw(frame_, w, h, 0.0);
+    window_.swap();
+    SDL_Delay(16);
+  }
+}
+
+/// While a set of pictures is being fetched: a line of text and a ring of dots turning, in
+/// the game's own window, so the wait does not look like a hang. The game has drawn nothing
+/// yet at this point, so the palette is this drawing's own.
+void App::drawWaiting(double seconds, std::string_view line) {
+  constexpr int kDots = 8, kSize = 10;
+  constexpr double kRadius = 44.0;
+  frame_.clear(0);
+  palette_[0] = Rgb{0x10, 0x10, 0x18};
+  for (std::size_t i = 0; i < 16 && i < askFont_.cmap.size(); ++i) palette_[0x10 + i] = askFont_.cmap[i];
+  putTextCentred(frame_, askFont_, line, frame_.height() / 2 - 3 * kLetterH);
+  const int cx = frame_.width() / 2, cy = frame_.height() / 2 + kLetterH;
+  for (int i = 0; i < kDots; ++i) {
+    const double angle = (seconds * 1.5 + static_cast<double>(i) / kDots) * 2.0 * 3.14159265358979;
+    const double fade = 1.0 - static_cast<double>(i) / kDots;
+    const auto shade = [&](int full) { return static_cast<u8>(0x18 + (full - 0x18) * fade * fade); };
+    palette_[static_cast<std::size_t>(i) + 1] = Rgb{shade(0xff), shade(0xc0), shade(0x40)};
+    const Rect dot{cx + static_cast<int>(std::cos(angle) * kRadius) - kSize / 2,
+                   cy + static_cast<int>(std::sin(angle) * kRadius) - kSize / 2, kSize, kSize};
+    frame_.fillRect(dot, static_cast<u8>(i + 1));
+  }
+  int w = 0, h = 0;
+  window_.drawableSize(w, h);
+  renderer_.setPalette(palette_);
+  renderer_.draw(frame_, w, h, std::max(0.0, seconds));
+  window_.swap();
 }
 
 void App::render(double now) {

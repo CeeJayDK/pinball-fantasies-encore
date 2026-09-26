@@ -34,6 +34,8 @@ add_library(encore_core STATIC
   src/core/Log.cpp
   src/core/File.cpp
   src/core/Png.cpp
+  src/core/Inflate.cpp
+  src/core/Zip.cpp
   src/data/IffImage.cpp
   src/data/GameFiles.cpp
   src/assets/Exe.cpp
@@ -75,6 +77,8 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
   src/platform/DataLocator.cpp
   src/platform/AudioDevice.cpp
   src/platform/ImageFile.cpp
+  src/platform/Download.cpp
+  src/game/Skins.cpp
   src/gfx/Gl.cpp
   src/gfx/Renderer.cpp
   src/gfx/ShaderProgram.cpp
@@ -83,6 +87,14 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
 # Pictures are decoded by this project's own PNG reader, and every OpenGL function past 1.1
 # is fetched from the driver, so nothing here is platform-specific but the library names.
 target_link_libraries(pinball-fantasies PRIVATE encore_core SDL3::SDL3 OpenGL::GL)
+# Fetching a set of pictures uses what the platform already has, so there is nothing to
+# install: libcurl ships with macOS and every Linux, WinHTTP is part of Windows.
+if(WIN32)
+  target_link_libraries(pinball-fantasies PRIVATE winhttp)
+else()
+  find_package(CURL REQUIRED)
+  target_link_libraries(pinball-fantasies PRIVATE CURL::libcurl)
+endif()
 target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 set_target_properties(pinball-fantasies PROPERTIES OUTPUT_NAME "Pinball Fantasies")
 

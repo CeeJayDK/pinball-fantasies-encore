@@ -16,4 +16,5 @@ __pycache__/
 re/*
 !re/legacy-engine/
 # Your own copy of the original DOS files, when kept here: never redistributed.
-/game/
+/game/*
+!/game/README.md
