@@ -7,19 +7,16 @@
 
 namespace pfr {
 
-/// Searches, in order: an explicit folder, the folder remembered from last time, the
-/// working directory and its parents, and the folders around the application bundle.
+/// The folder the game files are read from: FANTASY, inside this version's own folder
+/// (see preferencesDir), and nowhere else -- or the folder given with --data, when there
+/// is one. Nothing is searched for, so nothing outside this version's own things is read.
 std::optional<std::filesystem::path> locateGameData(const std::optional<std::filesystem::path>& explicitDir);
 
-/// Asks the player to point at the folder, using the system's folder chooser.
-/// Returns nothing if they cancel or the folder does not hold the game.
-std::optional<std::filesystem::path> askForGameData();
+/// Where the game files belong: <preferences>/FANTASY.
+std::filesystem::path gameDataDir();
 
-/// Where the app keeps its own files: remembered folder, options, high scores.
+/// Where the app keeps its own files: the game files, options, high scores.
 std::filesystem::path preferencesDir();
-
-/// Remembers a folder for next time.
-void rememberGameData(const std::filesystem::path& dir);
 
 /// Tells the player what is missing.
 void reportMissingGameData();

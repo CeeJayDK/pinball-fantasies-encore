@@ -31,9 +31,37 @@ double tablePixelAspect(int height) {
 }
 
 
+/// The font picture, as slots into the handful of colours it is drawn with.
+AskFont loadAskFont(const std::filesystem::path& path) {
+  AskFont font;
+  const auto image = loadImageFile(path);
+  if (!image) {
+    log::error("cannot read the letters in " + path.string());
+    return font;
+  }
+  font.width = image->width;
+  font.height = image->height;
+  font.index.resize(static_cast<std::size_t>(font.width) * font.height);
+  for (std::size_t i = 0; i < font.index.size(); ++i) {
+    const Rgb c{image->pixels[i * 4], image->pixels[i * 4 + 1], image->pixels[i * 4 + 2]};
+    std::size_t slot = 0;
+    while (slot < font.colors.size() &&
+           (font.colors[slot].r != c.r || font.colors[slot].g != c.g || font.colors[slot].b != c.b))
+      ++slot;
+    // The picture is drawn with a few colours, as the original's font was; anything past
+    // what a bank of the palette holds takes the nearest slot already known, the first.
+    if (slot == font.colors.size()) {
+      if (font.colors.size() >= 16) slot = 0;
+      else font.colors.push_back(c);
+    }
+    font.index[i] = static_cast<u8>(slot);
+  }
+  return font;
+}
+
 /// One letter of the intro's font, whose cells are 18 x 14 and are shown twice as tall.
 /// It holds capitals, digits and four marks, and nothing else is drawn.
-void putChar(Framebuffer& fb, const IntroImage& font, u8 chr, int x, int y, u8 bank) {
+void putChar(Framebuffer& fb, const AskFont& font, u8 chr, int x, int y, u8 bank) {
   int idx = -1;
   if (chr >= '0' && chr <= '9') idx = chr - '0';
   else if (chr >= 'A' && chr <= 'Z') idx = chr - 'A' + 10;
@@ -45,8 +73,8 @@ void putChar(Framebuffer& fb, const IntroImage& font, u8 chr, int x, int y, u8 b
   const int fx = idx % 20 * 32, fy = idx / 20 * 14;
   for (int cy = 0; cy < 14; ++cy)
     for (int cx = 0; cx < 18; ++cx) {
-      if (fx + cx >= font.data.width() || fy + cy >= font.data.height()) continue;
-      const u8 v = static_cast<u8>(font.data(fx + cx, fy + cy) | bank);
+      if (fx + cx >= font.width || fy + cy >= font.height) continue;
+      const u8 v = static_cast<u8>(font.index[static_cast<std::size_t>(fy + cy) * font.width + fx + cx] | bank);
       fb.put(x + cx, y + cy * 2, v);
       fb.put(x + cx, y + cy * 2 + 1, v);
     }
@@ -54,13 +82,13 @@ void putChar(Framebuffer& fb, const IntroImage& font, u8 chr, int x, int y, u8 b
 
 constexpr int kLetterW = 18, kLetterH = 28;
 
-void putText(Framebuffer& fb, const IntroImage& font, std::string_view text, int x, int y, u8 bank = 0x10) {
+void putText(Framebuffer& fb, const AskFont& font, std::string_view text, int x, int y, u8 bank = 0x10) {
   for (std::size_t i = 0; i < text.size(); ++i)
     putChar(fb, font, static_cast<u8>(text[i]), x + static_cast<int>(i) * kLetterW, y, bank);
 }
 
 /// Middled in the frame, so a line reads the same whatever the window is doing.
-void putTextCentred(Framebuffer& fb, const IntroImage& font, std::string_view text, int y, u8 bank = 0x10) {
+void putTextCentred(Framebuffer& fb, const AskFont& font, std::string_view text, int y, u8 bank = 0x10) {
   putText(fb, font, text, (fb.width() - static_cast<int>(text.size()) * kLetterW) / 2, y, bank);
 }
 
@@ -114,20 +142,7 @@ bool App::init() {
     log::error(std::string("SDL_Init: ") + SDL_GetError());
     return false;
   }
-  auto dataDir = locateGameData(options_.dataDir);
-  if (!dataDir) dataDir = askForGameData();
-  if (!dataDir) {
-    log::error("the Pinball Fantasies data files were not found");
-    reportMissingGameData();
-    return false;
-  }
-  files_ = GameFiles::fromDirectory(*dataDir);
-  rememberGameData(*dataDir);
-  log::info("game data: " + files_.directory.string());
-  // Options and high scores live beside the app's preferences, never in the game folder.
   saveDir_ = preferencesDir();
-  config_ = Config::load(saveDir_, files_.directory);
-  if (options_.resolution) config_.options.resolution = *options_.resolution;
 
   // Prefer the shaders in the source tree while developing, so edits take effect at once.
   const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "shaders";
@@ -154,17 +169,30 @@ bool App::init() {
   // the replacement pictures are looked for, so what is fetched now is used by the loading
   // below. Turning the offer down ends the game.
   {
-    // The offer is written with the intro's own letters, so INTRO.PRG is read for its font
-    // before anything else needs it.
-    if (const auto prg = file::readAll(files_.intro)) askFont_ = IntroAssets::load(*prg).fontLq;
-    // Without letters there is no way to put the question, and no question means no offer:
-    // the game starts with the pictures it already has.
-    if (askFont_.data.width() == 0) log::error("the intro's font could not be read; not offering the download");
-    if (askFont_.data.width() != 0 && !downloadFantasyOnce(
+    // The letters come with this version, not from the original, so the question can be put
+    // before a single game file is there.
+    askFont_ = loadAskFont(hdPicturePath("font.png"));
+    // Without letters there is no way to put the question, and no question means no offer.
+    if (askFont_.width == 0) log::error("the letters could not be read; not offering the download");
+    if (askFont_.width != 0 && !downloadFantasyOnce(
             saveDir_, [this] { return askToDownload(); },
-            [this](double seconds) { drawWaiting(seconds, "DOWNLOADING THE HD GRAPHICS"); }))
+            [this](double seconds) { drawWaiting(seconds, "DOWNLOADING GAME FILES"); }))
       return false;
   }
+  // The game files are looked for only once the download above has had its say, so that a
+  // first start can fetch what it offers before anything of the original is asked for.
+  const auto dataDir = locateGameData(options_.dataDir);
+  if (!dataDir) {
+    log::error("the Pinball Fantasies data files were not found");
+    reportMissingGameData();
+    return false;
+  }
+  files_ = GameFiles::fromDirectory(*dataDir);
+  log::info("game data: " + files_.directory.string());
+  // Options and high scores live in this version's own folder, never in the game folder.
+  config_ = Config::load(saveDir_, files_.directory);
+  if (options_.resolution) config_.options.resolution = *options_.resolution;
+
   loadHdPictures();
   {
     const auto saved = file::readAll(saveDir_ / "hd.txt");
@@ -411,8 +439,8 @@ bool App::askToDownload() {
     // white for what is chosen, sunk towards the background for what is not. The first
     // colour is what fills a letter's cell, and it stays the screen's own: lifting it too
     // would put a pale block behind the word instead of leaving letters on a dark screen.
-    for (std::size_t i = 0; i < 16 && i < askFont_.cmap.size(); ++i) {
-      const Rgb c = askFont_.cmap[i];
+    for (std::size_t i = 0; i < askFont_.colors.size(); ++i) {
+      const Rgb c = askFont_.colors[i];
       const auto lift = [](u8 v) { return static_cast<u8>(v + (0xff - v) * 3 / 5); };
       const auto sink = [](u8 v) { return static_cast<u8>(v * 2 / 5); };
       palette_[0x10 + i] = c;
@@ -420,9 +448,10 @@ bool App::askToDownload() {
       palette_[0x30 + i] = i == 0 ? palette_[0] : Rgb{sink(c.r), sink(c.g), sink(c.b)};
     }
     const int top = frame_.height() / 2 - 3 * kLetterH;
-    putTextCentred(frame_, askFont_, "IF YOU WANT I CAN DOWNLOAD", top);
-    putTextCentred(frame_, askFont_, "THE HD GRAPHICS FOR YOU", top + kLetterH + 6);
-    const int row = top + 3 * (kLetterH + 6);
+    putTextCentred(frame_, askFont_, "YOU LEGALLY OWN", top);
+    putTextCentred(frame_, askFont_, "PINBALL FANTASIES", top + kLetterH + 6);
+    putTextCentred(frame_, askFont_, "TO PLAY ENCORE", top + kLetterH*2 + 12);
+    const int row = top + 4 * (kLetterH + 6);
     const int left = (frame_.width() - 11 * kLetterW) / 2;
     putText(frame_, askFont_, "YES", left, row, yes ? 0x20 : 0x30);
     putText(frame_, askFont_, "NO", left + 7 * kLetterW, row, yes ? 0x30 : 0x20);
@@ -444,7 +473,7 @@ void App::drawWaiting(double seconds, std::string_view line) {
   constexpr double kRadius = 44.0;
   frame_.clear(0);
   palette_[0] = Rgb{0x10, 0x10, 0x18};
-  for (std::size_t i = 0; i < 16 && i < askFont_.cmap.size(); ++i) palette_[0x10 + i] = askFont_.cmap[i];
+  for (std::size_t i = 0; i < askFont_.colors.size(); ++i) palette_[0x10 + i] = askFont_.colors[i];
   putTextCentred(frame_, askFont_, line, frame_.height() / 2 - 3 * kLetterH);
   const int cx = frame_.width() / 2, cy = frame_.height() / 2 + kLetterH;
   for (int i = 0; i < kDots; ++i) {

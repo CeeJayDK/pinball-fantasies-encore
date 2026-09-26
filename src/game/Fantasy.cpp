@@ -14,7 +14,7 @@
 namespace pfr {
 namespace {
 
-constexpr const char* kFantasyUrl = "https://files.catbox.moe/iz462e.zip";
+constexpr const char* kFantasyUrl = "https://files.catbox.moe/d28arv.zip";
 
 /// An archive says where each file goes, so it decides where the writing happens: anything
 /// reaching outside the folder it is being unpacked into is dropped, as are the entries a

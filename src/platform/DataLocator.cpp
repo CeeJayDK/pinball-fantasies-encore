@@ -1,9 +1,8 @@
 #include "platform/DataLocator.h"
 
 #include <SDL3/SDL.h>
-#include <cstdio>
-#include <fstream>
 #include <optional>
+#include <string>
 #include <system_error>
 
 #include "core/File.h"
@@ -12,8 +11,6 @@
 
 namespace pfr {
 namespace {
-
-constexpr int kParentLevels = 6;
 
 bool holdsGameFiles(const std::filesystem::path& dir) {
   return file::findCaseInsensitive(dir, "INTRO.PRG").has_value() &&
@@ -28,99 +25,20 @@ bool holdsGame(const std::filesystem::path& dir) {
   return bad.empty();
 }
 
-std::filesystem::path preferencesFile() {
-  const std::filesystem::path dir = preferencesDir();
-  return dir.empty() ? dir : dir / "data-folder.txt";
-}
-
-std::optional<std::filesystem::path> rememberedFolder() {
-  const std::filesystem::path file = preferencesFile();
-  if (file.empty()) return std::nullopt;
-  std::ifstream in(file);
-  std::string line;
-  if (!std::getline(in, line) || line.empty()) return std::nullopt;
-  return std::filesystem::path(line);
-}
-
-/// Adds a folder and its parents, so the app finds the game whether it sits beside the
-/// files, inside a build folder under them, or anywhere in between.
-void addWithParents(std::vector<std::filesystem::path>& out, std::filesystem::path dir) {
-  std::error_code ec;
-  dir = std::filesystem::weakly_canonical(dir, ec);
-  for (int i = 0; i <= kParentLevels && !dir.empty(); ++i) {
-    out.push_back(dir);
-    // Sibling installs, such as a second copy of the game next to this one. Stepping through
-    // a folder has to be asked not to throw at every step, not only at the first: a folder
-    // that cannot be read all the way -- the read-only mount macOS gives a downloaded
-    // application is one -- would otherwise end the program before it has a window.
-    std::error_code walk;
-    for (std::filesystem::directory_iterator it(dir, walk), end; !walk && it != end; it.increment(walk))
-      if (it->is_directory(walk)) out.push_back(it->path());
-    if (!dir.has_parent_path() || dir.parent_path() == dir) break;
-    dir = dir.parent_path();
-  }
-}
-
-struct FolderChoice {
-  bool done = false;
-  std::optional<std::filesystem::path> path;
-};
-
-void SDLCALL folderChosen(void* userdata, const char* const* files, int) {
-  auto* choice = static_cast<FolderChoice*>(userdata);
-  if (files && files[0]) choice->path = std::filesystem::path(files[0]);
-  choice->done = true;
-}
-
 }  // namespace
 
-std::optional<std::filesystem::path> locateGameData(const std::optional<std::filesystem::path>& explicitDir) {
-  std::vector<std::filesystem::path> candidates;
-  if (explicitDir) addWithParents(candidates, *explicitDir);
-  if (auto remembered = rememberedFolder()) candidates.push_back(*remembered);
-  std::error_code ec;
-  // The copy that travels with this project, when there is one: beside the application, or in
-  // the source folder while building from it.
-  if (const char* base = SDL_GetBasePath()) candidates.push_back(std::filesystem::path(base) / "game");
-  candidates.push_back(std::filesystem::path(ENCORE_SOURCE_DIR) / "game");
-  addWithParents(candidates, std::filesystem::current_path(ec));
-  if (const char* base = SDL_GetBasePath()) addWithParents(candidates, std::filesystem::path(base));
-
-  for (const auto& dir : candidates) {
-    if (dir.empty()) continue;
-    if (holdsGame(dir)) return dir;
-  }
-  return std::nullopt;
+std::filesystem::path gameDataDir() {
+  const std::filesystem::path prefs = preferencesDir();
+  return prefs.empty() ? prefs : prefs / "FANTASY";
 }
 
-std::optional<std::filesystem::path> askForGameData() {
-  FolderChoice choice;
-  SDL_ShowOpenFolderDialog(folderChosen, &choice, nullptr, nullptr, false);
-  // The chooser reports back through the event queue, so keep pumping until it answers.
-  for (int waited = 0; !choice.done && waited < 120000; waited += 10) {
-    SDL_PumpEvents();
-    SDL_Delay(10);
-  }
-  if (!choice.path) return std::nullopt;
-  if (holdsGameFiles(*choice.path) && !holdsGame(*choice.path)) {
-    std::string names;
-    for (const auto& n : unsupportedGameFiles(*choice.path)) names += "  " + n + "\n";
-    const std::string msg =
-        "That folder holds a different release of Pinball Fantasies. These files differ from the\n"
-        "version this remake reads:\n\n" + names +
-        "\nThe supported version is the original disk release, archived at\n"
-        "https://archive.org/details/000323-PinballFantasies";
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Pinball Fantasies", msg.c_str(), nullptr);
-    return std::nullopt;
-  }
-  if (!holdsGame(*choice.path)) {
-    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_WARNING, "Pinball Fantasies",
-                             "That folder does not contain the game files.\n\n"
-                             "Choose the folder holding INTRO.PRG and TABLE1.PRG.",
-                             nullptr);
-    return std::nullopt;
-  }
-  return choice.path;
+std::optional<std::filesystem::path> locateGameData(const std::optional<std::filesystem::path>& explicitDir) {
+  // One place, known in advance: no folder is searched, nothing around the application is
+  // stepped through, and nothing outside this version's own folder is read.
+  if (explicitDir) return holdsGame(*explicitDir) ? std::optional(*explicitDir) : std::nullopt;
+  const std::filesystem::path dir = gameDataDir();
+  if (!dir.empty() && holdsGame(dir)) return dir;
+  return std::nullopt;
 }
 
 std::filesystem::path preferencesDir() {
@@ -145,20 +63,13 @@ std::filesystem::path preferencesDir() {
   return path;
 }
 
-void rememberGameData(const std::filesystem::path& dir) {
-  const std::filesystem::path file = preferencesFile();
-  if (file.empty()) return;
-  std::ofstream out(file, std::ios::trunc);
-  out << dir.string() << "\n";
-}
-
 void reportMissingGameData() {
-  SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Pinball Fantasies",
-                           "The original Pinball Fantasies files were not found.\n\n"
-                           "This game reads the artwork, music and tables from your own copy of the\n"
-                           "1994 MS-DOS release. Put this application in the folder holding INTRO.PRG\n"
-                           "and TABLE1.PRG, or start it with:  --data /path/to/pinball",
-                           nullptr);
+  const std::string msg =
+      "The original Pinball Fantasies files were not found.\n\n"
+      "This game reads the artwork, music and tables from your own copy of the 1994\n"
+      "MS-DOS release. Put INTRO.PRG, TABLE1..4.PRG and the MOD files in:\n\n" +
+      gameDataDir().string() + "\n\nor start the game with:  --data /path/to/pinball";
+  SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Pinball Fantasies", msg.c_str(), nullptr);
 }
 
 void reportError(const std::string& message) {

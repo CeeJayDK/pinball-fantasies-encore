@@ -37,6 +37,15 @@ struct AppOptions {
   int screenshotFrame = 30;
 };
 
+/// The letters the screens before the game are written with. They are the intro's own,
+/// kept as a picture in assets/hd (font.png, 20 cells of 32 x 14 per row) so that they can
+/// be read before any file of the original game is, or even found.
+struct AskFont {
+  int width = 0, height = 0;
+  Bytes index;              ///< one colour slot per pixel
+  std::vector<Rgb> colors;  ///< what each slot looks like; slot 0 fills a letter's cell
+};
+
 class App {
  public:
   explicit App(AppOptions options);
@@ -67,7 +76,7 @@ class App {
   Renderer renderer_;
   AudioDevice audio_;
   Framebuffer frame_;
-  IntroImage askFont_;  ///< the intro's own letters, for the screens shown before the game
+  AskFont askFont_;  ///< the letters for the screens shown before the game
   Palette palette_;
   HdFrame hd_;
   u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own
