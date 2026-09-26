@@ -1,4 +1,9 @@
-#include <SDL3/SDL_main.h>  // on Windows this turns main() into the entry point SDL wants
+// Windows wants its own entry point, which this header provides. On macOS the same header
+// hands the application to SDL's Cocoa loop, which then asks it to quit the moment it starts,
+// so it stays where it is needed.
+#ifdef _WIN32
+#include <SDL3/SDL_main.h>
+#endif
 
 #include <algorithm>
 #include <cstdio>
