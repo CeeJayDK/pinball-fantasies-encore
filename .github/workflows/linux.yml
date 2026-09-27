@@ -34,7 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install what SDL3, OpenGL and the downloader need
+      - name: Install what SDL3 and OpenGL need
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -43,8 +43,7 @@ jobs:
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev \
             libxss-dev libxtst-dev libxkbcommon-dev libxinerama-dev \
             libwayland-dev wayland-protocols libdecor-0-dev \
-            libasound2-dev libpulse-dev libdbus-1-dev libudev-dev libibus-1.0-dev \
-            libcurl4-openssl-dev
+            libasound2-dev libpulse-dev libdbus-1-dev libudev-dev libibus-1.0-dev
 
       # Ubuntu has no SDL3 package yet, so it is built once and kept for later runs.
       - name: Cache SDL3
@@ -95,13 +94,17 @@ jobs:
 
       # The runner has every library this was built against, so it proves nothing about
       # anyone else's machine: the package is unpacked in a bare Debian instead, which has
-      # no SDL and an older glibc. --help returns before SDL is ever started, so no screen
-      # is needed -- what is being tested is whether the thing can load at all.
+      # no SDL and an older glibc. Only the graphics library is added, which every machine
+      # that can run the game has; anything else the package needs is a fault. --help
+      # returns before SDL is started, so no screen is needed -- this asks whether the
+      # program can load at all.
       - name: Check the package runs on an older distribution
         run: |
           mkdir -p pkgtest && tar xzf "pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz" -C pkgtest
           docker run --rm -v "$PWD/pkgtest:/pkg:ro" -w /pkg/pinball-fantasies-encore \
-            debian:bookworm-slim sh -c 'ldd "./Pinball Fantasies" && ./"Pinball Fantasies" --help'
+            debian:bookworm-slim sh -c '
+              apt-get -qq update && apt-get -qq install -y --no-install-recommends libgl1 >/dev/null
+              ldd "./Pinball Fantasies" && ./"Pinball Fantasies" --help'
 
       - name: Attach to the release
         if: github.event_name == 'release'
