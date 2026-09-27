@@ -25,6 +25,9 @@ if(ENCORE_SDL3_FRAMEWORK)
 else()
   find_package(SDL3 REQUIRED CONFIG)
 endif()
+# libGL.so.1 rather than libOpenGL.so.0: every Linux with working graphics has the first,
+# while the second comes with libglvnd, which older systems do not have at all.
+set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(OpenGL REQUIRED)
 
 # ---------------------------------------------------------------------------
