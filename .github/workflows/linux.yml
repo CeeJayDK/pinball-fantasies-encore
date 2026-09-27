@@ -62,7 +62,7 @@ jobs:
           cmake --install sdl-build
 
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$HOME/sdl3-install" -DENCORE_BUNDLE_GAME=OFF
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_PREFIX_PATH="$HOME/sdl3-install"
 
       - name: Build
         run: cmake --build build -j3

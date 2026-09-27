@@ -40,7 +40,6 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
             -DENCORE_SDL3_FRAMEWORK="$PWD/SDL3.framework" \
-            -DENCORE_BUNDLE_GAME=OFF
 
       - name: Build
         run: cmake --build build -j3
