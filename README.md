@@ -46,16 +46,8 @@ the left of the line, the remastered one on the right. Everything else -- the ge
 lamps, the scrolling, the physics -- is the same on both sides. The right-hand half is not
 the left one enlarged: it is its own picture, drawn to sit over the original's shapes.
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/sweep-intro.png" alt="The opening slide" width="100%"></td>
-    <td width="50%"><img src="docs/sweep-menu.png" alt="The table chooser" width="100%"></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/sweep-party.png" alt="Party Land" width="100%"></td>
-    <td width="50%"><img src="docs/sweep-stones.png" alt="Stones n Bones" width="100%"></td>
-  </tr>
-</table>
+![The opening slide, the table chooser, Party Land and Stones n Bones, each with the line
+sweeping across it](docs/sweep.png)
 
 ## Game files
 
@@ -227,3 +219,12 @@ These two work at any time, in the menu or in play:
 | `tests` | Pure-logic tests, and tests that play full games when the game files are present |
 | `docs` | Notes from the reverse-engineering work |
 | `re/legacy-engine` | The earlier engine this translation replaced, kept for reference; not built |
+
+## Licence
+
+The code is under the **GNU General Public License, version 3 or later** ([LICENSE](LICENSE)).
+The redrawn artwork in `assets` is under **CC BY-SA 4.0** instead, since a software licence
+fits pictures badly. [NOTICE.md](NOTICE.md) says which is which.
+
+*Pinball Fantasies* belongs to its respective owners and this project is not affiliated with
+them. No file of the original game is included here, or in anything built from it.
