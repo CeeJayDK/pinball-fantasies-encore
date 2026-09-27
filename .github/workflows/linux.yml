@@ -21,13 +21,16 @@ env:
 jobs:
   build:
     name: Linux (${{ matrix.arch }})
+    # 22.04 on purpose: a binary asks for a glibc no older than the one it was built
+    # against, and glibc only promises the other direction, so building on the oldest
+    # runner still supported is what lets the package run on more machines.
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-24.04, arch: x86_64 }
-          - { runner: ubuntu-24.04-arm, arch: arm64 }
+          - { runner: ubuntu-22.04, arch: x86_64 }
+          - { runner: ubuntu-22.04-arm, arch: arm64 }
     steps:
       - uses: actions/checkout@v5
 
@@ -89,6 +92,16 @@ jobs:
           patchelf --set-rpath '$ORIGIN/lib' "$dist/Pinball Fantasies"
           tar czf "pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz" "$dist"
           ldd "$dist/Pinball Fantasies" | grep -i sdl
+
+      # The runner has every library this was built against, so it proves nothing about
+      # anyone else's machine: the package is unpacked in a bare Debian instead, which has
+      # no SDL and an older glibc. --help returns before SDL is ever started, so no screen
+      # is needed -- what is being tested is whether the thing can load at all.
+      - name: Check the package runs on an older distribution
+        run: |
+          mkdir -p pkgtest && tar xzf "pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz" -C pkgtest
+          docker run --rm -v "$PWD/pkgtest:/pkg:ro" -w /pkg/pinball-fantasies-encore \
+            debian:bookworm-slim sh -c 'ldd "./Pinball Fantasies" && ./"Pinball Fantasies" --help'
 
       - name: Attach to the release
         if: github.event_name == 'release'
