@@ -70,7 +70,7 @@ fb7bfd1c96a462cb03999d2e6f843a20d3de69ba05fcbd384a9f1c131b9a563a  TABLE3.MOD
 31ad7e671ae77c07c3d075e2f1fecd3d918fd921fa23acd9a1b0b6fc07fbbcea  TABLE4.MOD
 ```
 
-As long as you confirm you legally own a copy of the game, the correct files will be downloaded and unpacked automatically the first time you run it. 
+> As long as you confirm you legally own a copy of the game, the correct files will be downloaded and unpacked automatically the first time you run it. 
 
 The files are then read from one place and one only: a `FANTASY` folder inside the folder this
 version keeps its own things in, which is the folder SDL gives it for the platform —
