@@ -65,12 +65,8 @@ the left of the line, the remastered one on the right. Everything else -- the ge
 lamps, the scrolling, the physics -- is the same on both sides. The right-hand half is not
 the left one enlarged: it is its own picture, drawn to sit over the original's shapes.
 
-<p>
-<img src="docs/sweep-intro.png" alt="The opening slide" width="370">
-<img src="docs/sweep-menu.png" alt="The table chooser" width="370">
-<img src="docs/sweep-party.png" alt="Party Land" width="370">
-<img src="docs/sweep-stones.png" alt="Stones n Bones" width="370">
-</p>
+![The opening slide, the table chooser and Stones n Bones, with the line sweeping across
+all three at once](docs/sweep.png)
 
 ## Game files
 
