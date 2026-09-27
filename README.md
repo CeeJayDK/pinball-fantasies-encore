@@ -14,6 +14,25 @@ The engine is written from the game's own data: it reads the original DOS files 
 physics, the table rules and scripts, the dot matrix, the music and the menus itself. Nothing
 of the original is emulated, and nothing of it is included here.
 
+## Download
+
+Version **0.9.0**, a first cut for testing — unpack and run, no installation:
+
+| | |
+| --- | --- |
+| macOS (Apple Silicon and Intel) | [pinball-fantasies-encore-macos-universal.zip](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-macos-universal.zip) |
+| Linux x86_64 | [pinball-fantasies-encore-linux-x86_64.tar.gz](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-linux-x86_64.tar.gz) |
+| Linux arm64 | [pinball-fantasies-encore-linux-arm64.tar.gz](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-linux-arm64.tar.gz) |
+| Windows x64 | [pinball-fantasies-encore-windows-x64.zip](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-windows-x64.zip) |
+
+**This build has been played on macOS only.** The Linux and Windows ones are built and tested
+by the machines that make them, nothing more: they compile, their tests pass, and no one has
+yet sat down in front of them. If something is wrong there, that is the news I am after.
+
+On macOS the application is not signed, so the system refuses it the first time — see
+[a downloaded build on macOS](#a-downloaded-build-on-macos) below. Every release is also on
+the [releases page](https://github.com/pedrocatalao/pinball-fantasies-encore/releases).
+
 ## The remaster
 
 All four tables play exactly as the original does, and the picture on top of it can be either
