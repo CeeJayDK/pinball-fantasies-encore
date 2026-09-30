@@ -157,7 +157,20 @@ bool App::init() {
   // Fullscreen or in a window, as it was left last time, unless told otherwise.
   {
     const auto saved = file::readAll(saveDir_ / "fullscreen.txt");
-    if (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1')) window_.setFullscreen(true);
+    if (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1')) {
+      // macOS slides into fullscreen over about a second, stretching whatever the window last
+      // showed to the shape of the screen as it goes: the first frames of the intro would be
+      // seen pulled wide and then snap back. So the window shows black while it goes, and
+      // nothing is drawn until it has arrived; the intro then starts at its final size.
+      glClearColor(0, 0, 0, 1);
+      glClear(GL_COLOR_BUFFER_BIT);
+      window_.swap();
+      window_.setFullscreen(true);
+      const auto before = std::chrono::steady_clock::now();
+      SDL_SyncWindow(window_.handle());
+      const auto waited = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - before);
+      log::info("fullscreen reached in " + std::to_string(waited.count()) + " ms");
+    }
   }
   // The window's context is current from here, so the driver can be asked for its functions.
   if (!loadGlFunctions()) {
