@@ -836,13 +836,6 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
     }
     hd->fade.fill(static_cast<float>(fade_) / 256.0f);
   }
-  // The flipper and plunger pictures carry the playfield around them; only where they differ
-  // from it does the original show through.
-  auto hdClearChanged = [&](int y, int sy, const u8* row, int x0, int x1) {
-    if (!hd) return;
-    for (int x = std::max(x0, 0); x < std::min(x1, 320); ++x)
-      if (sy >= 576 || row[x] != assets_.mainBoard(x, sy)) hd->map[static_cast<std::size_t>(y) * 320 + x].picture = 0;
-  };
   const auto [bx, by0] = ball_.pos();
   const int by = ball_.frozen ? by0 : by0 + push_.offset();
   for (int y = 0; y < height; ++y) {
@@ -875,7 +868,16 @@ void Table::render(u8* data, Rgb* pal, HdFrame* hd) const {
       const int springY = sy - 553;
       if (springY >= springPos) {
         for (int sx = 0; sx < 10; ++sx) row[sx + 304] = assets_.spring(sx, springY - springPos);
-        hdClearChanged(y, sy, row, 304, 314);
+        // The plunger has a picture of its own: every pixel of it drawn here says which of the
+        // original's it is, so the replacement slides down with it as it is pulled.
+        if (hd) {
+          const auto p = static_cast<u16>(HdPicture::Plunger);
+          hd->size[p] = {static_cast<u16>(assets_.spring.width()), static_cast<u16>(assets_.spring.height())};
+          hd->used |= 1u << p;
+          for (int sx = 0; sx < 10; ++sx)
+            hd->map[static_cast<std::size_t>(y) * 320 + sx + 304] = {
+                static_cast<u16>(sx * 8), static_cast<u16>((springY - springPos) * 8), p, 0};
+        }
       }
     }
     for (std::size_t f = 0; f < assets_.flippers.size(); ++f) {

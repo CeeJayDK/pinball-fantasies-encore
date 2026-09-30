@@ -20,6 +20,7 @@ enum class HdPicture : u16 {
   // Each table's playfield with every lamp lit, and with every lamp off.
   Playfield1On, Playfield2On, Playfield3On, Playfield4On,
   Playfield1Off, Playfield2Off, Playfield3Off, Playfield4Off,
+  Plunger,                                 // the plunger, the same on every table
   Count,
 };
 
@@ -28,7 +29,8 @@ inline const char* hdPictureName(HdPicture p) {
   static constexpr const char* kNames[] = {"", "slide1", "slide2", "slide3", "slide4", "slide5",
                                            "left", "table1", "table2", "table3", "table4", "hiscores",
                                            "playfield1_on", "playfield2_on", "playfield3_on", "playfield4_on",
-                                           "playfield1_off", "playfield2_off", "playfield3_off", "playfield4_off"};
+                                           "playfield1_off", "playfield2_off", "playfield3_off", "playfield4_off",
+                                           "plunger"};
   return kNames[static_cast<std::size_t>(p)];
 }
 
