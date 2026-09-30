@@ -1,0 +1,4 @@
+/* The icon Explorer and the taskbar show for the .exe. Windows has no convention for an
+ * icon file beside the program: it has to be a resource compiled into the executable. The
+ * .ico is made from assets/app/icon.png by tools/mkico.py and committed. */
+IDI_ICON1 ICON "pinball.ico"

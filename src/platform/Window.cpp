@@ -1,6 +1,7 @@
 #include "platform/Window.h"
 
 #include "core/Log.h"
+#include "platform/AppIcon.h"
 
 namespace pfr {
 
@@ -20,6 +21,16 @@ bool Window::create(const std::string& title, int width, int height) {
     log::error(std::string("SDL_CreateWindow: ") + SDL_GetError());
     return false;
   }
+#ifndef __APPLE__
+  // The window's icon, for the taskbar and the window list. Windows also carries one as a
+  // resource for Explorer to show on the .exe; macOS takes it from the bundle, at every size,
+  // which a 128-pixel one set here would replace in the Dock.
+  if (SDL_Surface* icon = SDL_CreateSurfaceFrom(kAppIconSize, kAppIconSize, SDL_PIXELFORMAT_RGBA32,
+                                                const_cast<std::uint8_t*>(kAppIcon), kAppIconSize * 4)) {
+    SDL_SetWindowIcon(window_, icon);
+    SDL_DestroySurface(icon);
+  }
+#endif
   context_ = SDL_GL_CreateContext(window_);
   if (!context_) {
     log::error(std::string("SDL_GL_CreateContext: ") + SDL_GetError());

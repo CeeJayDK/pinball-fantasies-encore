@@ -66,6 +66,8 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 | `encore-extract <dir> <out>` | writes every table's artwork, collision maps, flipper frames, ball and plunger out as PNGs |
 | `tools/hd_import.py <name>=<picture> ...` | prepares redrawn pictures (trims, resizes to 3x the original) into `assets/hd` |
 | `tools/hd_unlit.py <lit.png> <unlit.png> <table dir>` | derives a playfield's lights-off picture from its lights-on one, using the original's lamps (needs `encore-extract` output) |
+| `tools/mkico.py <icon.png> <out.ico>` | the Windows icon, compiled into the `.exe`; run once when the icon changes, and commit `packaging/windows/pinball.ico` |
+| `tools/mkappicon.py <icon.png> <out.h>` | the window's own icon for the taskbar on Linux and Windows; run once when the icon changes, and commit `src/platform/AppIcon.h` |
 
 ## Layout
 

@@ -138,6 +138,9 @@ Key keyFor(SDL_Keycode k) {
 App::App(AppOptions options) : options_(std::move(options)), frame_(640, 480) {}
 
 bool App::init() {
+  // Who this is, for the system: on Linux the identifier is the window's app id, which is how
+  // the desktop matches the window to its menu entry and icon (see packaging/linux).
+  SDL_SetAppMetadata("Pinball Fantasies: Encore!", nullptr, "org.encore.pinball-fantasies");
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD)) {
     log::error(std::string("SDL_Init: ") + SDL_GetError());
     return false;

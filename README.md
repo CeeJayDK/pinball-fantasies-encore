@@ -30,7 +30,9 @@ by the machines that make them, nothing more: they compile, their tests pass, an
 yet sat down in front of them. If something is wrong there, that is the news I am after.
 
 On macOS the application is not signed, so the system refuses it the first time — see
-[a downloaded build on macOS](#a-downloaded-build-on-macos) below. Every release is also on
+[a downloaded build on macOS](#a-downloaded-build-on-macos) below. On Linux, `./install.sh`
+from the unpacked folder puts the game in your menu with its icon, all under `~/.local`;
+it's optional, and the game runs from the folder just the same. Every release is also on
 the [releases page](https://github.com/pedrocatalao/pinball-fantasies-encore/releases).
 
 ## The remaster

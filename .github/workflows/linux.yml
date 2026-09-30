@@ -87,6 +87,8 @@ jobs:
           mkdir -p "$dist/lib"
           cp "build/Pinball Fantasies" "$dist/"
           cp -r build/shaders build/hd "$dist/"
+          # To put it in the menu, with its icon: optional, and all under ~/.local.
+          cp packaging/linux/install.sh assets/app/icon.png "$dist/"
           cp -L "$(ldd "build/Pinball Fantasies" | awk '/libSDL3/ {print $3}')" "$dist/lib/"
           patchelf --set-rpath '$ORIGIN/lib' "$dist/Pinball Fantasies"
           tar czf "pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz" "$dist"

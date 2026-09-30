@@ -89,6 +89,15 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
 )
 # Pictures are decoded by this project's own PNG reader, and every OpenGL function past 1.1
 # is fetched from the driver, so nothing here is platform-specific but the library names.
+# Windows carries its icon as a compiled-in resource, not a file beside the program. The .ico
+# is made once by tools/mkico.py and committed, so no image tooling has to be on the runner.
+if(WIN32)
+  enable_language(RC)
+  target_sources(pinball-fantasies PRIVATE packaging/windows/pinball.rc)
+  # the resource compiler does not say what the .rc pulls in
+  set_source_files_properties(packaging/windows/pinball.rc PROPERTIES OBJECT_DEPENDS
+    "${CMAKE_SOURCE_DIR}/packaging/windows/pinball.ico")
+endif()
 target_link_libraries(pinball-fantasies PRIVATE encore_core SDL3::SDL3 OpenGL::GL)
 # Fetching a set of pictures uses what the platform already has, so there is nothing to
 # install: libcurl ships with macOS and every Linux, WinHTTP is part of Windows.
