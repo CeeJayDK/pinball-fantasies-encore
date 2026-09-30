@@ -151,7 +151,11 @@ bool App::init() {
   if (!window_.create("Pinball Fantasies: Encore!", 640 * std::max(1, options_.windowScale) / 2,
                       480 * std::max(1, options_.windowScale) / 2))
     return false;
-  if (options_.fullscreen) window_.setFullscreen(true);
+  // Fullscreen or in a window, as it was left last time, unless told otherwise.
+  {
+    const auto saved = file::readAll(saveDir_ / "fullscreen.txt");
+    if (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1')) window_.setFullscreen(true);
+  }
   // The window's context is current from here, so the driver can be asked for its functions.
   if (!loadGlFunctions()) {
     log::error("this computer's OpenGL is missing what the renderer needs (4.1 core)");
@@ -539,6 +543,14 @@ int App::run() {
         if (e.type == SDL_EVENT_QUIT) running_ = false;
         // Nothing in the game is played with the mouse, so the pointer keeps out of the way
         // while it is over the window, and comes back when it leaves or the window does.
+        // However it came about -- the key, or the system's own button on the title bar -- the
+        // window's state is the one kept for next time, and the one the key switches from.
+        if (e.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || e.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) {
+          const bool on = e.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN;
+          if (window_.fullscreen() != on) window_.setFullscreen(on);
+          const char c = on ? '1' : '0';
+          file::writeAll(saveDir_ / "fullscreen.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
+        }
         if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_WINDOW_FOCUS_GAINED) SDL_HideCursor();
         if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) SDL_ShowCursor();
         handleKey(e);

@@ -123,7 +123,7 @@ The original layout.
 | P | pause (see below) |
 | M | music on or off |
 | Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
-| Command+F | fullscreen (the Windows or Super key elsewhere) |
+| Command+F | fullscreen or back to a window, remembered for next time (the Windows or Super key elsewhere) |
 
 While paused, the original's own options, and two of this version's for looking at the artwork:
 

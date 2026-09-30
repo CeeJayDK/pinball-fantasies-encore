@@ -51,7 +51,7 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 | `--hd-dir <dir>` | pictures to use instead of the application's own |
 | `--smooth` | soften the one pixel that straddles two source pixels; steadies scrolling |
 | `--square-pixels` | show the picture unstretched instead of filling a 4:3 screen |
-| `--fullscreen`, `--scale <n>` | window options |
+| `--fullscreen`, `--scale <n>` | window options; fullscreen is otherwise as it was left last time |
 | `--screenshot <file>`, `--screenshot-frame <n>` | render one frame to a PNG and quit |
 | `--stats` | log, once a second, how long each frame takes |
 | `--verbose` | log every step, not only what matters |
