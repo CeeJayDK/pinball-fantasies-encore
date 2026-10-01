@@ -416,7 +416,10 @@ class Table {
   void stonesIncrTowerBonus();
   void stonesLoadFixup();
 
-  int rand(int n) { return std::uniform_int_distribution<int>(0, n - 1)(rng_); }
+  /// 0 to n-1. The generator's numbers are the same everywhere, but how a standard library's
+  /// distributions turn them into a range is not, so the same seed would play differently on
+  /// Windows, Linux and macOS; this mapping is the game's own.
+  int rand(int n) { return static_cast<int>(rng_() % static_cast<u64>(n)); }
   const Jingle& jingle(JingleBind b) const { return assets_.jingle(b); }
 
   // ---- state (same names as pfr, camelCased) ----
