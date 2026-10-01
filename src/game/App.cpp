@@ -224,7 +224,7 @@ bool App::init() {
     ballTrail_ = options_.trail.value_or(!saved || saved->empty() || (*saved)[0] != '0');
     if (options_.trail) setBallTrail(*options_.trail);
   }
-  audio_.open(48000);
+  sound_ = audio_.open(48000);
 
   if (options_.table >= 1 && options_.table <= 4)
     openTable(options_.table - 1);
@@ -392,12 +392,21 @@ void App::handleKey(const SDL_Event& e) {
   else if (intro_) intro_->handleKey(k, down);
 }
 
+/// Without a sound card nothing would move the music on, and the game waits on it: a table's
+/// scripts for a jingle to end, the intro's pictures for the music to reach their moment. It
+/// is moved on here instead, a frame's worth at a time, and nobody hears it.
+void App::playSilently(Player& player) {
+  silence_.resize(800 * 2);  // 48000 a second, 60 frames
+  player.render(silence_.data(), 800);
+}
+
 void App::update(double dt) {
   clock_ += dt;
   while (clock_ >= kFrame) {
     clock_ -= kFrame;
     if (intro_) {
       const IntroAction a = intro_->runFrame();
+      if (!sound_) playSilently(intro_->player());
       switch (a.kind) {
         case IntroAction::Kind::OpenTable:
           config_.options = intro_->options();
@@ -413,6 +422,7 @@ void App::update(double dt) {
       }
     } else if (table_) {
       const TableAction a = table_->runFrame();
+      if (!sound_) playSilently(table_->player());
       const int index = table_->tableIndex();
       switch (a.kind) {
         case TableAction::Kind::SaveOptions:

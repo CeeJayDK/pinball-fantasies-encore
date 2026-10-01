@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include "data/GameFiles.h"
 #include "game/Config.h"
@@ -54,6 +55,7 @@ class App {
  private:
   bool init();
   void update(double dt);
+  void playSilently(Player& player);
   void render(double now);
   bool askToDownload();
   void drawWaiting(double seconds, std::string_view line);
@@ -90,6 +92,8 @@ class App {
   double clock_ = 0;
   int frameCounter_ = 0;
   bool running_ = true;
+  bool sound_ = false;            ///< a sound card is playing the music
+  std::vector<float> silence_;   ///< where the music goes without one
 };
 
 }  // namespace pfr
