@@ -2,6 +2,9 @@
 
 #include "core/Log.h"
 #include "platform/AppIcon.h"
+#ifdef __APPLE__
+#include "platform/MacMenu.h"
+#endif
 
 namespace pfr {
 
@@ -30,6 +33,8 @@ bool Window::create(const std::string& title, int width, int height) {
     SDL_SetWindowIcon(window_, icon);
     SDL_DestroySurface(icon);
   }
+#else
+  plainWindowMenu();
 #endif
   context_ = SDL_GL_CreateContext(window_);
   if (!context_) {

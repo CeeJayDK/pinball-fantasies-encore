@@ -91,6 +91,13 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
 # is fetched from the driver, so nothing here is platform-specific but the library names.
 # Windows carries its icon as a compiled-in resource, not a file beside the program. The .ico
 # is made once by tools/mkico.py and committed, so no image tooling has to be on the runner.
+# On macOS, a few lines that have to speak to AppKit itself, in Objective-C++.
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(pinball-fantasies PRIVATE src/platform/MacMenu.mm)
+  set_source_files_properties(src/platform/MacMenu.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  target_link_libraries(pinball-fantasies PRIVATE "-framework AppKit")
+endif()
 if(WIN32)
   enable_language(RC)
   target_sources(pinball-fantasies PRIVATE packaging/windows/pinball.rc)

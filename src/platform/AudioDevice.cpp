@@ -17,6 +17,11 @@ bool AudioDevice::open(int sampleRate) {
   spec.format = SDL_AUDIO_F32;
   spec.channels = 2;
   spec.freq = sampleRate;
+  // The card is asked to take a little at a time, about 5 ms, rather than SDL's 21: a sound
+  // the game starts waits for the next helping and then for it to play out, so this is how
+  // late every flipper is heard. It may take more if it must; an environment variable of the
+  // same name still wins, for a system that crackles with so little.
+  SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, "256");
   stream_ = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, &AudioDevice::callback, this);
   if (!stream_) {
     log::error(std::string("SDL_OpenAudioDeviceStream: ") + SDL_GetError());
