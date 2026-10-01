@@ -38,6 +38,10 @@ Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64
   sequencer_ = std::make_shared<TableSequencer>(jingle(JingleBind::Attract).position, assets_.positionJingleStart,
                                                 jingle(JingleBind::Silence).position, options_.noMusic);
   player_ = std::make_unique<Player>(Mod::load(module), sequencer_);
+  replay_.table = table;
+  replay_.seed = seed;
+  replay_.options = options_;
+  replay_.highScores = highScores_;
 
   scroll_.speed = rawScrollSpeed(options_.scrollSpeed);
   scroll_.setResolution(options_.resolution, std::nullopt);
@@ -559,8 +563,25 @@ std::vector<FlipperSide> Table::flipperSides() const {
 
 // ---- the frame ---------------------------------------------------------------------------
 
+/// The music as the game sees it this frame: the player's, or a recording's when playing
+/// one back; recorded whenever it moved on by itself since the game last looked.
+void Table::syncMusic() {
+  const u32 before = sequencer_->view();
+  if (playback_) {
+    const auto& events = playback_->events;
+    for (; playbackAt_ < events.size() && events[playbackAt_].frame <= frame_; ++playbackAt_)
+      if (events[playbackAt_].frame == frame_ && events[playbackAt_].kind == Replay::Event::Kind::Music)
+        sequencer_->setView(events[playbackAt_].value);
+  } else {
+    sequencer_->sync();
+  }
+  if (sequencer_->view() != before) replay_.events.push_back({frame_, Replay::Event::Kind::Music, sequencer_->view()});
+}
+
 TableAction Table::runFrame() {
   using K = TableAction::Kind;
+  syncMusic();
+  replay_.frames = ++frame_;
   if (kbdState_ == KbdState::Paused) {
     if (scrollKey_) {
       const int top = 576 - scroll_.windowHeight;
@@ -701,6 +722,8 @@ TableAction Table::runFrame() {
 }
 
 void Table::handleKey(Key key, bool pressed) {
+  replay_.events.push_back(
+      {frame_, pressed ? Replay::Event::Kind::KeyDown : Replay::Event::Kind::KeyUp, static_cast<u32>(key)});
   auto flipperKey = [&](FlipperSide side) {
     const std::size_t s = static_cast<std::size_t>(side);
     if (pressed && flippersEnabled_ && !flipperState_[s]) {

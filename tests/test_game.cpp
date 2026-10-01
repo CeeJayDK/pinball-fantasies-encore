@@ -11,6 +11,7 @@
 #include "core/File.h"
 #include "data/GameVersion.h"
 #include "intro/Intro.h"
+#include "table/Replay.h"
 #include "table/Table.h"
 
 using namespace pfr;
@@ -37,7 +38,7 @@ struct Outcome {
   Bcd best;
   int triggers = 0;
 };
-Outcome play(int table, int frames, u64 seed) {
+Outcome play(int table, int frames, u64 seed, Replay* recording = nullptr) {
   Table t(read("TABLE" + std::to_string(table + 1) + ".PRG"), read("TABLE" + std::to_string(table + 1) + ".MOD"),
           Config::defaults(), table, seed);
   std::vector<std::string> events;
@@ -69,6 +70,7 @@ Outcome play(int table, int frames, u64 seed) {
     o.triggers += static_cast<int>(events.size());
     events.clear();
   }
+  if (recording) *recording = t.recording();
   return o;
 }
 
@@ -118,6 +120,35 @@ TEST(games_are_deterministic) {
   const Outcome a = play(3, 3000, 42), b = play(3, 3000, 42);
   CHECK(a.best == b.best);
   CHECK(a.triggers == b.triggers);
+}
+
+// A game recorded while it was played, music and all, plays again from the file with no
+// sound at all and arrives at the same games, scores and events, frame for frame.
+TEST(recorded_games_replay_exactly) {
+  if (!haveData()) return;
+  for (int t = 0; t < 4; ++t) {
+    Replay played;
+    play(t, 20000, 11 + static_cast<u64>(t), &played);
+    const Bytes file = played.save();
+    const auto loaded = Replay::load(file);
+    CHECK(loaded.has_value());
+    if (!loaded) continue;
+    CHECK(loaded->events == played.events);
+    CHECK(loaded->games == played.games);
+    const std::string n = std::to_string(t + 1);
+    const Replay again = replay(read("TABLE" + n + ".PRG"), read("TABLE" + n + ".MOD"), *loaded);
+    std::size_t music = 0;
+    for (const auto& e : played.events) music += e.kind == Replay::Event::Kind::Music;
+    const auto score = played.games.empty() ? Bcd::kZero.toAscii() : played.games[0].scores[0].toAscii();
+    std::printf("  table %d: %zu bytes, %zu events (%zu music), %zu games, first %s; replayed %s\n", t + 1,
+                file.size(), played.events.size(), music, played.games.size(),
+                std::string(score.begin(), score.end()).c_str(),
+                again.events == played.events && again.games == played.games ? "the same" : "DIFFERENT");
+    CHECK(!played.games.empty());
+    CHECK(again.frames == played.frames);
+    CHECK(again.events == played.events);
+    CHECK(again.games == played.games);
+  }
 }
 
 // A flipper's replacement picture turns about the point its own artwork hinges on, which is

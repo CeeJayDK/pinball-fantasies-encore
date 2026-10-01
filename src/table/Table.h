@@ -16,6 +16,7 @@
 #include "gfx/HdLayer.h"
 #include "sound/Player.h"
 #include "table/Keys.h"
+#include "table/Replay.h"
 #include "table/TableStates.h"
 
 namespace pfr {
@@ -99,6 +100,11 @@ class Table {
   u8 currentBall() const { return curBall_; }
   /// Tools can collect a line per trigger fired.
   std::vector<std::string>* trace = nullptr;
+
+  /// Everything since the table opened, to play it again (Replay).
+  const Replay& recording() const { return replay_; }
+  /// Takes the music from `r` rather than from the player, which is not played: for replay().
+  void playBack(const Replay& r) { playback_ = &r; }
 
  private:
   struct Ball {
@@ -241,6 +247,7 @@ class Table {
   // --- tasks.rs
   void addTask(TaskKind kind, u16 a = 0, u16 b = 0, bool flag = false);
   void tasksFrame();
+  void syncMusic();
   bool runTask(Task& t);
   u16 taskDelay(const Task& t) const;
   bool runPartyTask(Task& t);
@@ -491,6 +498,11 @@ class Table {
   bool startKeysActive_ = true;
   std::optional<u8> startKey_;
   bool quitting_ = false;
+  Replay replay_;
+  const Replay* playback_ = nullptr;
+  std::size_t playbackAt_ = 0;  ///< the next of its events
+  u32 frame_ = 0;               ///< frames run since the table opened
+  bool abandoned_ = false;      ///< the game being ended was quit from the pause menu
   u16 fade_ = 0x100;
 
   u8 curPlayer_ = 1, totalPlayers_ = 1, curBall_ = 1, totalBalls_ = 3, extraBalls_ = 0;

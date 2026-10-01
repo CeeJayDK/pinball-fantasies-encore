@@ -36,10 +36,17 @@ class SimpleSequencer final : public Sequencer {
   u8 wrap_;
 };
 
+/// The game sees the music through a view of its own: the state as it was at the start of
+/// the frame, with what the game itself has done to it since. The player moves the state on
+/// in the audio thread, at moments that depend on the sound card; the table takes the
+/// player's state into its view at the start of each frame (sync), and a replay records it
+/// there whenever it differs, so a game read from a recording sees the music exactly as the
+/// game that was played did, whatever the card was doing.
 class TableSequencer final : public Sequencer {
  public:
   TableSequencer(u8 position, u8 positionJingleStart, u8 positionSilence, bool noMusic);
 
+  // The game's side: decided on the view, and done to the player's state as well.
   /// Starts a jingle unless a higher-priority one is playing (or `force`). `music` replaces
   /// the position to return to afterwards.
   bool playJingle(const Jingle& jingle, bool force, std::optional<u8> music);
@@ -47,9 +54,16 @@ class TableSequencer final : public Sequencer {
   void resetPriority();
   void setNoMusic(bool flag);
   void forceEndLoop();
-  u8 music() const { return State(state_.load(std::memory_order_acquire)).music; }
-  u8 priority() const { return State(state_.load(std::memory_order_acquire)).priority; }
-  bool jinglePlaying() const { return State(state_.load(std::memory_order_acquire)).repeat != 0; }
+  u8 music() const { return State(view_).music; }
+  u8 priority() const { return State(view_).priority; }
+  bool jinglePlaying() const { return State(view_).repeat != 0; }
+
+  /// The view, packed.
+  u32 view() const { return view_; }
+  /// The player's state, packed, taken into the view.
+  u32 sync() { return view_ = state_.load(std::memory_order_acquire); }
+  /// The view as a recording says it was.
+  void setView(u32 state) { view_ = state; }
 
   std::optional<u8> checkInterrupt() override;
   u8 nextPosition() override;
@@ -70,6 +84,17 @@ class TableSequencer final : public Sequencer {
              u32{noMusic} << 31;
     }
   };
+  /// Applies a game's change to the view, and to the player's state too; what it decides is
+  /// what it decided on the view.
+  template <typename F>
+  bool gameUpdate(F f) {
+    State s(view_);
+    const bool changed = f(s);
+    if (changed) view_ = s.pack();
+    update(f);
+    return changed;
+  }
+
   /// Applies `f` to the state atomically; `f` returns false to leave it unchanged.
   template <typename F>
   bool update(F f) {
@@ -82,6 +107,7 @@ class TableSequencer final : public Sequencer {
   }
 
   std::atomic<u32> state_;
+  u32 view_ = 0;
   u8 positionJingleStart_, positionSilence_;
 };
 

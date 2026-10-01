@@ -40,6 +40,8 @@ TEST(table_sequencer_jingles) {
   CHECK(seq.checkInterrupt() == std::optional<u8>(20));
   CHECK_EQ(seq.jump(20), 20);  // first repeat
   CHECK_EQ(seq.jump(20), 1);   // repeats used up: back to the music
+  CHECK(seq.jinglePlaying());  // the game sees what the player did at its next frame
+  seq.sync();
   CHECK(!seq.jinglePlaying());
   CHECK_EQ(seq.priority(), 0);
 }

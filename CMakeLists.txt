@@ -52,6 +52,7 @@ add_library(encore_core STATIC
   src/intro/IntroAssets.cpp
   src/intro/Intro.cpp
   src/table/Table.cpp
+  src/table/Replay.cpp
   src/table/TablePhysics.cpp
   src/table/TableScript.cpp
   src/table/TableTasks.cpp
