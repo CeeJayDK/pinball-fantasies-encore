@@ -1,0 +1,11 @@
+# The Worker behind the online high scores (src/index.ts). See README.md for setting it up.
+name = "pinball-fantasies-encore"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "encore-scores"
+# Printed by `npx wrangler d1 create encore-scores`.
+database_id = "39690902-9678-465c-a52c-e1dcf9e6e496"
+migrations_dir = "migrations"
