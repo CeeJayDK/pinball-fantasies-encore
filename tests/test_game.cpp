@@ -151,6 +151,26 @@ TEST(recorded_games_replay_exactly) {
   }
 }
 
+// A game played with a cheat that makes it easier is not counted: no tilt, slow motion, or
+// more balls than the options give.
+TEST(cheated_games_are_not_counted) {
+  if (!haveData()) return;
+  const Bytes prg = read("TABLE2.PRG"), mod = read("TABLE2.MOD");
+  Replay honest;
+  play(1, 20000, 5, &honest);
+  CHECK(honest.games.size() == 1);
+  CHECK(verify(prg, mod, honest).ok);
+  Replay snail = honest, earthquake = honest, extra = honest;
+  snail.carry.slowdown = true;
+  earthquake.carry.noTilt = true;
+  extra.carry.balls = 5;
+  for (const Replay* r : {&snail, &earthquake, &extra}) {
+    const Verdict v = verify(prg, mod, *r);
+    CHECK(!v.ok);
+    CHECK(v.reason == "played with cheats");
+  }
+}
+
 // A flipper's replacement picture turns about the point its own artwork hinges on, which is
 // not always the origin the table gives for it: the upper bats of Party Land and Speed Devils
 // draw the main bats' frames, hinged several pixels away from where their ball bounces off.

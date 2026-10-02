@@ -63,7 +63,9 @@ struct TableAction {
 
 class Table {
  public:
-  Table(ByteView prg, ByteView module, const Config& config, int table, u64 seed);
+  /// `carry`: what a game started on another table takes over from it (Replay::Carry).
+  Table(ByteView prg, ByteView module, const Config& config, int table, u64 seed,
+        const Replay::Carry* carry = nullptr);
   ~Table();
 
   TableAction runFrame();
@@ -101,8 +103,15 @@ class Table {
   /// Tools can collect a line per trigger fired.
   std::vector<std::string>* trace = nullptr;
 
-  /// Everything since the table opened, to play it again (Replay).
+  /// Everything since the table opened, up to the end of its first game, to play it again.
   const Replay& recording() const { return replay_; }
+  /// Whether `key`, pressed now, would start a game: so the application can give the game a
+  /// table of its own first (Replay).
+  bool startsGame(Key key) const;
+  /// What a game started now on a new table should take over from this one.
+  Replay::Carry carryOver() const {
+    return {cheatNoTilt_, cheatSlowdown_, totalBalls_, scroll_.pos, scroll_.rawPosF4};
+  }
   /// Takes the music from `r` rather than from the player, which is not played: for replay().
   void playBack(const Replay& r) { playback_ = &r; }
 
@@ -502,6 +511,7 @@ class Table {
   const Replay* playback_ = nullptr;
   std::size_t playbackAt_ = 0;  ///< the next of its events
   u32 frame_ = 0;               ///< frames run since the table opened
+  bool recorded_ = false;       ///< its first game is over: nothing more is recorded
   bool abandoned_ = false;      ///< the game being ended was quit from the pause menu
   u16 fade_ = 0x100;
 

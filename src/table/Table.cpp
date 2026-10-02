@@ -29,7 +29,7 @@ constexpr std::array<u16, 36> kMatchTimingHigh = {22, 28, 25, 25, 22, 19, 18, 15
 
 }  // namespace
 
-Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64 seed)
+Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64 seed, const Replay::Carry* carry)
     : assets_(TableAssets::load(prg, table)),
       options_(config.options),
       highScores_(config.highScores[static_cast<std::size_t>(table)]),
@@ -69,6 +69,16 @@ Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64
   push_.speedRelease = speedFix(-200);
   ball_.maxSpeed = speedFix(4100);
   totalBalls_ = options_.balls;
+  if (carry) {
+    cheatNoTilt_ = carry->noTilt;
+    cheatSlowdown_ = carry->slowdown;
+    if (carry->balls) totalBalls_ = carry->balls;
+    if (carry->scrollPos != 0xffff) {
+      scroll_.pos = carry->scrollPos;
+      scroll_.rawPosF4 = carry->scrollRawF4;
+    }
+  }
+  replay_.carry = carryOver();
 
   ball_.setPos({280, 525});
   startScript(ScriptBind::Init);
@@ -575,13 +585,20 @@ void Table::syncMusic() {
   } else {
     sequencer_->sync();
   }
-  if (sequencer_->view() != before) replay_.events.push_back({frame_, Replay::Event::Kind::Music, sequencer_->view()});
+  if (sequencer_->view() != before && !recorded_)
+    replay_.events.push_back({frame_, Replay::Event::Kind::Music, sequencer_->view()});
+}
+
+bool Table::startsGame(Key key) const {
+  return kbdState_ == KbdState::Main && startKeysActive_ && inAttract_ &&
+         ((key >= Key::F1 && key <= Key::F8) || (key >= Key::Digit1 && key <= Key::Digit8) || key == Key::Enter);
 }
 
 TableAction Table::runFrame() {
   using K = TableAction::Kind;
   syncMusic();
-  replay_.frames = ++frame_;
+  ++frame_;
+  if (!recorded_) replay_.frames = frame_;
   if (kbdState_ == KbdState::Paused) {
     if (scrollKey_) {
       const int top = 576 - scroll_.windowHeight;
@@ -722,8 +739,9 @@ TableAction Table::runFrame() {
 }
 
 void Table::handleKey(Key key, bool pressed) {
-  replay_.events.push_back(
-      {frame_, pressed ? Replay::Event::Kind::KeyDown : Replay::Event::Kind::KeyUp, static_cast<u32>(key)});
+  if (!recorded_)
+    replay_.events.push_back(
+        {frame_, pressed ? Replay::Event::Kind::KeyDown : Replay::Event::Kind::KeyUp, static_cast<u32>(key)});
   auto flipperKey = [&](FlipperSide side) {
     const std::size_t s = static_cast<std::size_t>(side);
     if (pressed && flippersEnabled_ && !flipperState_[s]) {

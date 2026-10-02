@@ -61,6 +61,7 @@ class App {
   void drawWaiting(double seconds, std::string_view line);
   void openIntro(int returningFrom);
   void openTable(int index);
+  void newGame();
   void saveRecording();
   void handleKey(const SDL_Event& e);
   void resizeFrame(int width, int height, double pixelAspect);
@@ -92,8 +93,8 @@ class App {
   } stats_;
   double clock_ = 0;
   int frameCounter_ = 0;
-  std::filesystem::path recordingPath_;  ///< where the open table's recording goes
-  std::size_t recordedGames_ = 0;        ///< games in it when it was last written
+  Bytes tablePrg_, tableMod_;  ///< the open table's files, for a table of its own per game
+  bool recordingSaved_ = false;  ///< the open table's game has been kept
   bool running_ = true;
   bool sound_ = false;            ///< a sound card is playing the music
   std::vector<float> silence_;   ///< where the music goes without one

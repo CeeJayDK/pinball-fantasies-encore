@@ -341,7 +341,6 @@ void App::resizeFrame(int width, int height, double pixelAspect) {
 }
 
 void App::openIntro(int returningFrom) {
-  saveRecording();
   audio_.setSource({});
   table_.reset();
   // The slideshow plays to INTRO.MOD; coming back from a table the menu plays MOD2.MOD.
@@ -359,35 +358,47 @@ void App::openTable(int index) {
   const auto prg = file::readAll(files_.tables[static_cast<std::size_t>(index)]);
   const auto mod = file::readAll(files_.tableMusic[static_cast<std::size_t>(index)]);
   if (!prg || !mod) throw DataError("cannot read the table files");
+  tablePrg_ = *prg;
+  tableMod_ = *mod;
   const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
-  table_ = std::make_unique<Table>(*prg, *mod, config_, index, seed);
-  {
-    const std::time_t now = std::time(nullptr);
-    char stamp[32];
-    std::strftime(stamp, sizeof stamp, "%Y-%m-%d %H-%M-%S", std::localtime(&now));
-    recordingPath_ = saveDir_ / "replays" / (std::string(stamp) + " table " + std::to_string(index + 1) + ".replay");
-    recordedGames_ = 0;
-  }
+  table_ = std::make_unique<Table>(tablePrg_, tableMod_, config_, index, seed);
+  recordingSaved_ = false;
   resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
   loadFlipperPictures(index);
   log::info("opened table " + std::to_string(index + 1));
 }
 
-/// Everything played on the open table, kept beside the high scores each time a game ends and
-/// when the table is left; a table opened and left without a game being played is not kept.
+/// Every game is played on a table of its own, made as the key that starts it is pressed, so
+/// that its recording depends on nothing played before it. The new table takes over what the
+/// old one had that the game would play differently without: the options and high scores as
+/// they are now, any cheats typed while it waited, and where its screen was looking.
+void App::newGame() {
+  const int index = table_->tableIndex();
+  Config config = config_;
+  config.options = table_->options();
+  config.highScores[static_cast<std::size_t>(index)] = table_->highScores();
+  const Replay::Carry carry = table_->carryOver();
+  audio_.setSource({});
+  const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
+  table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, seed, &carry);
+  audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
+  recordingSaved_ = false;
+}
+
+/// The game just over, kept beside the high scores as `replays/<date time> table N.replay`.
 void App::saveRecording() {
-  if (!table_ || recordingPath_.empty()) return;
-  const Replay& r = table_->recording();
-  if (r.games.empty() && table_->inAttract()) return;
+  const std::time_t now = std::time(nullptr);
+  char stamp[32];
+  std::strftime(stamp, sizeof stamp, "%Y-%m-%d %H-%M-%S", std::localtime(&now));
+  const auto path = saveDir_ / "replays" /
+                    (std::string(stamp) + " table " + std::to_string(table_->tableIndex() + 1) + ".replay");
   std::error_code ec;
-  std::filesystem::create_directories(recordingPath_.parent_path(), ec);
-  const Bytes data = r.save();
-  if (!file::writeAll(recordingPath_, data))
-    log::error("cannot write " + recordingPath_.string());
-  else if (r.games.size() != recordedGames_)
-    log::info("recorded: " + recordingPath_.string());
-  recordedGames_ = r.games.size();
+  std::filesystem::create_directories(path.parent_path(), ec);
+  if (file::writeAll(path, table_->recording().save()))
+    log::info("recorded: " + path.string());
+  else
+    log::error("cannot write " + path.string());
 }
 
 void App::handleKey(const SDL_Event& e) {
@@ -413,6 +424,7 @@ void App::handleKey(const SDL_Event& e) {
   const Key k = keyFor(e.key.key);
   if (k == Key::None) return;
   const bool down = e.type == SDL_EVENT_KEY_DOWN;
+  if (table_ && down && table_->startsGame(k)) newGame();
   if (table_) table_->handleKey(k, down);
   else if (intro_) intro_->handleKey(k, down);
 }
@@ -448,7 +460,10 @@ void App::update(double dt) {
     } else if (table_) {
       const TableAction a = table_->runFrame();
       if (!sound_) playSilently(table_->player());
-      if (table_->recording().games.size() != recordedGames_) saveRecording();
+      if (!recordingSaved_ && !table_->recording().games.empty()) {
+        saveRecording();
+        recordingSaved_ = true;
+      }
       const int index = table_->tableIndex();
       switch (a.kind) {
         case TableAction::Kind::SaveOptions:
@@ -642,7 +657,6 @@ int App::run() {
     SDL_Quit();
     return 1;
   }
-  saveRecording();
   audio_.setSource({});
   audio_.close();
   SDL_Quit();

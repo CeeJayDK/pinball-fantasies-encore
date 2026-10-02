@@ -77,6 +77,11 @@ Bytes Replay::save() const {
   w.u8_(static_cast<u8>(options.resolution));
   w.u8_(options.noMusic);
   w.u8_(options.mono);
+  w.u8_(carry.noTilt);
+  w.u8_(carry.slowdown);
+  w.u8_(carry.balls);
+  w.u16_(carry.scrollPos);
+  w.u16_(static_cast<u16>(carry.scrollRawF4));
   for (const HighScore& h : highScores) {
     w.bcd(h.score);
     w.out.insert(w.out.end(), h.name.begin(), h.name.end());
@@ -117,6 +122,11 @@ std::optional<Replay> Replay::load(ByteView data) {
   p.options.resolution = static_cast<Resolution>(r.u8_());
   p.options.noMusic = r.u8_() != 0;
   p.options.mono = r.u8_() != 0;
+  p.carry.noTilt = r.u8_() != 0;
+  p.carry.slowdown = r.u8_() != 0;
+  p.carry.balls = r.u8_();
+  p.carry.scrollPos = static_cast<u16>(r.le(2));
+  p.carry.scrollRawF4 = static_cast<i16>(r.le(2));
   if (p.table > 3 || static_cast<u8>(p.options.angle) > 2 || static_cast<u8>(p.options.scrollSpeed) > 2 ||
       static_cast<u8>(p.options.resolution) > 2)
     return std::nullopt;
@@ -154,7 +164,7 @@ Replay replay(ByteView prg, ByteView module, const Replay& recording) {
   Config config = Config::defaults();
   config.options = recording.options;
   config.highScores[static_cast<std::size_t>(recording.table)] = recording.highScores;
-  Table t(prg, module, config, recording.table, recording.seed);
+  Table t(prg, module, config, recording.table, recording.seed, &recording.carry);
   t.playBack(recording);
   std::size_t next = 0;
   for (u32 f = 0; f < recording.frames; ++f) {
@@ -176,7 +186,9 @@ Verdict verify(ByteView prg, ByteView module, const Replay& rec, const VerifyLim
   };
   if (rec.frames > limits.maxFrames) return refuse("longer than allowed");
   if (rec.events.size() > limits.maxEvents) return refuse("too many events");
-  if (rec.options.balls < 1 || rec.options.balls > 9) return refuse("odd number of balls");
+  if (rec.options.balls < 1 || rec.options.balls > 9 || rec.carry.balls < 1 || rec.carry.balls > 9)
+    return refuse("odd number of balls");
+  if (rec.cheated()) return refuse("played with cheats");
   for (std::size_t i = 0; i < rec.events.size(); ++i) {
     const Replay::Event& e = rec.events[i];
     if (e.frame > rec.frames || (i && e.frame < rec.events[i - 1].frame)) return refuse("events out of order");
@@ -184,6 +196,8 @@ Verdict verify(ByteView prg, ByteView module, const Replay& rec, const VerifyLim
   }
 
   v.replayed = replay(prg, module, rec);
+  if (v.replayed.games.size() != 1) return refuse("not one whole game");
+  if (v.replayed.games[0].abandoned) return refuse("quit before the end");
   v.claimsMatch = v.replayed.games == rec.games && v.replayed.events == rec.events;
   v.ok = true;
   return v;

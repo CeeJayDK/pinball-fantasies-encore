@@ -54,7 +54,7 @@ int replayFile(const std::filesystem::path& dir, const std::filesystem::path& fi
     return 1;
   }
   static constexpr const char* kAngle[] = {"low", "high", "higher"};
-  std::printf("table %d, %d balls, angle %s, %u frames (%u:%02u), %zu events\n", rec->table + 1, rec->options.balls,
+  std::printf("table %d, %d balls, angle %s, %u frames (%u:%02u), %zu events\n", rec->table + 1, rec->carry.balls,
               kAngle[static_cast<int>(rec->options.angle)], rec->frames, rec->frames / 3600, rec->frames / 60 % 60,
               rec->events.size());
   const auto start = std::chrono::steady_clock::now();
@@ -100,7 +100,7 @@ int verifyFile(const std::filesystem::path& dir, const std::filesystem::path& fi
   std::string out = "{\"ok\":" + std::string(v.ok ? "true" : "false");
   if (!v.ok) out += ",\"reason\":\"" + v.reason + "\"";
   out += ",\"format\":" + std::to_string(pfr::Replay::kFormat) + ",\"table\":" + std::to_string(rec->table + 1) +
-         ",\"balls\":" + std::to_string(rec->options.balls) + ",\"angle\":\"" +
+         ",\"balls\":" + std::to_string(rec->carry.balls) + ",\"angle\":\"" +
          kAngle[static_cast<int>(rec->options.angle)] + "\",\"frames\":" + std::to_string(rec->frames);
   if (v.ok) {
     out += ",\"games\":[";
