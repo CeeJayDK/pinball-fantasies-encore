@@ -31,11 +31,11 @@ if [ -z "${GAME_DIR:-}" ]; then
 fi
 
 for id in $ids; do
-  curl -fsS "${auth[@]}" -o "$work/$id.replay" "$ENCORE_API/v1/verifier/runs/$id/replay"
+  curl -fsS "${auth[@]}" -o "$work/$id.RPL" "$ENCORE_API/v1/verifier/runs/$id/replay"
   # A recording it cannot play comes back as {"ok":false,...} and an exit code of 1; only a
   # missing table file (2) means the verifier itself is wrong, and then nothing is reported.
   set +e
-  verdict=$("$ENCORE_PLAY" "$GAME_DIR" --verify "$work/$id.replay")
+  verdict=$("$ENCORE_PLAY" "$GAME_DIR" --verify "$work/$id.RPL")
   code=$?
   set -e
   if [ $code -gt 1 ] || [ -z "$verdict" ]; then

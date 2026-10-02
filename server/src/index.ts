@@ -5,9 +5,9 @@
 // encore-play --verify against the game's own files) has played it again and reported what it
 // found, and only then does its score count.
 //
-//   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per nickname
-//   POST /v1/players            {"nickname"}       claim or change a nickname   (player token)
-//   GET  /v1/players/<nickname>                    a player's verified games
+//   GET  /                                         a page with the four boards
+//   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player
+//   GET  /v1/players/<tag>                         a player's verified games
 //   POST /v1/runs               <recording>        send a game                  (player token)
 //   GET  /v1/runs/<id>                             a game, and its rank once verified
 //   GET  /v1/runs/<id>/replay                      a verified game's recording
@@ -18,8 +18,11 @@
 //   GET  /v1/verifier/files/<name>                 one of them                  (verifier token)
 //   PUT  /v1/verifier/files/<name>  <file>         keep one (TABLE1.PRG ...)    (verifier token)
 //
-// A player's token is a random 64-hex-digit secret the game makes and keeps; only its SHA-256
-// is stored here. The verifier's is a Worker secret, VERIFIER_TOKEN.
+// A player is an installation of the game. Its token is a random 64-hex-digit secret the game
+// makes and keeps, and sends with every game; only its SHA-256 is stored here. Everyone else
+// knows it by its tag, five hexadecimal digits given out the first time it sends a game. A
+// score shows the initials typed for it, which anyone may type, and the tag: "RDX (4e87a)".
+// The verifier's token is a Worker secret, VERIFIER_TOKEN.
 
 export interface Env {
   DB: D1Database;
@@ -27,12 +30,22 @@ export interface Env {
 }
 
 /** Recording formats a verifier can play (Replay::kFormat in the game). */
-const FORMATS = [2];
+const FORMATS = [3];
 const MAX_RECORDING = 512 * 1024;
 const MAX_PENDING_PER_PLAYER = 50;
 const MAX_RUNS_PER_DAY = 300;
-/** As the dot matrix can show them: capitals, digits and spaces, 3 to 12 long. */
-const NICKNAME = /^[A-Z0-9][A-Z0-9 ]{1,10}[A-Z0-9]$/;
+/** As the game lets them be typed: three capitals or spaces. */
+const INITIALS = /^[A-Z ]{3}$/;
+const TAG = /^[0-9a-f]{5}$/;
+/** The tables as recordings are named after them (kTableCodes in the game). */
+const TABLE_CODES = ["PARTYLND", "SPDDEVLS", "GAMESHOW", "STONBONE"];
+
+/** As the game names a recording, with the tag: FANTASY-STONBONE-RDX-56070-67108120-20261002.RPL */
+function fileName(table: number, initials: string | null, tag: string, score: number, at: number): string {
+  const who = initials && INITIALS.test(initials) ? initials.replace(/ /g, "_") : "---";
+  const day = new Date(at * 1000).toISOString().slice(0, 10).replace(/-/g, "");
+  return `FANTASY-${TABLE_CODES[table - 1]}-${who}-${tag}-${score}-${day}.RPL`;
+}
 const ANGLES = ["low", "high", "higher"];
 /** The original game's files the verifier plays recordings with. */
 const GAME_FILE = /^TABLE[1-4]\.(PRG|MOD)$/;
@@ -71,13 +84,29 @@ const now = () => Math.floor(Date.now() / 1000);
 
 interface Player {
   id: number;
-  nickname: string;
+  tag: string;
 }
 
+/** The installation a token belongs to, made the first time it is seen, with a tag of its own. */
 async function playerOf(env: Env, req: Request): Promise<Player | null> {
   const token = bearer(req);
   if (!token) return null;
-  return env.DB.prepare("SELECT id, nickname FROM players WHERE token_hash = ?").bind(await sha256(new TextEncoder().encode(token))).first<Player>();
+  const tokenHash = await sha256(new TextEncoder().encode(token));
+  const known = await env.DB.prepare("SELECT id, tag FROM players WHERE token_hash = ?").bind(tokenHash).first<Player>();
+  if (known) return known;
+  for (let tries = 0; tries < 20; ++tries) {
+    const tag = [...crypto.getRandomValues(new Uint8Array(3))].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 5);
+    const made = await env.DB.prepare(
+      "INSERT INTO players (token_hash, tag, created_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING RETURNING id, tag",
+    )
+      .bind(tokenHash, tag, now())
+      .first<Player>();
+    if (made) return made;
+    // The tag was taken, or the same token arrived twice at once.
+    const raced = await env.DB.prepare("SELECT id, tag FROM players WHERE token_hash = ?").bind(tokenHash).first<Player>();
+    if (raced) return raced;
+  }
+  return null;
 }
 
 function blob(value: unknown): Uint8Array {
@@ -86,7 +115,7 @@ function blob(value: unknown): Uint8Array {
 
 // ---- the boards ----------------------------------------------------------------------------
 
-/** The best verified score of each nickname on a table, optionally for one ball count and angle. */
+/** The best verified score of each player on a table, optionally for one ball count and angle. */
 async function scores(env: Env, url: URL): Promise<Response> {
   const table = Number(url.searchParams.get("table"));
   if (!(table >= 1 && table <= 4)) return fail(400, "table must be 1 to 4");
@@ -97,8 +126,8 @@ async function scores(env: Env, url: URL): Promise<Response> {
   if (angle !== null && !ANGLES.includes(angle)) return fail(400, "angle must be low, high or higher");
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50) || 50, 1), 200);
   const { results } = await env.DB.prepare(
-    `SELECT nickname, score, balls, angle, run, at FROM (
-       SELECT p.nickname, r.score, r.balls, r.angle, r.id AS run, r.verified_at AS at,
+    `SELECT initials, tag, score, balls, angle, run, at FROM (
+       SELECT r.initials, p.tag, r.score, r.balls, r.angle, r.id AS run, r.verified_at AS at,
               ROW_NUMBER() OVER (PARTITION BY r.player_id ORDER BY r.score DESC, r.verified_at ASC) AS n
        FROM runs r JOIN players p ON p.id = r.player_id
        WHERE r.status = 'verified' AND r.table_no = ?1 AND (?2 IS NULL OR r.balls = ?2) AND (?3 IS NULL OR r.angle = ?3))
@@ -109,42 +138,19 @@ async function scores(env: Env, url: URL): Promise<Response> {
   return json({ table, balls, angle, scores: results.map((r, i) => ({ rank: i + 1, ...r })) });
 }
 
-async function playerPage(env: Env, nickname: string): Promise<Response> {
-  const player = await env.DB.prepare("SELECT id, nickname, created_at FROM players WHERE nickname = ?")
-    .bind(nickname.toUpperCase())
+async function playerPage(env: Env, tag: string): Promise<Response> {
+  if (!TAG.test(tag)) return fail(404, "no such player");
+  const player = await env.DB.prepare("SELECT id, tag, created_at FROM players WHERE tag = ?")
+    .bind(tag)
     .first<Player & { created_at: number }>();
   if (!player) return fail(404, "no such player");
   const { results } = await env.DB.prepare(
-    `SELECT id AS run, table_no AS "table", balls, angle, score, frames, verified_at AS at FROM runs
+    `SELECT id AS run, initials, table_no AS "table", balls, angle, score, frames, verified_at AS at FROM runs
      WHERE player_id = ? AND status = 'verified' ORDER BY verified_at DESC LIMIT 200`,
   )
     .bind(player.id)
     .all();
-  return json({ nickname: player.nickname, since: player.created_at, runs: results });
-}
-
-// ---- players -------------------------------------------------------------------------------
-
-/** Claims a nickname for a token, or moves the token's player to another free one. */
-async function claimNickname(env: Env, req: Request): Promise<Response> {
-  const token = bearer(req);
-  if (!token) return fail(401, "a player token is needed");
-  const body = (await req.json().catch(() => null)) as { nickname?: unknown } | null;
-  const nickname = typeof body?.nickname === "string" ? body.nickname.trim().toUpperCase() : "";
-  if (!NICKNAME.test(nickname)) return fail(400, "a nickname is 3 to 12 capitals, digits or spaces");
-  const tokenHash = await sha256(new TextEncoder().encode(token));
-  const mine = await env.DB.prepare("SELECT id, nickname FROM players WHERE token_hash = ?").bind(tokenHash).first<Player>();
-  if (mine?.nickname === nickname) return json({ nickname });
-  const taken = await env.DB.prepare("SELECT id FROM players WHERE nickname = ?").bind(nickname).first();
-  if (taken) return fail(409, "that nickname is taken");
-  if (mine) {
-    await env.DB.prepare("UPDATE players SET nickname = ? WHERE id = ?").bind(nickname, mine.id).run();
-    return json({ nickname });
-  }
-  await env.DB.prepare("INSERT INTO players (nickname, token_hash, created_at) VALUES (?, ?, ?)")
-    .bind(nickname, tokenHash, now())
-    .run();
-  return json({ nickname }, 201);
+  return json({ tag: player.tag, since: player.created_at, runs: results });
 }
 
 // ---- games ---------------------------------------------------------------------------------
@@ -152,7 +158,7 @@ async function claimNickname(env: Env, req: Request): Promise<Response> {
 /** Takes a recording to be checked. Only what can be seen without playing it is looked at. */
 async function sendRun(env: Env, req: Request): Promise<Response> {
   const player = await playerOf(env, req);
-  if (!player) return fail(401, "send a nickname first");
+  if (!player) return fail(401, "a player token is needed");
   const data = new Uint8Array(await req.arrayBuffer());
   if (data.length < 8 || data.length > MAX_RECORDING) return fail(413, "not a recording, or too big");
   if (String.fromCharCode(...data.slice(0, 4)) !== "PFRP") return fail(400, "not a recording");
@@ -164,7 +170,7 @@ async function sendRun(env: Env, req: Request): Promise<Response> {
     .first<{ id: number; player_id: number; status: string }>();
   if (existing) {
     if (existing.player_id !== player.id) return fail(409, "already sent by someone else");
-    return json({ id: existing.id, status: existing.status });
+    return json({ id: existing.id, status: existing.status, tag: player.tag });
   }
   const counts = await env.DB.prepare(
     `SELECT SUM(status = 'pending') AS pending, SUM(submitted_at > ?2) AS today FROM runs WHERE player_id = ?1`,
@@ -180,12 +186,12 @@ async function sendRun(env: Env, req: Request): Promise<Response> {
     .bind(player.id, hash, format, version, now())
     .first<{ id: number }>();
   await env.DB.prepare("INSERT INTO replays (run_id, data) VALUES (?, ?)").bind(run!.id, data).run();
-  return json({ id: run!.id, status: "pending" }, 202);
+  return json({ id: run!.id, status: "pending", tag: player.tag }, 202);
 }
 
 async function getRun(env: Env, id: number): Promise<Response> {
   const run = await env.DB.prepare(
-    `SELECT r.id, p.nickname, r.status, r.reason, r.table_no AS "table", r.balls, r.angle, r.score, r.frames,
+    `SELECT r.id, r.initials, p.tag, r.status, r.reason, r.table_no AS "table", r.balls, r.angle, r.score, r.frames,
             r.submitted_at, r.verified_at
      FROM runs r JOIN players p ON p.id = r.player_id WHERE r.id = ?`,
   )
@@ -207,15 +213,19 @@ async function getRun(env: Env, id: number): Promise<Response> {
 
 async function getReplay(env: Env, id: number, anyStatus: boolean): Promise<Response> {
   const row = await env.DB.prepare(
-    `SELECT d.data FROM replays d JOIN runs r ON r.id = d.run_id WHERE r.id = ? AND (? OR r.status = 'verified')`,
+    `SELECT d.data, r.status, r.table_no, r.initials, r.score, r.verified_at, p.tag
+     FROM replays d JOIN runs r ON r.id = d.run_id JOIN players p ON p.id = r.player_id
+     WHERE r.id = ? AND (? OR r.status = 'verified')`,
   )
     .bind(id, anyStatus ? 1 : 0)
-    .first<{ data: unknown }>();
+    .first<{ data: unknown; status: string; table_no: number; initials: string | null; score: number; verified_at: number; tag: string }>();
   if (!row) return fail(404, "no such recording");
+  const name =
+    row.status === "verified" ? fileName(row.table_no, row.initials, row.tag, row.score, row.verified_at) : `FANTASY-${id}.RPL`;
   return new Response(blob(row.data), {
     headers: {
       "Content-Type": "application/octet-stream",
-      "Content-Disposition": `attachment; filename="encore-${id}.replay"`,
+      "Content-Disposition": `attachment; filename="${name}"`,
       ...CORS,
     },
   });
@@ -247,7 +257,7 @@ interface Verdict {
   balls?: number;
   angle?: string;
   frames?: number;
-  games?: { endFrame: number; abandoned: boolean; scores: number[] }[];
+  games?: { endFrame: number; abandoned: boolean; initials?: string; scores: number[] }[];
 }
 
 async function report(env: Env, req: Request, id: number): Promise<Response> {
@@ -259,6 +269,7 @@ async function report(env: Env, req: Request, id: number): Promise<Response> {
   if (!v.ok) reason = v.reason ?? "not believed";
   else if (v.games?.length !== 1) reason = "not one whole game";
   else if (v.games[0].scores.length !== 1) reason = "more than one player";
+  else if (!INITIALS.test(v.games[0].initials ?? "")) reason = "no initials typed for it";
   else if (!(v.table! >= 1 && v.table! <= 4) || !ANGLES.includes(v.angle!) || !(v.balls! >= 1 && v.balls! <= 9))
     reason = "a verdict that makes no sense";
   if (reason) {
@@ -269,9 +280,9 @@ async function report(env: Env, req: Request, id: number): Promise<Response> {
   }
   await env.DB.prepare(
     `UPDATE runs SET status = 'verified', reason = NULL, table_no = ?, balls = ?, angle = ?, frames = ?, score = ?,
-       verified_at = ? WHERE id = ?`,
+       initials = ?, verified_at = ? WHERE id = ?`,
   )
-    .bind(v.table, v.balls, v.angle, v.frames, v.games![0].scores[0], now(), id)
+    .bind(v.table, v.balls, v.angle, v.frames, v.games![0].scores[0], v.games![0].initials, now(), id)
     .run();
   return json({ id, status: "verified" });
 }
@@ -306,6 +317,64 @@ async function putFile(env: Env, req: Request, name: string): Promise<Response> 
   return json({ name, sha256: hash, size: data.length });
 }
 
+// ---- the page ------------------------------------------------------------------------------
+
+/** The four boards, read from the API by the page itself; plain for now. */
+const PAGE = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinball Fantasies: Encore! high scores</title>
+</head>
+<body>
+<h1>Pinball Fantasies: Encore! high scores</h1>
+<p>Every score here was played again by the server from the game's own recording.</p>
+<div id="boards">Loading...</div>
+<script>
+const TABLES = ["Party Land", "Speed Devils", "Billion Dollar Gameshow", "Stones 'n' Bones"];
+const CODES = ["PARTYLND", "SPDDEVLS", "GAMESHOW", "STONBONE"];
+const text = (tag, content) => { const e = document.createElement(tag); e.textContent = content; return e; };
+async function board(n) {
+  const section = document.createElement("section");
+  section.append(text("h2", TABLES[n - 1]));
+  try {
+    const r = await fetch("/v1/scores?table=" + n);
+    const { scores } = await r.json();
+    if (!scores.length) {
+      section.append(text("p", "No scores yet."));
+      return section;
+    }
+    const table = document.createElement("table");
+    const head = table.insertRow();
+    for (const h of ["#", "Player", "Score", "Balls", "Angle", "Date", "Recording"]) head.append(text("th", h));
+    for (const s of scores) {
+      const row = table.insertRow();
+      row.append(text("td", s.rank), text("td", s.initials + " (" + s.tag + ")"),
+                 text("td", Number(s.score).toLocaleString("en")), text("td", s.balls), text("td", s.angle),
+                 text("td", new Date(s.at * 1000).toISOString().slice(0, 10)));
+      const link = document.createElement("a");
+      link.href = "/v1/runs/" + s.run + "/replay";
+      // Named here too, as the server names it, since not every browser goes by the server.
+      link.download = ["FANTASY", CODES[n - 1], s.initials.replace(/ /g, "_"), s.tag, s.score,
+                       new Date(s.at * 1000).toISOString().slice(0, 10).replace(/-/g, "")].join("-") + ".RPL";
+      link.textContent = "download";
+      const cell = document.createElement("td");
+      cell.append(link);
+      row.append(cell);
+    }
+    section.append(table);
+  } catch {
+    section.append(text("p", "The scores could not be read."));
+  }
+  return section;
+}
+Promise.all([1, 2, 3, 4].map(board)).then((sections) => document.getElementById("boards").replaceChildren(...sections));
+</script>
+</body>
+</html>
+`;
+
 // ---- routing -------------------------------------------------------------------------------
 
 export default {
@@ -316,8 +385,8 @@ export default {
     const get = req.method === "GET", post = req.method === "POST";
     let m: RegExpExecArray | null;
     try {
+      if (get && path === "") return new Response(PAGE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
       if (get && path === "/v1/scores") return await scores(env, url);
-      if (post && path === "/v1/players") return await claimNickname(env, req);
       if (get && (m = /^\/v1\/players\/([^/]+)$/.exec(path))) return await playerPage(env, decodeURIComponent(m[1]));
       if (post && path === "/v1/runs") return await sendRun(env, req);
       if (get && (m = /^\/v1\/runs\/(\d+)$/.exec(path))) return await getRun(env, Number(m[1]));

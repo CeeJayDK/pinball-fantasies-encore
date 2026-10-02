@@ -1,6 +1,7 @@
 # Online high scores
 
-The game sends every one-player game it finishes as a recording. A Cloudflare Worker keeps it
+When a one-player game makes the local high scores, the game asks, after the initials are
+typed, whether to send it online; if so, it sends the game as a recording. A Cloudflare Worker keeps it
 as *pending*; a GitHub Actions job (`.github/workflows/verify-scores.yml`) plays it again with
 `encore-play --verify` against the game's own files and reports what it found; only then does
 the score count. What the recording claims is never believed: the score on the board is the
@@ -64,11 +65,13 @@ npx wrangler d1 migrations apply encore-scores --local
 npx wrangler dev
 ```
 
-Then, from the repository root, with a player token of your own (`openssl rand -hex 32`):
+Then, from the repository root, with a player token of your own (`openssl rand -hex 32`), and a
+recording with initials (`ENCORE_INITIALS=RDX ENCORE_RECORD=rdx.RPL build/encore-play <the
+game's folder> 2` makes one; or point the game itself at the local server with
+`ENCORE_API=http://localhost:8787`):
 
 ```bash
-curl -X POST -H "Authorization: Bearer $TOKEN" -d '{"nickname":"YOU"}' http://localhost:8787/v1/players
-curl -X POST -H "Authorization: Bearer $TOKEN" --data-binary @"<a game>.replay" http://localhost:8787/v1/runs
+curl -X POST -H "Authorization: Bearer $TOKEN" --data-binary @rdx.RPL http://localhost:8787/v1/runs
 ENCORE_API=http://localhost:8787 VERIFIER_TOKEN=local-secret ENCORE_PLAY=build/encore-play \
   GAME_DIR=<the game's folder> server/verify.sh
 curl "http://localhost:8787/v1/scores?table=1"
@@ -77,6 +80,13 @@ curl "http://localhost:8787/v1/scores?table=1"
 ## What counts
 
 One whole game, by one player, played to its end without cheats (no tilt, slow motion, or
-more balls than the options give), in a recording format the verifier can play. The boards
-show each nickname's best verified score per table, and can be narrowed to a ball count and
-an angle. Every verified game's recording can be downloaded from `/v1/runs/<id>/replay`.
+more balls than the options give), with initials typed for it, in a recording format the
+verifier can play.
+
+A player is an installation of the game: it makes a secret token the first time it sends a
+game (kept in `online.txt` beside the high scores) and the server gives it a public tag of
+five hexadecimal digits. A score shows the initials typed for it and the tag, `RDX (4e87a)`,
+so anyone may type any initials and still be told apart. The boards show each
+installation's best verified score per table, and can be narrowed to a ball count and an
+angle; `/v1/players/<tag>` lists all of one installation's games, and every verified game's
+recording can be downloaded from `/v1/runs/<id>/replay`.
