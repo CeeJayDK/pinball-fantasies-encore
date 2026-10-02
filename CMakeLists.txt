@@ -10,6 +10,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
+# Only what checks recorded games, with no window, sound or graphics, so nothing but a C++
+# compiler and CMake is needed: the server's verifier builds this way.
+option(ENCORE_TOOLS_ONLY "Build only the core, the command-line tools and the tests" OFF)
+
+if(NOT ENCORE_TOOLS_ONLY)
 # SDL comes from the system (Homebrew, a distribution's package, the Windows development
 # files). On macOS it can instead be the official universal framework, which is what a build
 # for both Apple Silicon and Intel needs: -DENCORE_SDL3_FRAMEWORK=<path to SDL3.framework>.
@@ -29,6 +34,7 @@ endif()
 # while the second comes with libglvnd, which older systems do not have at all.
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(OpenGL REQUIRED)
+endif()
 
 # ---------------------------------------------------------------------------
 # encore_core: everything that does not touch SDL or OpenGL. Unit-testable.
@@ -72,6 +78,7 @@ else()
   target_compile_options(encore_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
 endif()
 
+if(NOT ENCORE_TOOLS_ONLY)
 # ---------------------------------------------------------------------------
 # Executable: SDL3 window, OpenGL renderer, audio device, game loop.
 # ---------------------------------------------------------------------------
@@ -168,6 +175,8 @@ if(APPLE)
   add_custom_command(TARGET encore_shaders POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${PFR_RESOURCE_DIR}/icon.icns")
 endif()
+
+endif()  # NOT ENCORE_TOOLS_ONLY
 
 # ---------------------------------------------------------------------------
 # Command-line tools (asset inspection, no SDL).
