@@ -86,7 +86,7 @@ verifier can play.
 A player is an installation of the game: it makes a secret token the first time it sends a
 game (kept in `online.txt` beside the high scores) and the server gives it a public tag of
 five hexadecimal digits. A score shows the initials typed for it and the tag, `RDX (4e87a)`,
-so anyone may type any initials and still be told apart. The boards show each
-installation's best verified score per table, and can be narrowed to a ball count and an
-angle; `/v1/players/<tag>` lists all of one installation's games, and every verified game's
+so anyone may type any initials and still be told apart. The boards show the best
+verified score of each installation and initials per table, so everyone who plays on one
+computer has a place of their own, and can be narrowed to a ball count and an angle; `/v1/players/<tag>` lists all of one installation's games, and every verified game's
 recording can be downloaded from `/v1/runs/<id>/replay`.

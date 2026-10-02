@@ -6,7 +6,7 @@
 // found, and only then does its score count.
 //
 //   GET  /                                         a page with the four boards
-//   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player
+//   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player and initials
 //   GET  /v1/players/<tag>                         a player's verified games
 //   POST /v1/runs               <recording>        send a game                  (player token)
 //   GET  /v1/runs/<id>                             a game, and its rank once verified
@@ -115,7 +115,8 @@ function blob(value: unknown): Uint8Array {
 
 // ---- the boards ----------------------------------------------------------------------------
 
-/** The best verified score of each player on a table, optionally for one ball count and angle. */
+/** The best verified score of each player and initials on a table (so everyone who plays on one
+ *  installation has a place of their own), optionally for one ball count and angle. */
 async function scores(env: Env, url: URL): Promise<Response> {
   const table = Number(url.searchParams.get("table"));
   if (!(table >= 1 && table <= 4)) return fail(400, "table must be 1 to 4");
@@ -128,7 +129,7 @@ async function scores(env: Env, url: URL): Promise<Response> {
   const { results } = await env.DB.prepare(
     `SELECT initials, tag, score, balls, angle, run, at FROM (
        SELECT r.initials, p.tag, r.score, r.balls, r.angle, r.id AS run, r.verified_at AS at,
-              ROW_NUMBER() OVER (PARTITION BY r.player_id ORDER BY r.score DESC, r.verified_at ASC) AS n
+              ROW_NUMBER() OVER (PARTITION BY r.player_id, r.initials ORDER BY r.score DESC, r.verified_at ASC) AS n
        FROM runs r JOIN players p ON p.id = r.player_id
        WHERE r.status = 'verified' AND r.table_no = ?1 AND (?2 IS NULL OR r.balls = ?2) AND (?3 IS NULL OR r.angle = ?3))
      WHERE n = 1 ORDER BY score DESC, at ASC LIMIT ?4`,
@@ -199,10 +200,11 @@ async function getRun(env: Env, id: number): Promise<Response> {
     .first<Record<string, unknown>>();
   if (!run) return fail(404, "no such game");
   if (run.status === "verified") {
-    // Among each player's best on the same table, balls and angle.
+    // Among each player's and initials' best on the same table, balls and angle.
     const above = await env.DB.prepare(
       `SELECT COUNT(*) AS n FROM (SELECT MAX(score) AS best FROM runs
-         WHERE status = 'verified' AND table_no = ? AND balls = ? AND angle = ? GROUP BY player_id) WHERE best > ?`,
+         WHERE status = 'verified' AND table_no = ? AND balls = ? AND angle = ? GROUP BY player_id, initials)
+       WHERE best > ?`,
     )
       .bind(run.table, run.balls, run.angle, run.score)
       .first<{ n: number }>();
