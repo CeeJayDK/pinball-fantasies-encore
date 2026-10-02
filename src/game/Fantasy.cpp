@@ -9,7 +9,7 @@
 #include "core/File.h"
 #include "core/Log.h"
 #include "core/Zip.h"
-#include "platform/Download.h"
+#include "platform/Http.h"
 
 namespace pfr {
 namespace {
