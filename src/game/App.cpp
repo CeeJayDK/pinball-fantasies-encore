@@ -226,11 +226,16 @@ bool App::init() {
     if (options_.trail) setBallTrail(*options_.trail);
   }
   sound_ = audio_.open(48000);
+  // Whatever could not be sent last time goes now.
+  sender_ = std::make_unique<ScoreSender>(saveDir_);
+  sender_->send();
 
-  if (options_.table >= 1 && options_.table <= 4)
+  if (options_.replay && openReplay(*options_.replay)) {
+  } else if (options_.table >= 1 && options_.table <= 4) {
     openTable(options_.table - 1);
-  else
+  } else {
     openIntro(options_.skipIntro ? 0 : -1);
+  }
   return true;
 }
 
@@ -343,6 +348,7 @@ void App::resizeFrame(int width, int height, double pixelAspect) {
 void App::openIntro(int returningFrom) {
   audio_.setSource({});
   table_.reset();
+  replaying_ = fromReplay_ = false;
   // The slideshow plays to INTRO.MOD; coming back from a table the menu plays MOD2.MOD.
   const auto prg = file::readAll(files_.intro);
   const auto mod = file::readAll(returningFrom < 0 ? files_.introMusic : files_.menuMusic);
@@ -352,21 +358,53 @@ void App::openIntro(int returningFrom) {
   audio_.setSource([p = &intro_->player()](float* out, int frames) { p->render(out, frames); });
 }
 
-void App::openTable(int index) {
+/// A table to play on; with `recording`, the table that recording was played on, which then
+/// plays it back.
+void App::openTable(int index, const Replay* recording) {
   audio_.setSource({});
   intro_.reset();
+  table_.reset();
   const auto prg = file::readAll(files_.tables[static_cast<std::size_t>(index)]);
   const auto mod = file::readAll(files_.tableMusic[static_cast<std::size_t>(index)]);
   if (!prg || !mod) throw DataError("cannot read the table files");
   tablePrg_ = *prg;
   tableMod_ = *mod;
-  const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
-  table_ = std::make_unique<Table>(tablePrg_, tableMod_, config_, index, seed);
-  recordingSaved_ = false;
+  if (recording) {
+    Config config = config_;
+    config.options = recording->options;
+    config.highScores[static_cast<std::size_t>(index)] = recording->highScores;
+    table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, recording->seed, &recording->carry);
+    table_->playBack(*recording);
+  } else {
+    const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
+    table_ = std::make_unique<Table>(tablePrg_, tableMod_, config_, index, seed);
+  }
+  // A game played back is the recording's, not one to keep or send.
+  recordingSaved_ = recording != nullptr;
+  replaying_ = fromReplay_ = recording != nullptr;
+  replayNext_ = 0;
+  replayFrame_ = 0;
   resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
   loadFlipperPictures(index);
   log::info("opened table " + std::to_string(index + 1));
+}
+
+/// Plays a recording, dropped on the program or its window or named on its command line, on
+/// the table it was played on. Once it is over the table stays, for a game of one's own.
+bool App::openReplay(const std::filesystem::path& path) {
+  const auto data = file::readAll(path);
+  auto recording = data ? Replay::load(*data) : std::nullopt;
+  if (!recording) {
+    log::error("not a recording this version can play: " + path.string());
+    return false;
+  }
+  audio_.setSource({});
+  table_.reset();  // before the recording it may be playing goes
+  replay_ = std::move(recording);
+  openTable(replay_->table, &*replay_);
+  log::info("playing " + path.filename().string());
+  return true;
 }
 
 /// Every game is played on a table of its own, made as the key that starts it is pressed, so
@@ -376,9 +414,16 @@ void App::openTable(int index) {
 void App::newGame() {
   const int index = table_->tableIndex();
   Config config = config_;
-  config.options = table_->options();
-  config.highScores[static_cast<std::size_t>(index)] = table_->highScores();
-  const Replay::Carry carry = table_->carryOver();
+  Replay::Carry carry = table_->carryOver();
+  if (fromReplay_) {
+    // After a recording, one's own options and high scores, and none of its cheats.
+    carry.noTilt = carry.slowdown = false;
+    carry.balls = 0;
+    fromReplay_ = false;
+  } else {
+    config.options = table_->options();
+    config.highScores[static_cast<std::size_t>(index)] = table_->highScores();
+  }
   audio_.setSource({});
   const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
   table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, seed, &carry);
@@ -386,19 +431,27 @@ void App::newGame() {
   recordingSaved_ = false;
 }
 
-/// The game just over, kept beside the high scores as `replays/<date time> table N.replay`.
+/// The game just over, kept beside the high scores in replays/, named by Replay::fileName.
 void App::saveRecording() {
   const std::time_t now = std::time(nullptr);
   char stamp[32];
-  std::strftime(stamp, sizeof stamp, "%Y-%m-%d %H-%M-%S", std::localtime(&now));
-  const auto path = saveDir_ / "replays" /
-                    (std::string(stamp) + " table " + std::to_string(table_->tableIndex() + 1) + ".replay");
+  std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M", std::localtime(&now));
+  const Replay& r = table_->recording();
+  auto path = saveDir_ / "replays" / r.fileName(stamp);
+  // Two games ending in the same minute with the same score keep both.
+  for (int n = 2; std::filesystem::exists(path); ++n)
+    path = saveDir_ / "replays" / r.fileName(std::string(stamp) + "-" + std::to_string(n));
   std::error_code ec;
   std::filesystem::create_directories(path.parent_path(), ec);
-  if (file::writeAll(path, table_->recording().save()))
-    log::info("recorded: " + path.string());
-  else
+  if (!file::writeAll(path, r.save())) {
     log::error("cannot write " + path.string());
+    return;
+  }
+  log::info("recorded: " + path.string());
+  if (table_->sendOnline() && sender_) {
+    sender_->queue(path);
+    sender_->send();
+  }
 }
 
 void App::handleKey(const SDL_Event& e) {
@@ -424,6 +477,11 @@ void App::handleKey(const SDL_Event& e) {
   const Key k = keyFor(e.key.key);
   if (k == Key::None) return;
   const bool down = e.type == SDL_EVENT_KEY_DOWN;
+  if (table_ && replaying_) {
+    // The recording plays the table; Escape stops it and goes back to the menu.
+    if (down && k == Key::Escape) openIntro(table_->tableIndex());
+    return;
+  }
   if (table_ && down && table_->startsGame(k)) newGame();
   if (table_) table_->handleKey(k, down);
   else if (intro_) intro_->handleKey(k, down);
@@ -458,7 +516,19 @@ void App::update(double dt) {
         case IntroAction::Kind::None: break;
       }
     } else if (table_) {
+      if (replaying_) {
+        const auto& events = replay_->events;
+        for (; replayNext_ < events.size() && events[replayNext_].frame == replayFrame_; ++replayNext_)
+          if (events[replayNext_].kind != Replay::Event::Kind::Music)
+            table_->handleKey(static_cast<Key>(events[replayNext_].value),
+                              events[replayNext_].kind == Replay::Event::Kind::KeyDown);
+      }
       const TableAction a = table_->runFrame();
+      if (replaying_ && ++replayFrame_ >= replay_->frames) {
+        replaying_ = false;
+        table_->stopPlayBack();
+        log::info("the recording is over; the table is yours");
+      }
       if (!sound_) playSilently(table_->player());
       if (!recordingSaved_ && !table_->recording().games.empty()) {
         saveRecording();
@@ -466,16 +536,19 @@ void App::update(double dt) {
       }
       const int index = table_->tableIndex();
       switch (a.kind) {
+        // A recording's table has the recording's options and high scores: none are kept.
         case TableAction::Kind::SaveOptions:
+          if (fromReplay_) break;
           config_.options = table_->options();
           Config::saveOptions(saveDir_, config_.options);
           break;
         case TableAction::Kind::SaveHighScores:
+          if (fromReplay_) break;
           config_.highScores[static_cast<std::size_t>(index)] = table_->highScores();
           Config::saveHighScores(saveDir_, index, table_->highScores());
           break;
         case TableAction::Kind::Quit:
-          config_.options = table_->options();
+          if (!fromReplay_) config_.options = table_->options();
           openIntro(index);
           return;
         case TableAction::Kind::None: break;
@@ -620,6 +693,7 @@ int App::run() {
         }
         if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_WINDOW_FOCUS_GAINED) SDL_HideCursor();
         if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) SDL_ShowCursor();
+        if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) openReplay(e.drop.data);
         handleKey(e);
       }
       const auto nowT = clock::now();

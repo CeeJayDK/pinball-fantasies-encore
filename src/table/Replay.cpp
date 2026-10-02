@@ -104,6 +104,7 @@ Bytes Replay::save() const {
     w.u8_(g.abandoned);
     w.u8_(static_cast<u8>(g.scores.size()));
     for (const Bcd& s : g.scores) w.bcd(s);
+    w.out.insert(w.out.end(), g.initials.begin(), g.initials.end());
   }
   return std::move(w.out);
 }
@@ -154,10 +155,28 @@ std::optional<Replay> Replay::load(ByteView data) {
     g.abandoned = r.u8_() != 0;
     const u8 n = r.u8_();
     for (u8 j = 0; j < n && r.ok; ++j) g.scores.push_back(r.bcd());
+    for (u8& c : g.initials) c = r.u8_();
     p.games.push_back(std::move(g));
   }
   if (!r.ok || r.at != data.size()) return std::nullopt;
   return p;
+}
+
+std::string Replay::fileName(const std::string& when, const std::string& tag) const {
+  std::string initials, score = "0";
+  if (!games.empty()) {
+    for (u8 c : games[0].initials) initials += c >= 'A' && c <= 'Z' ? static_cast<char>(c) : c == ' ' ? '_' : '\0';
+    if (initials.find('\0') != std::string::npos) initials.clear();
+    if (!games[0].scores.empty()) {
+      const auto digits = games[0].scores[0].toAscii();
+      score.assign(digits.begin(), digits.end());
+      score.erase(0, score.find_first_not_of(' '));
+    }
+  }
+  if (initials.empty()) initials = "---";
+  std::string name = std::string("FANTASY-") + kTableCodes[table & 3] + "-" + initials + "-";
+  if (!tag.empty()) name += tag + "-";
+  return name + score + "-" + when + ".RPL";
 }
 
 Replay replay(ByteView prg, ByteView module, const Replay& recording) {

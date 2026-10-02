@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <string>
 
 #include "Test.h"
@@ -38,9 +39,10 @@ struct Outcome {
   Bcd best;
   int triggers = 0;
 };
-Outcome play(int table, int frames, u64 seed, Replay* recording = nullptr) {
+Outcome play(int table, int frames, u64 seed, Replay* recording = nullptr, const Config& config = Config::defaults(),
+             const std::function<void(Table&)>& each = {}) {
   Table t(read("TABLE" + std::to_string(table + 1) + ".PRG"), read("TABLE" + std::to_string(table + 1) + ".MOD"),
-          Config::defaults(), table, seed);
+          config, table, seed);
   std::vector<std::string> events;
   t.trace = &events;
   std::vector<float> audio(1600);
@@ -61,6 +63,7 @@ Outcome play(int table, int frames, u64 seed, Replay* recording = nullptr) {
     const bool wl = zone && p[0] < 150, wr = zone && p[0] >= 130 && p[0] < 290;
     if (wl != l) t.handleKey(Key::ShiftLeft, l = wl);
     if (wr != r) t.handleKey(Key::ShiftRight, r = wr);
+    if (each) each(t);
     t.runFrame();
     t.player().render(audio.data(), 800);
     o.balls = std::max<int>(o.balls, t.currentBall());
@@ -149,6 +152,36 @@ TEST(recorded_games_replay_exactly) {
     CHECK(again.events == played.events);
     CHECK(again.games == played.games);
   }
+}
+
+// A one-player high score asks for initials and then whether to send the game online; both
+// answers are keys, so the recording has them and plays them again, initials and all.
+TEST(initials_and_the_online_question_are_recorded) {
+  if (!haveData()) return;
+  Config config = Config::defaults();
+  config.highScores[1] = {};  // any score is a high score
+  bool typed = false, answered = false;
+  bool asked = false;
+  Replay played;
+  play(1, 20000, 5, &played, config, [&](Table& t) {
+    if (t.askingName() && !typed) {
+      for (Key k : {Key::R, Key::D, Key::X}) t.handleKey(k, true), t.handleKey(k, false);
+      typed = true;
+    }
+    if (t.askingOnline() && !answered) {
+      asked = true;
+      t.handleKey(Key::Y, true), t.handleKey(Key::Y, false);
+      answered = true;
+    }
+  });
+  CHECK(typed);
+  CHECK(asked);
+  CHECK(played.games.size() == 1);
+  if (played.games.empty()) return;
+  CHECK((played.games[0].initials == std::array<u8, 3>{'R', 'D', 'X'}));
+  const Replay again = replay(read("TABLE2.PRG"), read("TABLE2.MOD"), *Replay::load(played.save()));
+  CHECK(again.games == played.games);
+  CHECK(again.events == played.events);
 }
 
 // A game played with a cheat that makes it easier is not counted: no tilt, slow motion, or

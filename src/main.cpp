@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <string>
 #include <utility>
 
@@ -35,6 +36,8 @@ void usage() {
             "  --screenshot <f> render a frame to a PNG file and quit\n"
             "  --screenshot-frame <n>  which frame to capture (default 30)\n"
             "  --stats          log how long each frame takes\n"
+            "  <file.RPL>       play a recording, then stay on its table (also by dropping it on the\n"
+            "                   program or its window)\n"
             "  --verbose        debug logging\n");
 }
 
@@ -69,6 +72,7 @@ int main(int argc, char** argv) {
     else if (a == "--verbose") pfr::log::setMinimumLevel(pfr::log::Level::Debug);
     else if (a == "--help" || a == "-h") { usage(); return 0; }
     else if (a.rfind("-psn", 0) == 0) { /* macOS launch services */ }
+    else if (a[0] != '-' && std::filesystem::is_regular_file(a)) options.replay = a;
     else { usage(); return 2; }
   }
   return pfr::App(std::move(options)).run();

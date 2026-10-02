@@ -266,6 +266,8 @@ bool Table::runScriptTask(ScriptTask& t) {
         HighScore h{players_[curPlayer_ - 1u].scoreMain, {name[0], name[1], name[2]}};
         for (std::size_t i = 3; i > place; --i) highScores_[i] = highScores_[i - 1];
         highScores_[place] = h;
+        if (curPlayer_ == 1) initials_ = h.name;
+        askOnline_ = totalPlayers_ == 1;
         ++curPlayer_;
         flushHighScores_ = true;
         t = ScriptTask{};
@@ -280,7 +282,24 @@ bool Table::runScriptTask(ScriptTask& t) {
       if (t.count == 2) {
         t = ScriptTask{};
         t.kind = S::RecordHighScores;
+        // One player, a high score, initials typed: whether to send the game to the online
+        // high scores, which only the website shows.
+        if (askOnline_) {
+          askOnline_ = false;
+          dmPuts(DmFont::H13, {0, 1}, bytes("SEND ONLINE (Y OR N)"));
+          onlineAnswer_.reset();
+          kbdState_ = KbdState::AskOnline;
+          t.kind = S::RecordHighScoresAskOnline;
+        }
       }
+      return true;
+    case S::RecordHighScoresAskOnline:
+      if (!onlineAnswer_) return true;
+      sendOnline_ = *onlineAnswer_;
+      dm_.clear();
+      kbdState_ = KbdState::GetName;  // as it was: the name is full, so typing does nothing
+      t = ScriptTask{};
+      t.kind = S::RecordHighScores;
       return true;
   }
   return false;

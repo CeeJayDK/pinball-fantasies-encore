@@ -37,7 +37,7 @@ bool Table::runTask(Task& t) {
     case TaskKind::DrainSfx: playSfxBind(SfxBind::BallDrained); return false;
     case TaskKind::GameOver: {
       if (!recorded_) {
-        Replay::Game g{frame_, abandoned_, {}};
+        Replay::Game g{frame_, abandoned_, {}, initials_};
         for (const PlayerState& p : players_) g.scores.push_back(p.scoreMain);
         replay_.games.push_back(std::move(g));
         recorded_ = true;

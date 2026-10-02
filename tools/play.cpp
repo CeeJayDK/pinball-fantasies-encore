@@ -2,9 +2,11 @@
 // ball, score and dot matrix, to check the rules and physics without a window; or plays a
 // recording again and says whether it comes out the same.
 //
-//   encore-play <game folder> <table 1-4> [frames] [seed] [out.png]   (ENCORE_RECORD=<file> keeps the game)
-//   encore-play <game folder> --replay <file.replay>
-//   encore-play <game folder> --verify <file.replay>   (what a server makes of it, as JSON)
+//   encore-play <game folder> <table 1-4> [frames] [seed] [out.png]   (ENCORE_RECORD=<file> keeps the game;
+//                                     ENCORE_INITIALS=ABC starts from no high scores, types ABC
+//                                     for the one it makes, and says yes to sending it online)
+//   encore-play <game folder> --replay <file.RPL>
+//   encore-play <game folder> --verify <file.RPL>   (what a server makes of it, as JSON)
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -106,8 +108,12 @@ int verifyFile(const std::filesystem::path& dir, const std::filesystem::path& fi
     out += ",\"games\":[";
     for (std::size_t g = 0; g < v.replayed.games.size(); ++g) {
       const auto& game = v.replayed.games[g];
+      std::string initials;
+      for (pfr::u8 c : game.initials)
+        if ((c >= 'A' && c <= 'Z') || c == ' ') initials += static_cast<char>(c);
       out += std::string(g ? "," : "") + "{\"endFrame\":" + std::to_string(game.endFrame) +
-             ",\"abandoned\":" + (game.abandoned ? "true" : "false") + ",\"scores\":[";
+             ",\"abandoned\":" + (game.abandoned ? "true" : "false") + ",\"initials\":\"" + initials +
+             "\",\"scores\":[";
       for (std::size_t i = 0; i < game.scores.size(); ++i) out += std::string(i ? "," : "") + text(game.scores[i]);
       out += "]}";
     }
@@ -128,8 +134,8 @@ std::string score(const pfr::Table& t) {
 int main(int argc, char** argv) {
   if (argc < 3) {
     std::puts("usage: encore-play <game folder> <table 1-4> [frames] [seed] [out.png]\n"
-              "       encore-play <game folder> --replay <file.replay>\n"
-              "       encore-play <game folder> --verify <file.replay>");
+              "       encore-play <game folder> --replay <file.RPL>\n"
+              "       encore-play <game folder> --verify <file.RPL>");
     return 2;
   }
   if (std::string(argv[2]) == "--replay") {
@@ -152,6 +158,8 @@ int main(int argc, char** argv) {
     return 1;
   }
   pfr::Config cfg = pfr::Config::defaults();
+  const char* initials = std::getenv("ENCORE_INITIALS");
+  if (initials) cfg.highScores[static_cast<std::size_t>(table)] = {};
   if (const char* a = std::getenv("PFR_ANGLE"))
     cfg.options.angle = a[0] == 'l' ? pfr::Angle::Low : a[0] == 'x' ? pfr::Angle::Higher : pfr::Angle::High;
   pfr::Table t(*prg, *mod, cfg, table, seed);
@@ -194,6 +202,12 @@ int main(int argc, char** argv) {
     if (wantL != left) t.handleKey(Key::ShiftLeft, left = wantL);
     if (wantR != right) t.handleKey(Key::ShiftRight, right = wantR);
 
+    if (initials && t.askingName())
+      for (const char* c = initials; *c; ++c) {
+        const auto k = *c == ' ' ? pfr::Key::Space : static_cast<pfr::Key>(static_cast<int>(pfr::Key::A) + (*c - 'A'));
+        t.handleKey(k, true), t.handleKey(k, false);
+      }
+    if (initials && t.askingOnline()) t.handleKey(pfr::Key::Y, true), t.handleKey(pfr::Key::Y, false);
     t.runFrame();
     for (const auto& e : events) std::printf("frame %5d: %s\n", f, e.c_str());
     events.clear();

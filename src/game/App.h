@@ -8,6 +8,7 @@
 
 #include "data/GameFiles.h"
 #include "game/Config.h"
+#include "game/Online.h"
 #include "gfx/Framebuffer.h"
 #include "gfx/Palette.h"
 #include "gfx/Renderer.h"
@@ -35,6 +36,7 @@ struct AppOptions {
   int windowScale = 3;
   bool stats = false;                    ///< log how long each frame takes
   std::optional<std::filesystem::path> screenshot;  ///< render one frame, save it, quit
+  std::optional<std::filesystem::path> replay;      ///< a recording to play, as dropped on the program
   int screenshotFrame = 30;
 };
 
@@ -60,7 +62,8 @@ class App {
   bool askToDownload();
   void drawWaiting(double seconds, std::string_view line);
   void openIntro(int returningFrom);
-  void openTable(int index);
+  void openTable(int index, const Replay* recording = nullptr);
+  bool openReplay(const std::filesystem::path& path);
   void newGame();
   void saveRecording();
   void handleKey(const SDL_Event& e);
@@ -95,6 +98,13 @@ class App {
   int frameCounter_ = 0;
   Bytes tablePrg_, tableMod_;  ///< the open table's files, for a table of its own per game
   bool recordingSaved_ = false;  ///< the open table's game has been kept
+  std::unique_ptr<ScoreSender> sender_;
+  // A recording being played: the table's keys come from it until its last frame.
+  std::optional<Replay> replay_;
+  std::size_t replayNext_ = 0;  ///< its next event
+  u32 replayFrame_ = 0;         ///< frames of it played
+  bool replaying_ = false;
+  bool fromReplay_ = false;     ///< the table is the recording's, until a game of one's own
   bool running_ = true;
   bool sound_ = false;            ///< a sound card is playing the music
   std::vector<float> silence_;   ///< where the music goes without one

@@ -90,6 +90,7 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
   src/platform/ImageFile.cpp
   src/platform/Http.cpp
   src/game/Fantasy.cpp
+  src/game/Online.cpp
   src/gfx/Gl.cpp
   src/gfx/Renderer.cpp
   src/gfx/ShaderProgram.cpp
@@ -130,7 +131,8 @@ if(APPLE)
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.encore.pinball-fantasies"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-    MACOSX_BUNDLE_ICON_FILE "icon")
+    MACOSX_BUNDLE_ICON_FILE "icon"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in")
 
   # The application's icon, built from the one picture into the sizes the Finder asks for.
   set(ICON_SET "${CMAKE_BINARY_DIR}/icon.iconset")

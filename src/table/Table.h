@@ -100,6 +100,8 @@ class Table {
   const TableAssets& assets() const { return assets_; }
   const std::array<std::array<bool, 160>, 16>& dotMatrix() const { return dm_.pixels; }
   u8 currentBall() const { return curBall_; }
+  bool askingName() const { return kbdState_ == KbdState::GetName && nameBuf_.size() < 3; }
+  bool askingOnline() const { return kbdState_ == KbdState::AskOnline; }
   /// Tools can collect a line per trigger fired.
   std::vector<std::string>* trace = nullptr;
 
@@ -108,12 +110,17 @@ class Table {
   /// Whether `key`, pressed now, would start a game: so the application can give the game a
   /// table of its own first (Replay).
   bool startsGame(Key key) const;
+  /// The player, having typed initials for a high score in a one-player game, said yes to
+  /// sending the game online.
+  bool sendOnline() const { return sendOnline_; }
   /// What a game started now on a new table should take over from this one.
   Replay::Carry carryOver() const {
     return {cheatNoTilt_, cheatSlowdown_, totalBalls_, scroll_.pos, scroll_.rawPosF4};
   }
   /// Takes the music from `r` rather than from the player, which is not played: for replay().
   void playBack(const Replay& r) { playback_ = &r; }
+  /// The recording is over: the music is the player's again, and the keys whoever's are pressed.
+  void stopPlayBack() { playback_ = nullptr; }
 
  private:
   struct Ball {
@@ -178,12 +185,12 @@ class Table {
     i16 unk0, unk2, bounceFactor, minBounceSpeed, maxBounceAngle;
   };
 
-  enum class KbdState : u8 { Main, ConfirmQuit, Paused, PausedConfirmQuit, GetName };
+  enum class KbdState : u8 { Main, ConfirmQuit, Paused, PausedConfirmQuit, GetName, AskOnline };
 
   enum class ScriptTaskKind : u8 {
     Placeholder, Default, Delay, Halt, ConfirmQuit, WaitJingle, WaitWhileGameStarting, AccBonus, Mode, DmClear,
     DmWipeDown, DmWipeRight, DmWipeDownStriped, DmMsgScroll, DmLongMsg, DmAnim, DmTowerHunt, Match, MatchStones,
-    RecordHighScores, RecordHighScoresGetName, RecordHighScoresFinish,
+    RecordHighScores, RecordHighScoresGetName, RecordHighScoresFinish, RecordHighScoresAskOnline,
   };
   /// The script's current wait, with the fields its kind needs.
   struct ScriptTask {
@@ -477,6 +484,10 @@ class Table {
   bool silenceEffect_ = false, timerStop_ = false, blockDrain_ = false, gotHighScore_ = false,
        flushHighScores_ = false;
   std::vector<u8> nameBuf_;
+  std::array<u8, 3> initials_{};      ///< typed for a high score in this game, for its recording
+  bool askOnline_ = false;            ///< to ask, once the initials have shown, to send it online
+  std::optional<bool> onlineAnswer_;  ///< Y or N, when asked
+  bool sendOnline_ = false;
 
   bool inMode_ = false, inModeHit_ = false, inModeRamp_ = false;
   bool pendingMode_ = false, pendingModeHit_ = false, pendingModeRamp_ = false;

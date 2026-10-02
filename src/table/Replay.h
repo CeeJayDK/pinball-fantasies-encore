@@ -9,6 +9,7 @@
 // at the same frames. The music is the one thing played on the side, by the
 // audio thread, at moments that depend on the sound card; so what the game saw of it at the
 // start of each frame is recorded too, whenever it changed by itself (TableSequencer).
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
@@ -19,10 +20,13 @@
 
 namespace pfr {
 
+/// The tables as recordings are named after them, eight letters each.
+inline constexpr const char* kTableCodes[4] = {"PARTYLND", "SPDDEVLS", "GAMESHOW", "STONBONE"};
+
 struct Replay {
   /// Raised whenever a recording would no longer play back the same: a change in the file's
   /// layout, or in how the tables play.
-  static constexpr u16 kFormat = 2;
+  static constexpr u16 kFormat = 3;
 
   struct Event {
     enum class Kind : u8 { KeyDown, KeyUp, Music };
@@ -45,6 +49,7 @@ struct Replay {
     u32 endFrame = 0;
     bool abandoned = false;  ///< quit from the pause menu before the end
     std::vector<Bcd> scores;
+    std::array<u8, 3> initials{};  ///< typed for a high score by the first player; zeros if none
     bool operator==(const Game&) const = default;
   };
 
@@ -63,6 +68,10 @@ struct Replay {
 
   Bytes save() const;
   static std::optional<Replay> load(ByteView data);
+  /// What a recording is called: FANTASY-<table>-<initials>-[<tag>-]<score>-<when>.RPL, as
+  /// FANTASY-STONBONE-RDX-67108120-20261002-2153.RPL. Initials not typed are ---, a space in
+  /// them is _, and the score is the first player's. `tag` is the server's, for its own.
+  std::string fileName(const std::string& when, const std::string& tag = {}) const;
 };
 
 /// Plays a recording again from the table's files, and returns what that recorded: for a

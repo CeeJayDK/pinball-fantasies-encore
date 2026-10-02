@@ -841,6 +841,10 @@ void Table::handleKey(Key key, bool pressed) {
     case KbdState::GetName:
       if (chr && nameBuf_.size() < 3) nameBuf_.push_back(chr);
       break;
+    case KbdState::AskOnline:
+      if (key == Key::Y) onlineAnswer_ = true;
+      if (key == Key::N) onlineAnswer_ = false;
+      break;
   }
 }
 
