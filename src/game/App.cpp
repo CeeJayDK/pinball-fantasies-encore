@@ -108,6 +108,14 @@ std::filesystem::path executableDir() {
   return base ? std::filesystem::path(base) : std::filesystem::current_path();
 }
 
+/// Whether there is something at the path; what cannot be looked at is not there. On Windows a
+/// drive with no card or disc in it answers "not ready", and the build's own folder, looked for
+/// first, can be on such a drive (D:, on GitHub's builders).
+bool present(const std::filesystem::path& path) {
+  std::error_code ec;
+  return std::filesystem::exists(path, ec);
+}
+
 /// The keys the game understands, from SDL key codes (the original layout: Shift, Ctrl or
 /// Alt for the flippers, Space to nudge, Down to pull the plunger, F1-F4 for the tables).
 Key keyFor(SDL_Keycode k) {
@@ -150,7 +158,7 @@ bool App::init() {
 
   // Prefer the shaders in the source tree while developing, so edits take effect at once.
   const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "shaders";
-  shaderDir_ = std::filesystem::exists(source) ? source : executableDir() / "shaders";
+  shaderDir_ = present(source) ? source : executableDir() / "shaders";
 
   if (!window_.create("Pinball Fantasies: Encore!", 640 * std::max(1, options_.windowScale) / 2,
                       480 * std::max(1, options_.windowScale) / 2))
@@ -255,9 +263,9 @@ void App::setCrt(bool on) {
 /// leaves in the preferences folder is not read: fetching it is the experiment for now, and
 /// choosing between sets comes later.
 std::filesystem::path App::hdPicturePath(const std::string& name) const {
-  if (options_.hdDir && std::filesystem::exists(*options_.hdDir / name)) return *options_.hdDir / name;
+  if (options_.hdDir && present(*options_.hdDir / name)) return *options_.hdDir / name;
   const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "assets" / "hd";
-  return (std::filesystem::exists(source) ? source : executableDir() / "hd") / name;
+  return (present(source) ? source : executableDir() / "hd") / name;
 }
 
 void App::loadHdPictures() {
@@ -265,7 +273,7 @@ void App::loadHdPictures() {
   for (std::size_t i = 1; i < HdFrame::kCount; ++i) {
     const auto p = static_cast<HdPicture>(i);
     const auto path = hdPicturePath(std::string(hdPictureName(p)) + ".png");
-    if (!std::filesystem::exists(path)) continue;
+    if (!present(path)) continue;
     const auto image = loadImageFile(path);
     if (!image) {
       log::error("cannot read " + path.string());
@@ -293,7 +301,7 @@ void App::loadFlipperPictures(int table) {
                              (nth > 1 ? std::to_string(nth) : "") + ".png";
     const auto path = hdPicturePath(name);
     std::optional<RgbaImage> picture;
-    if (std::filesystem::exists(path)) {
+    if (present(path)) {
       picture = loadImageFile(path);
       if (!picture) log::error("cannot read " + path.string());
     }
@@ -311,7 +319,7 @@ void App::loadFlipperPictures(int table) {
   std::optional<RgbaImage> ball;
   for (const std::string& name : {"ball" + std::to_string(table + 1) + ".png", std::string("ball.png")}) {
     const auto path = hdPicturePath(name);
-    if (!std::filesystem::exists(path)) continue;
+    if (!present(path)) continue;
     ball = loadImageFile(path);
     if (!ball) log::error("cannot read " + path.string());
     break;
@@ -499,7 +507,7 @@ void App::saveRecording() {
   const Replay& r = table_->recording();
   auto path = saveDir_ / "replays" / r.fileName(stamp);
   // Two games ending in the same minute with the same score keep both.
-  for (int n = 2; std::filesystem::exists(path); ++n)
+  for (int n = 2; present(path); ++n)
     path = saveDir_ / "replays" / r.fileName(std::string(stamp) + "-" + std::to_string(n));
   std::error_code ec;
   std::filesystem::create_directories(path.parent_path(), ec);
@@ -517,7 +525,9 @@ void App::saveRecording() {
 void App::handleKey(const SDL_Event& e) {
   if (e.type != SDL_EVENT_KEY_DOWN && e.type != SDL_EVENT_KEY_UP) return;
   if (e.key.repeat) return;
-  if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F && (e.key.mod & SDL_KMOD_GUI)) {
+  // F11 everywhere; Command+F too on a Mac (Windows keeps Windows+F for itself).
+  if (e.type == SDL_EVENT_KEY_DOWN &&
+      (e.key.key == SDLK_F11 || (e.key.key == SDLK_F && (e.key.mod & SDL_KMOD_GUI)))) {
     window_.setFullscreen(!window_.fullscreen());
     return;
   }

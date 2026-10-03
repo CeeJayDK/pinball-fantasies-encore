@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <atomic>
+#include <cctype>
 #include <string>
 #include <thread>
 #include <system_error>
@@ -9,12 +10,11 @@
 #include "core/File.h"
 #include "core/Log.h"
 #include "core/Zip.h"
+#include "game/Online.h"
 #include "platform/Http.h"
 
 namespace pfr {
 namespace {
-
-constexpr const char* kFantasyUrl = "https://files.catbox.moe/d28arv.zip";
 
 /// An archive says where each file goes, so it decides where the writing happens: anything
 /// reaching outside the folder it is being unpacked into is dropped, as are the entries a
@@ -34,21 +34,39 @@ bool safeName(const std::string& name) {
   return true;
 }
 
-/// What a finished download leaves behind. It holds the address the archive came from, so
-/// that a later archive at a different address is fetched even though this one is unpacked.
+/// What a finished download leaves behind, holding the address the archive came from. Once it
+/// is there the server is not asked again, so moving the archive to another address does not
+/// fetch it a second time.
 constexpr const char* kDoneFile = "downloaded.txt";
 
 bool alreadyHere(const std::filesystem::path& into) {
-  const auto done = file::readAll(into / kDoneFile);
-  return done && std::string(done->begin(), done->end()).find(kFantasyUrl) != std::string::npos;
+  std::error_code ec;
+  return std::filesystem::exists(into / kDoneFile, ec);
+}
+
+/// The archive's address is the server's to say, so that it can move without a new release.
+std::optional<std::string> archiveUrl(std::string& error) {
+  const auto body = httpDownload(onlineApi() + "/v1/fantasy", &error);
+  if (!body) return std::nullopt;
+  std::string url(body->begin(), body->end());
+  while (!url.empty() && std::isspace(static_cast<unsigned char>(url.back()))) url.pop_back();
+  if (url.rfind("https://", 0) != 0 && url.rfind("http://", 0) != 0) {
+    error = "the server gave no address";
+    return std::nullopt;
+  }
+  return url;
 }
 
 /// The fetching happens on a thread of its own so that the caller can keep drawing.
-std::optional<Bytes> fetchWhileWaiting(const std::string& url, std::string& error, const FantasyWaitTick& tick) {
+std::optional<Bytes> fetchWhileWaiting(std::string& url, std::string& error, const FantasyWaitTick& tick) {
   std::optional<Bytes> body;
   std::atomic<bool> done{false};
   std::thread worker([&] {
-    body = httpDownload(url, &error);
+    if (const auto where = archiveUrl(error)) {
+      url = *where;
+      log::info("fetching " + url);
+      body = httpDownload(url, &error);
+    }
     done.store(true, std::memory_order_release);
   });
   const u64 start = SDL_GetTicks();
@@ -73,9 +91,8 @@ bool downloadFantasyOnce(const std::filesystem::path& into, const FantasyAsk& as
     return false;
   }
 
-  log::info(std::string("fetching ") + kFantasyUrl);
-  std::string error;
-  const auto zip = fetchWhileWaiting(kFantasyUrl, error, tick);
+  std::string url, error;
+  const auto zip = fetchWhileWaiting(url, error, tick);
   if (!zip) {
     log::error("the archive could not be fetched: " + error);
     return true;
@@ -102,7 +119,7 @@ bool downloadFantasyOnce(const std::filesystem::path& into, const FantasyAsk& as
   }
   log::info(std::to_string(written) + " files unpacked into " + into.string());
   // Only now, with everything written: a run that stops halfway asks again next time.
-  const std::string done = std::string(kFantasyUrl) + "\n";
+  const std::string done = url + "\n";
   file::writeAll(into / kDoneFile, ByteView(reinterpret_cast<const u8*>(done.data()), done.size()));
   return true;
 }

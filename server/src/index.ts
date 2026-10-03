@@ -11,6 +11,7 @@
 //   POST /v1/runs               <recording>        send a game                  (player token)
 //   GET  /v1/runs/<id>                             a game, and its rank once verified
 //   GET  /v1/runs/<id>/replay                      a verified game's recording
+//   GET  /v1/fantasy                               where the game fetches its first-start archive
 //   GET  /v1/verifier/pending                      games waiting to be checked  (verifier token)
 //   GET  /v1/verifier/runs/<id>/replay             any game's recording         (verifier token)
 //   POST /v1/verifier/runs/<id>  <verdict JSON>    what the verifier found      (verifier token)
@@ -27,6 +28,9 @@
 export interface Env {
   DB: D1Database;
   VERIFIER_TOKEN: string;
+  /** Where the game fetches the archive it offers on its first start (wrangler.toml [vars]), so
+   *  that a new address needs a deploy here and not a release of the game. */
+  FANTASY_URL: string;
 }
 
 /** Recording formats a verifier can play (Replay::kFormat in the game). */
@@ -330,6 +334,10 @@ export default {
     let m: RegExpExecArray | null;
     try {
       if (get && path === "/v1/scores") return await scores(env, url);
+      if (get && path === "/v1/fantasy")
+        return env.FANTASY_URL
+          ? new Response(env.FANTASY_URL, { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store", ...CORS } })
+          : fail(404, "nothing to fetch");
       if (get && (m = /^\/v1\/players\/([^/]+)$/.exec(path))) return await playerPage(env, decodeURIComponent(m[1]));
       if (post && path === "/v1/runs") return await sendRun(env, req);
       if (get && (m = /^\/v1\/runs\/(\d+)$/.exec(path))) return await getRun(env, Number(m[1]));

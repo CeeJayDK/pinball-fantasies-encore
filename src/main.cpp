@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
     else if (a == "--video") options.video = next();
     else if (a == "--video-from") options.videoFrom = std::max(0, std::atoi(next()));
     else if (a == "--video-seconds") options.videoSeconds = std::max(1, std::atoi(next()));
-    else if (a[0] != '-' && std::filesystem::is_regular_file(a)) options.replays.push_back(a);
+    else if (std::error_code ec; a[0] != '-' && std::filesystem::is_regular_file(a, ec)) options.replays.push_back(a);
     else { usage(); return 2; }
   }
   return pfr::App(std::move(options)).run();

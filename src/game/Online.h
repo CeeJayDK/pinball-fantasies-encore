@@ -9,9 +9,13 @@
 #include <atomic>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <thread>
 
 namespace pfr {
+
+/// The server; ENCORE_API points the game at another, to try one locally.
+std::string onlineApi();
 
 class ScoreSender {
  public:

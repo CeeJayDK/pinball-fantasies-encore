@@ -14,13 +14,12 @@
 
 namespace pfr {
 
-namespace {
-
-/// The server; ENCORE_API points the game at another, to try one locally.
-std::string api() {
+std::string onlineApi() {
   if (const char* a = std::getenv("ENCORE_API")) return a;
   return "https://pinball-fantasies-encore.pedrocatalao-9f8.workers.dev";
 }
+
+namespace {
 
 /// This installation's secret, made the first time it is wanted.
 std::string token(const std::filesystem::path& saveDir) {
@@ -63,7 +62,7 @@ void sendAll(const std::filesystem::path& saveDir) {
     if (isRecording(e.path())) waiting.push_back(e.path());
   if (waiting.empty()) return;
   std::sort(waiting.begin(), waiting.end());
-  const std::string url = api() + "/v1/runs", auth = "Authorization: Bearer " + token(saveDir);
+  const std::string url = onlineApi() + "/v1/runs", auth = "Authorization: Bearer " + token(saveDir);
   for (const auto& path : waiting) {
     const auto data = file::readAll(path);
     if (!data) continue;
