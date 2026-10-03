@@ -51,6 +51,17 @@ Secrets and variables → Actions**: a **secret** `VERIFIER_TOKEN` (the same sec
 default branch, or by hand from the Actions tab. GitHub stops scheduled jobs in a repository
 with no activity for 60 days; the Actions tab turns it back on.
 
+GitHub runs schedules late, and sometimes not at all, so the Worker also starts the job itself
+as soon as a game arrives, when it has a token for it. Make one on GitHub under **Settings →
+Developer settings → Personal access tokens → Fine-grained tokens**: only this repository, with
+the permission **Actions: Read and write**, and as long an expiry as it allows. Then:
+
+```bash
+npx wrangler secret put GITHUB_DISPATCH_TOKEN
+```
+
+Without it, or once it has expired, games simply wait for the schedule.
+
 After a change to the Worker or a new migration:
 
 ```bash

@@ -28,7 +28,9 @@
 // makes and keeps, and sends with every game; only its SHA-256 is stored here. Everyone else
 // knows it by its tag, five hexadecimal digits given out the first time it sends a game. A
 // score shows the initials typed for it, which anyone may type, and the tag: "RDX (4e87a)".
-// The verifier's token is a Worker secret, VERIFIER_TOKEN.
+// The verifier's token is a Worker secret, VERIFIER_TOKEN. A game arriving starts the job at
+// once, through GitHub's API, when the Worker has a token allowed to (GITHUB_DISPATCH_TOKEN):
+// the job's schedule is only for what that misses, as GitHub runs schedules late or not at all.
 //
 // The HD pictures are not part of a release: they live in an R2 bucket, each under the SHA-256
 // of its contents, so a picture is uploaded once and every set that has it shares it. A set is
@@ -52,6 +54,11 @@ export interface Env {
   /** The HD pictures and their manifests (wrangler.toml [[r2_buckets]]). */
   ART: R2Bucket;
   PUBLISH_TOKEN: string;
+  /** A GitHub token that may start the checking job (Actions: read and write, on this
+   *  repository alone); without it, games wait for the job's schedule. */
+  GITHUB_DISPATCH_TOKEN?: string;
+  /** The repository the job is in (wrangler.toml [vars]). */
+  GITHUB_REPO: string;
 }
 
 /** Recording formats a verifier can play (Replay::kFormat in the game). */
@@ -182,7 +189,25 @@ async function playerPage(env: Env, tag: string): Promise<Response> {
 // ---- games ---------------------------------------------------------------------------------
 
 /** Takes a recording to be checked. Only what can be seen without playing it is looked at. */
-async function sendRun(env: Env, req: Request): Promise<Response> {
+/** Starts the checking job now. A second start while it runs waits behind it (the job's
+ *  concurrency group), so the game sent meanwhile is checked too; any more are dropped by GitHub,
+ *  which is harmless. What goes wrong is only logged: the schedule still comes round. */
+async function startVerifier(env: Env): Promise<void> {
+  if (!env.GITHUB_DISPATCH_TOKEN || !env.GITHUB_REPO) return;
+  const r = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/actions/workflows/verify-scores.yml/dispatches`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_DISPATCH_TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "pinball-fantasies-encore-server",
+    },
+    body: JSON.stringify({ ref: "main" }),
+  });
+  if (!r.ok) console.error(`starting the checking job: ${r.status} ${await r.text()}`);
+}
+
+async function sendRun(env: Env, req: Request, ctx: ExecutionContext): Promise<Response> {
   const player = await playerOf(env, req);
   if (!player) return fail(401, "a player token is needed");
   const data = new Uint8Array(await req.arrayBuffer());
@@ -212,6 +237,8 @@ async function sendRun(env: Env, req: Request): Promise<Response> {
     .bind(player.id, hash, format, version, now())
     .first<{ id: number }>();
   await env.DB.prepare("INSERT INTO replays (run_id, data) VALUES (?, ?)").bind(run!.id, data).run();
+  // After the answer, so the game is not kept waiting on GitHub.
+  ctx.waitUntil(startVerifier(env).catch((e) => console.error(e)));
   return json({ id: run!.id, status: "pending", tag: player.tag }, 202);
 }
 
@@ -444,7 +471,7 @@ async function publishArt(env: Env, req: Request): Promise<Response> {
 // ---- routing -------------------------------------------------------------------------------
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, "");
@@ -465,7 +492,7 @@ export default {
         if (req.method === "PUT" && path === "/v1/publish/art") return await publishArt(env, req);
       }
       if (get && (m = /^\/v1\/players\/([^/]+)$/.exec(path))) return await playerPage(env, decodeURIComponent(m[1]));
-      if (post && path === "/v1/runs") return await sendRun(env, req);
+      if (post && path === "/v1/runs") return await sendRun(env, req, ctx);
       if (get && (m = /^\/v1\/runs\/(\d+)$/.exec(path))) return await getRun(env, Number(m[1]));
       if (get && (m = /^\/v1\/runs\/(\d+)\/replay$/.exec(path))) return await getReplay(env, Number(m[1]), false);
       if (path.startsWith("/v1/verifier/")) {

@@ -3,9 +3,11 @@ name: Verify scores
 # Plays again the games sent to the online high scores and tells the server what it found:
 # only then do they count. The recordings and the game's own table files both come from the
 # server (server/README.md); nothing of either is printed, and nothing is committed.
+# The server starts it as soon as a game arrives; the schedule catches whatever that missed.
+# Off the hour (:03, :13, ...), when GitHub is less busy and less likely to run it late or skip it.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "3-59/10 * * * *"
   workflow_dispatch:
 
 permissions:
