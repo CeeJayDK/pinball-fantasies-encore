@@ -5,6 +5,7 @@ build/
 !assets/hd/*.png
 !assets/app/*.png
 !assets/banner.png
+!site/*.png
 re/*.asm
 re/*.lst
 re/*.hex
