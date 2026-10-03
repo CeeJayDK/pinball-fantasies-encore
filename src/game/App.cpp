@@ -158,7 +158,7 @@ bool App::init() {
   // Fullscreen or in a window, as it was left last time, unless told otherwise.
   {
     const auto saved = file::readAll(saveDir_ / "fullscreen.txt");
-    if (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1')) {
+    if (!options_.video && (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1'))) {
       // macOS slides into fullscreen over about a second, stretching whatever the window last
       // showed to the shape of the screen as it goes: the first frames of the intro would be
       // seen pulled wide and then snap back. So the window shows black while it goes, and
@@ -230,7 +230,8 @@ bool App::init() {
   sender_ = std::make_unique<ScoreSender>(saveDir_);
   sender_->send();
 
-  if (options_.replay && openReplay(*options_.replay)) {
+  if (!options_.replays.empty() && openReplay(options_.replays[0])) {
+    nextReplay_ = 1;
   } else if (options_.table >= 1 && options_.table <= 4) {
     openTable(options_.table - 1);
   } else {
@@ -403,8 +404,67 @@ bool App::openReplay(const std::filesystem::path& path) {
   table_.reset();  // before the recording it may be playing goes
   replay_ = std::move(recording);
   openTable(replay_->table, &*replay_);
+  if (options_.video) table_->player().setMasterVolume(0);  // filmed in silence
   log::info("playing " + path.filename().string());
   return true;
+}
+
+/// A recording has played to its end, or as far as it is filmed: on to the next one, if there
+/// is one; true when the table is no longer the one that was playing.
+bool App::recordingOver() {
+  replaying_ = false;
+  table_->stopPlayBack();
+  if (clip_) endClip();
+  if (nextReplay_ < options_.replays.size()) {
+    if (!openReplay(options_.replays[nextReplay_++])) return recordingOver();
+    return true;
+  }
+  if (options_.video) {
+    running_ = false;
+    return true;
+  }
+  log::info("the recording is over; the table is yours");
+  return false;
+}
+
+/// A drawn frame, to the clip being filmed: raw pixels down a pipe to ffmpeg, which makes the
+/// file, so every frame is in it however long the drawing took.
+void App::captureFrame(int width, int height) {
+  if (!clip_) {
+    std::error_code ec;
+    std::filesystem::create_directories(*options_.video, ec);
+    const auto out = *options_.video / ("clip" + std::to_string(++clips_) + ".mp4");
+    const std::string command = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 -s " + std::to_string(width) +
+                                "x" + std::to_string(height) + " -r 60 -i - -vf vflip -c:v libx264 -crf 16 " +
+                                "-pix_fmt yuv420p \"" + out.string() + "\"";
+#ifdef _WIN32
+    clip_ = _popen(command.c_str(), "wb");
+#else
+    clip_ = popen(command.c_str(), "w");
+#endif
+    if (!clip_) {
+      log::error("cannot start ffmpeg to film");
+      running_ = false;
+      return;
+    }
+    clipWidth_ = width;
+    clipHeight_ = height;
+    log::info("filming " + out.string());
+  }
+  if (width != clipWidth_ || height != clipHeight_) return;  // the window changed size: not this frame
+  clipFrame_.resize(static_cast<std::size_t>(width) * height * 3);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, clipFrame_.data());
+  std::fwrite(clipFrame_.data(), 1, clipFrame_.size(), clip_);
+}
+
+void App::endClip() {
+#ifdef _WIN32
+  _pclose(clip_);
+#else
+  pclose(clip_);
+#endif
+  clip_ = nullptr;
 }
 
 /// Every game is played on a table of its own, made as the key that starts it is pressed, so
@@ -524,10 +584,11 @@ void App::update(double dt) {
                               events[replayNext_].kind == Replay::Event::Kind::KeyDown);
       }
       const TableAction a = table_->runFrame();
-      if (replaying_ && ++replayFrame_ >= replay_->frames) {
-        replaying_ = false;
-        table_->stopPlayBack();
-        log::info("the recording is over; the table is yours");
+      if (replaying_) {
+        ++replayFrame_;
+        const bool filmed =
+            options_.video && replayFrame_ >= static_cast<u32>((options_.videoFrom + options_.videoSeconds) * 60);
+        if ((replayFrame_ >= replay_->frames || filmed) && recordingOver()) return;
       }
       if (!sound_) playSilently(table_->player());
       if (!recordingSaved_ && !table_->recording().games.empty()) {
@@ -653,6 +714,7 @@ void App::render(double now) {
   renderer_.setPalette(palette_);
   const auto beforeDraw = std::chrono::steady_clock::now();
   renderer_.draw(frame_, w, h, now, &hd_);
+  if (options_.video && replaying_ && replayFrame_ >= static_cast<u32>(options_.videoFrom * 60)) captureFrame(w, h);
   if (options_.screenshot && ++frameCounter_ >= options_.screenshotFrame) {
     std::vector<u8> rgb(static_cast<std::size_t>(w) * h * 3);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -697,9 +759,13 @@ int App::run() {
         handleKey(e);
       }
       const auto nowT = clock::now();
-      const double dt = std::min(0.1, std::chrono::duration<double>(nowT - last).count());
+      // Filming, every drawn frame is one of the game's, however long it takes; and what comes
+      // before the part filmed is played through without being drawn.
+      const double dt = options_.video ? kFrame : std::min(0.1, std::chrono::duration<double>(nowT - last).count());
       last = nowT;
       const auto beforeUpdate = clock::now();
+      if (options_.video)
+        while (running_ && replaying_ && replayFrame_ < static_cast<u32>(options_.videoFrom * 60)) update(kFrame);
       update(dt);
       if (options_.stats) {
         using ms = std::chrono::duration<double, std::milli>;
@@ -731,6 +797,7 @@ int App::run() {
     SDL_Quit();
     return 1;
   }
+  if (clip_) endClip();
   audio_.setSource({});
   audio_.close();
   SDL_Quit();

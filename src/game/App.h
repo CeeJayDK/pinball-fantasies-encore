@@ -1,6 +1,7 @@
 #pragma once
 // Application shell: owns the window, renderer and audio, and runs either the intro/menu
 // screen or a table, both at the original's 60 frames a second.
+#include <cstdio>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -36,7 +37,10 @@ struct AppOptions {
   int windowScale = 3;
   bool stats = false;                    ///< log how long each frame takes
   std::optional<std::filesystem::path> screenshot;  ///< render one frame, save it, quit
-  std::optional<std::filesystem::path> replay;      ///< a recording to play, as dropped on the program
+  std::vector<std::filesystem::path> replays;  ///< recordings to play one after another, as dropped on the program
+  /// Film the recordings instead, a clip of each, into this folder (ffmpeg makes the files).
+  std::optional<std::filesystem::path> video;
+  int videoFrom = 12, videoSeconds = 9;  ///< which seconds of each recording are filmed
   int screenshotFrame = 30;
 };
 
@@ -64,6 +68,9 @@ class App {
   void openIntro(int returningFrom);
   void openTable(int index, const Replay* recording = nullptr);
   bool openReplay(const std::filesystem::path& path);
+  bool recordingOver();
+  void captureFrame(int width, int height);
+  void endClip();
   void newGame();
   void saveRecording();
   void handleKey(const SDL_Event& e);
@@ -105,6 +112,11 @@ class App {
   u32 replayFrame_ = 0;         ///< frames of it played
   bool replaying_ = false;
   bool fromReplay_ = false;     ///< the table is the recording's, until a game of one's own
+  std::size_t nextReplay_ = 0;  ///< of AppOptions::replays
+  // Filming (AppOptions::video): frames go to ffmpeg as they are drawn, a clip per recording.
+  std::FILE* clip_ = nullptr;
+  int clips_ = 0, clipWidth_ = 0, clipHeight_ = 0;
+  std::vector<u8> clipFrame_;
   bool running_ = true;
   bool sound_ = false;            ///< a sound card is playing the music
   std::vector<float> silence_;   ///< where the music goes without one

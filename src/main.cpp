@@ -36,8 +36,10 @@ void usage() {
             "  --screenshot <f> render a frame to a PNG file and quit\n"
             "  --screenshot-frame <n>  which frame to capture (default 30)\n"
             "  --stats          log how long each frame takes\n"
-            "  <file.RPL>       play a recording, then stay on its table (also by dropping it on the\n"
-            "                   program or its window)\n"
+            "  <file.RPL> ...   play recordings one after another, then stay on the last one's table\n"
+            "                   (also by dropping one on the program or its window)\n"
+            "  --video <dir>    film the recordings instead: a silent clip of each into <dir>, by ffmpeg\n"
+            "  --video-from <s>, --video-seconds <n>  which part of each (default from 12 s, for 9 s)\n"
             "  --verbose        debug logging\n");
 }
 
@@ -72,7 +74,10 @@ int main(int argc, char** argv) {
     else if (a == "--verbose") pfr::log::setMinimumLevel(pfr::log::Level::Debug);
     else if (a == "--help" || a == "-h") { usage(); return 0; }
     else if (a.rfind("-psn", 0) == 0) { /* macOS launch services */ }
-    else if (a[0] != '-' && std::filesystem::is_regular_file(a)) options.replay = a;
+    else if (a == "--video") options.video = next();
+    else if (a == "--video-from") options.videoFrom = std::max(0, std::atoi(next()));
+    else if (a == "--video-seconds") options.videoSeconds = std::max(1, std::atoi(next()));
+    else if (a[0] != '-' && std::filesystem::is_regular_file(a)) options.replays.push_back(a);
     else { usage(); return 2; }
   }
   return pfr::App(std::move(options)).run();
