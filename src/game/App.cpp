@@ -704,6 +704,13 @@ void App::render(double now) {
   HdFrame* const hd = renderer_.hasHdPictures() && renderer_.hdEnabled() ? &hd_ : nullptr;
   hd_.ownSprites = ownFlipperPictures_;
   hd_.ballTrail = ballTrail_;
+  // The frame drawn into is as big as the screen is now, not as it was after the last frame
+  // of the game: a resolution changed in the pause menu takes effect at once, and with the
+  // display faster than the game the screen is drawn again before another frame has run.
+  if (table_)
+    resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+  else if (intro_)
+    resizeFrame(intro_->width(), intro_->height(), 1.0);
   if (table_)
     table_->render(frame_.data(), colors.data(), hd);
   else if (intro_)
