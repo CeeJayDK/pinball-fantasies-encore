@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pinball Fantasies: Encore!</title>
+<meta name="description" content="A native remake of Pinball Fantasies for macOS, Windows and Linux, with remastered artwork and online high scores.">
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Doto:wght@500..900&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Game play behind the whole page, muted and dimmed: a few seconds of each table, filmed by the
+     game itself from recordings (--video) and stitched into a loop. -->
+<video class="bg-video" id="bg-video" autoplay muted loop playsinline preload="auto" poster="media/gameplay.jpg" aria-hidden="true" tabindex="-1">
+  <source src="media/gameplay.webm" type="video/webm">
+  <source src="media/gameplay.mp4" type="video/mp4">
+</video>
+<div class="bg-shade" aria-hidden="true"></div>
+
+<header class="masthead">
+  <div class="dmd dmd-hero" role="img" aria-label="Pinball Fantasies: Encore!">
+    <div class="dmd-text dmd-small">PINBALL FANTASIES</div>
+    <div class="dmd-text dmd-big">ENCORE!</div>
+    <div class="marquee" aria-hidden="true">
+      <span class="dmd-text">PARTY LAND &nbsp;&#8226;&nbsp; SPEED DEVILS &nbsp;&#8226;&nbsp; BILLION DOLLAR GAMESHOW &nbsp;&#8226;&nbsp; STONES 'N' BONES &nbsp;&#8226;&nbsp;&nbsp;</span><span class="dmd-text">PARTY LAND &nbsp;&#8226;&nbsp; SPEED DEVILS &nbsp;&#8226;&nbsp; BILLION DOLLAR GAMESHOW &nbsp;&#8226;&nbsp; STONES 'N' BONES &nbsp;&#8226;&nbsp;&nbsp;</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="download">
+    <h2 class="dmd-title"><span class="dmd-text">DOWNLOAD</span></h2>
+    <p id="release" class="muted">Looking up the latest version&hellip;</p>
+    <div class="downloads" id="downloads">
+      <a class="button" href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases">All releases on GitHub</a>
+    </div>
+    <p class="muted small">Unpack and run. On macOS, the first time: right-click the app, Open. On Linux, <code>./install.sh</code> adds it to your menu.</p>
+  </section>
+
+  <section id="scores">
+    <h2 class="dmd-title"><span class="dmd-text">HIGH SCORES</span></h2>
+    <div class="filters">
+      <div class="filter" role="group" aria-label="Balls" id="balls"></div>
+      <div class="filter" role="group" aria-label="Angle" id="angle"></div>
+    </div>
+    <div class="carousel" id="carousel" aria-roledescription="carousel" aria-label="High scores by table">
+      <button type="button" class="arrow prev" id="prev" aria-label="Previous table">&#8249;</button>
+      <div class="viewport">
+        <div class="track" id="track"></div>
+      </div>
+      <button type="button" class="arrow next" id="next" aria-label="Next table">&#8250;</button>
+    </div>
+    <div class="dots" id="dots" role="tablist" aria-label="Tables"></div>
+    <div class="how">
+      <p>You get a high score locally, the game asks <span class="kbd">SEND ONLINE (Y OR N)</span> after your initials. A yes sends a recording of the game; the server replays it before your score appears here.</p>
+      <p>Each score shows the initials typed for it and unique tag of your game. Download a recording (<span class="kbd">RPL</span>) and drop it on the game to watch it.</p>
+    </div>
+  </section>
+
+  <section id="about">
+    <p class="lead">A native remake of <em>Pinball Fantasies</em>, the 1994 PC release, for macOS, Windows and Linux.</p>
+    <p>It reads the original game's own files and runs the physics, the table rules, the dot matrix and the music itself: nothing is emulated. All four tables play exactly as the original does, under either the 1994 pictures or remastered ones.</p>
+    <ul class="features">
+      <li><strong>The original rules and physics</strong>, taken from the game's own data.</li>
+      <li><strong>Remastered artwork</strong>, every table redrawn at high resolution, not upscaled, with its lamps still working. F10 switches between it and the original pixels at any time.</li>
+      <li><strong>A CRT look</strong> with scanlines and glow, on F9.</li>
+      <li><strong>Online high scores</strong>, every one replayed by the server from a recording of the game before it counts.</li>
+      <li><strong>Free and open</strong>: the code under GPL-3.0, the new artwork under CC BY-SA 4.0.</li>
+    </ul>
+    <p class="note">Encore! needs the files of the <strong>1994 PC disk release</strong> of Pinball Fantasies. Nothing of the original game is included. <a href="https://github.com/pedrocatalao/pinball-fantasies-encore/blob/main/docs/game-files.md">Which files</a></p>
+  </section>
+
+
+</main>
+
+<footer class="footer">
+  <p><a href="https://github.com/pedrocatalao/pinball-fantasies-encore">Source on GitHub</a> &middot; code GPL-3.0 &middot; artwork CC BY-SA 4.0</p>
+  <p class="muted small"><em>Pinball Fantasies</em> was made by Digital Illusions and published by 21st Century Entertainment. Encore! is an unofficial fan project, not affiliated with them.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

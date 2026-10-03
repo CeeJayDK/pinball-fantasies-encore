@@ -1,0 +1,210 @@
+// The latest release's downloads, from GitHub, and the high scores, from this site's own API.
+
+const REPO = "pedrocatalao/pinball-fantasies-encore";
+const TABLES = [
+  { name: "Party Land", code: "PARTYLND" },
+  { name: "Speed Devils", code: "SPDDEVLS" },
+  { name: "Billion Dollar Gameshow", code: "GAMESHOW" },
+  { name: "Stones 'n' Bones", code: "STONBONE" },
+];
+const BALLS = [["", "All balls"], ["3", "3 balls"], ["5", "5 balls"]];
+const ANGLES = [["", "Any angle"], ["low", "Low"], ["high", "High"], ["higher", "Higher"]];
+const ADVANCE_MS = 8000;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, ...children) => {
+  const e = Object.assign(document.createElement(tag), props);
+  e.append(...children);
+  return e;
+};
+
+// ---- the background ---------------------------------------------------------------------
+
+if (reducedMotion) $("bg-video").pause();
+
+// ---- downloads --------------------------------------------------------------------------
+
+// The newest release, pre-releases included (GitHub's "latest" leaves those out).
+async function showDownloads() {
+  const platforms = [
+    [/macos-universal\.zip$/, "macOS", "Universal"],
+    [/windows-x64\.zip$/, "Windows", "x64"],
+    [/linux-x86_64\.tar\.gz$/, "Linux", "x86_64"],
+    [/linux-arm64\.tar\.gz$/, "Linux", "arm64"],
+  ];
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=10`);
+    const release = (await r.json()).find((x) => !x.draft);
+    if (!release) throw new Error("no release");
+    const version = release.tag_name.replace(/^v/, "");
+    $("release").replaceChildren(
+      `Version ${version}${release.prerelease ? ", a first cut for testing" : ""} · `,
+      el("a", { href: release.html_url }, "release notes"));
+    const buttons = [];
+    for (const [pattern, platform, detail] of platforms) {
+      const asset = release.assets.find((a) => pattern.test(a.name));
+      if (!asset) continue;
+      buttons.push(
+        el("a", { className: "button", href: asset.browser_download_url, title: asset.name },
+          el("span", { className: "platform" }, platform),
+          el("span", { className: "file" }, `${detail} · ${(asset.size / 1048576).toFixed(0)} MB`)),
+      );
+    }
+    if (buttons.length) $("downloads").replaceChildren(...buttons);
+  } catch {
+    $("release").textContent = "The releases are on GitHub.";
+  }
+}
+
+// ---- high scores ------------------------------------------------------------------------
+
+const state = { table: 0, balls: "", angle: "" };
+let linked = false;  // a board was asked for in the address: start there
+
+// #scores?table=2&balls=3&angle=high, so a board can be linked to.
+function readHash() {
+  if (!location.hash.startsWith("#scores?")) return;
+  const q = new URLSearchParams(location.hash.split("?")[1]);
+  const t = Number(q.get("table"));
+  if (t >= 1 && t <= 4) {
+    state.table = t - 1;
+    linked = true;
+  }
+  if (BALLS.some(([v]) => v === q.get("balls"))) state.balls = q.get("balls");
+  if (ANGLES.some(([v]) => v === q.get("angle"))) state.angle = q.get("angle");
+}
+function writeHash() {
+  const q = new URLSearchParams({ table: state.table + 1 });
+  if (state.balls) q.set("balls", state.balls);
+  if (state.angle) q.set("angle", state.angle);
+  history.replaceState(null, "", `#scores?${q}`);
+}
+
+function filters() {
+  const group = (id, options, key) =>
+    $(id).replaceChildren(...options.map(([value, label]) =>
+      el("button", {
+        type: "button",
+        textContent: label,
+        ariaPressed: String(state[key] === value),
+        onclick: () => {
+          state[key] = value;
+          filters();
+          writeHash();
+          loadBoards();
+        },
+      })));
+  group("balls", BALLS, "balls");
+  group("angle", ANGLES, "angle");
+}
+
+const day = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
+
+function row(table, s) {
+  const name = ["FANTASY", table.code, s.initials.replace(/ /g, "_"), s.tag, s.score, day(s.at).replace(/-/g, "")]
+    .join("-") + ".RPL";
+  return el("li", {},
+    el("span", { className: "rank" }, String(s.rank)),
+    el("span", { className: "who" }, s.initials, el("span", { className: "tag" }, s.tag)),
+    el("span", { className: "score" }, Number(s.score).toLocaleString("en-US")),
+    // The date's hyphens are ones a line cannot break at.
+    el("span", { className: "meta" }, `${s.balls} balls · ${s.angle} angle · ${day(s.at).replace(/-/g, "‑")}`,
+      el("a", { className: "replay", href: `/v1/runs/${s.run}/replay`, download: name, title: "Download the recording" }, "RPL")),
+  );
+}
+
+// One slide per table, made once; their boards are filled in whenever the filters change.
+const slides = TABLES.map((t, i) => {
+  const board = el("ol", { className: "board" });
+  const empty = el("p", { className: "dmd-text board-empty", hidden: true });
+  const slide = el("article", { className: "slide", ariaLabel: t.name, ariaRoleDescription: "slide" },
+    el("img", { src: `img/table${i + 1}.jpg`, alt: t.name, width: 1194, height: 285 }),
+    el("div", { className: "dmd dmd-board", ariaLive: "polite" }, board, empty));
+  return { slide, board, empty };
+});
+$("track").replaceChildren(...slides.map((s) => s.slide));
+$("dots").replaceChildren(...TABLES.map((t, i) =>
+  el("button", { type: "button", role: "tab", ariaLabel: t.name, onclick: () => show(i, true) })));
+
+let asked = 0;
+async function loadBoards() {
+  const mine = ++asked;
+  await Promise.all(TABLES.map(async (t, i) => {
+    const q = new URLSearchParams({ table: i + 1, limit: 100 });
+    if (state.balls) q.set("balls", state.balls);
+    if (state.angle) q.set("angle", state.angle);
+    const { board, empty } = slides[i];
+    try {
+      const { scores } = await (await fetch(`/v1/scores?${q}`)).json();
+      if (mine !== asked) return;  // the filters changed meanwhile
+      board.replaceChildren(...scores.map((s) => row(t, s)));
+      empty.textContent = "NO SCORES YET";
+      empty.hidden = scores.length > 0;
+      fit();
+    } catch {
+      if (mine !== asked) return;
+      board.replaceChildren();
+      empty.textContent = "SCORES UNAVAILABLE";
+      empty.hidden = false;
+      fit();
+    }
+  }));
+}
+
+// ---- the carousel -------------------------------------------------------------------------
+
+let timer = 0;
+let held = false;  // the pointer or the keyboard is on it: it waits
+
+// As tall as the table on show, rather than the one with the longest board.
+function fit() {
+  $("track").parentElement.style.height = `${slides[state.table].slide.offsetHeight}px`;
+}
+
+function show(i, byHand = false) {
+  state.table = (i + TABLES.length) % TABLES.length;
+  $("track").style.transform = `translateX(-${state.table * 100}%)`;
+  fit();
+  slides.forEach((s, k) => (s.slide.ariaHidden = String(k !== state.table)));
+  [...$("dots").children].forEach((d, k) => (d.ariaSelected = String(k === state.table)));
+  if (byHand) writeHash();
+  schedule();
+}
+
+// On to the next table every few seconds, counted again from each change.
+function schedule() {
+  clearTimeout(timer);
+  if (!held && !reducedMotion) timer = setTimeout(() => show(state.table + 1), ADVANCE_MS);
+}
+
+const carousel = $("carousel");
+$("prev").onclick = () => show(state.table - 1, true);
+$("next").onclick = () => show(state.table + 1, true);
+carousel.addEventListener("pointerenter", () => { held = true; schedule(); });
+carousel.addEventListener("pointerleave", () => { held = false; schedule(); });
+carousel.addEventListener("focusin", () => { held = true; schedule(); });
+carousel.addEventListener("focusout", () => { held = false; schedule(); });
+carousel.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft") show(state.table - 1, true);
+  if (e.key === "ArrowRight") show(state.table + 1, true);
+});
+// A swipe across it, on a phone.
+let swipeFrom = null;
+carousel.addEventListener("pointerdown", (e) => { swipeFrom = e.clientX; });
+carousel.addEventListener("pointerup", (e) => {
+  if (swipeFrom === null) return;
+  const dx = e.clientX - swipeFrom;
+  swipeFrom = null;
+  if (Math.abs(dx) > 50) show(state.table + (dx < 0 ? 1 : -1), true);
+});
+addEventListener("resize", fit);
+slides.forEach((s) => s.slide.querySelector("img").addEventListener("load", fit));
+document.addEventListener("visibilitychange", () => (document.hidden ? clearTimeout(timer) : schedule()));
+
+readHash();
+filters();
+show(state.table);
+if (linked) $("scores").scrollIntoView();
+loadBoards();
+showDownloads();

@@ -5,7 +5,7 @@
 // encore-play --verify against the game's own files) has played it again and reported what it
 // found, and only then does its score count.
 //
-//   GET  /                                         a page with the four boards
+//   GET  /                                         the project's page, from ../site (wrangler.toml)
 //   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player and initials
 //   GET  /v1/players/<tag>                         a player's verified games
 //   POST /v1/runs               <recording>        send a game                  (player token)
@@ -319,64 +319,6 @@ async function putFile(env: Env, req: Request, name: string): Promise<Response> 
   return json({ name, sha256: hash, size: data.length });
 }
 
-// ---- the page ------------------------------------------------------------------------------
-
-/** The four boards, read from the API by the page itself; plain for now. */
-const PAGE = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pinball Fantasies: Encore! high scores</title>
-</head>
-<body>
-<h1>Pinball Fantasies: Encore! high scores</h1>
-<p>Every score here was played again by the server from the game's own recording.</p>
-<div id="boards">Loading...</div>
-<script>
-const TABLES = ["Party Land", "Speed Devils", "Billion Dollar Gameshow", "Stones 'n' Bones"];
-const CODES = ["PARTYLND", "SPDDEVLS", "GAMESHOW", "STONBONE"];
-const text = (tag, content) => { const e = document.createElement(tag); e.textContent = content; return e; };
-async function board(n) {
-  const section = document.createElement("section");
-  section.append(text("h2", TABLES[n - 1]));
-  try {
-    const r = await fetch("/v1/scores?table=" + n);
-    const { scores } = await r.json();
-    if (!scores.length) {
-      section.append(text("p", "No scores yet."));
-      return section;
-    }
-    const table = document.createElement("table");
-    const head = table.insertRow();
-    for (const h of ["#", "Player", "Score", "Balls", "Angle", "Date", "Recording"]) head.append(text("th", h));
-    for (const s of scores) {
-      const row = table.insertRow();
-      row.append(text("td", s.rank), text("td", s.initials + " (" + s.tag + ")"),
-                 text("td", Number(s.score).toLocaleString("en")), text("td", s.balls), text("td", s.angle),
-                 text("td", new Date(s.at * 1000).toISOString().slice(0, 10)));
-      const link = document.createElement("a");
-      link.href = "/v1/runs/" + s.run + "/replay";
-      // Named here too, as the server names it, since not every browser goes by the server.
-      link.download = ["FANTASY", CODES[n - 1], s.initials.replace(/ /g, "_"), s.tag, s.score,
-                       new Date(s.at * 1000).toISOString().slice(0, 10).replace(/-/g, "")].join("-") + ".RPL";
-      link.textContent = "download";
-      const cell = document.createElement("td");
-      cell.append(link);
-      row.append(cell);
-    }
-    section.append(table);
-  } catch {
-    section.append(text("p", "The scores could not be read."));
-  }
-  return section;
-}
-Promise.all([1, 2, 3, 4].map(board)).then((sections) => document.getElementById("boards").replaceChildren(...sections));
-</script>
-</body>
-</html>
-`;
-
 // ---- routing -------------------------------------------------------------------------------
 
 export default {
@@ -387,7 +329,6 @@ export default {
     const get = req.method === "GET", post = req.method === "POST";
     let m: RegExpExecArray | null;
     try {
-      if (get && path === "") return new Response(PAGE, { headers: { "Content-Type": "text/html; charset=utf-8" } });
       if (get && path === "/v1/scores") return await scores(env, url);
       if (get && (m = /^\/v1\/players\/([^/]+)$/.exec(path))) return await playerPage(env, decodeURIComponent(m[1]));
       if (post && path === "/v1/runs") return await sendRun(env, req);
