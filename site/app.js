@@ -36,6 +36,12 @@ for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "scroll",
   addEventListener(event, wake, { passive: true });
 wake();
 
+// ---- the comparison ---------------------------------------------------------------------
+
+// Wherever it is dragged, the line follows.
+const compare = $("compare");
+compare.querySelector("input").addEventListener("input", (e) => compare.style.setProperty("--pos", `${e.target.value}%`));
+
 // ---- downloads --------------------------------------------------------------------------
 
 // The newest release, pre-releases included (GitHub's "latest" leaves those out).
@@ -68,6 +74,16 @@ async function showDownloads() {
   } catch {
     $("release").textContent = "The releases are on GitHub.";
   }
+}
+
+// The repository's stars, in the footer; without an answer from GitHub, nothing is shown.
+async function showStars() {
+  try {
+    const repo = await (await fetch(`https://api.github.com/repos/${REPO}`)).json();
+    if (typeof repo.stargazers_count !== "number") return;
+    $("star-count").textContent = repo.stargazers_count.toLocaleString("en-US");
+    $("stars").hidden = false;
+  } catch {}
 }
 
 // ---- high scores ------------------------------------------------------------------------
@@ -200,7 +216,11 @@ carousel.addEventListener("pointerenter", () => { held = true; schedule(); });
 carousel.addEventListener("pointerleave", () => { held = false; schedule(); });
 carousel.addEventListener("focusin", () => { held = true; schedule(); });
 carousel.addEventListener("focusout", () => { held = false; schedule(); });
-carousel.addEventListener("keydown", (e) => {
+// The arrow keys switch tables from anywhere on the page, but not with a modifier held,
+// which is the browser's (back, forward, selecting).
+addEventListener("keydown", (e) => {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (e.target instanceof HTMLInputElement) return;  // the comparison's line, say
   if (e.key === "ArrowLeft") show(state.table - 1, true);
   if (e.key === "ArrowRight") show(state.table + 1, true);
 });
@@ -223,3 +243,4 @@ show(state.table);
 if (linked) $("scores").scrollIntoView();
 loadBoards();
 showDownloads();
+showStars();

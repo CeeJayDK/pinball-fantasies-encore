@@ -32,9 +32,10 @@
   </div>
 </header>
 
+<div class="column">
 <main>
   <section id="scores">
-    <h2 class="dmd-title"><span class="dmd-text">HIGH SCORES</span></h2>
+    <h2 class="picture-title font-title"><img src="img/hall-of-fame.webp" alt="Hall of fame" width="864" height="112"></h2>
     <div class="filters">
       <div class="filter" role="group" aria-label="Balls" id="balls"></div>
       <div class="filter" role="group" aria-label="Angle" id="angle"></div>
@@ -54,6 +55,7 @@
   </section>
 
   <section id="download">
+    <h2 class="picture-title font-title"><img src="img/download.webp" alt="Download" width="576" height="112"></h2>
     <div class="downloads" id="downloads">
       <a class="button" href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases">All releases on GitHub</a>
     </div>
@@ -62,6 +64,7 @@
   </section>
 
   <section id="about">
+    <h2 class="picture-title font-title"><img src="img/about.webp" alt="About" width="360" height="112"></h2>
     <p class="lead">A native remake of <em>Pinball Fantasies</em>, the 1994 PC release, for macOS, Windows and Linux.</p>
     <p>It reads the original game's own files and runs the physics, the table rules, the dot matrix and the music itself: nothing is emulated. All four tables play exactly as the original does, under either the 1994 pictures or remastered ones.</p>
     <ul class="features">
@@ -71,14 +74,41 @@
       <li><strong>Online high scores</strong>, every one replayed by the server from a recording of the game before it counts.</li>
       <li><strong>Free and open</strong>: the code under GPL-3.0, the new artwork under CC BY-SA 4.0.</li>
     </ul>
+    <!-- The same moment on Stones 'n' Bones, the 1994 picture on the left of the line and the
+         remastered one on the right; dragging anywhere on it moves the line. -->
+    <div class="compare" id="compare" style="--pos: 50%">
+      <img src="img/compare-hd.webp" alt="Stones 'n' Bones, remastered" width="1668" height="1134">
+      <img class="compare-1994" src="img/compare-1994.webp" alt="Stones 'n' Bones, as in 1994" width="1668" height="1134">
+      <span class="compare-label left dmd-text">1994</span>
+      <span class="compare-label right dmd-text">REMASTERED</span>
+      <span class="compare-line" aria-hidden="true"></span>
+      <input type="range" min="0" max="100" step="0.1" value="50" aria-label="Between the 1994 picture and the remastered one">
+    </div>
+  </section>
+
+  <section id="team">
+    <h2 class="picture-title font-title"><img src="img/team.webp" alt="Team" width="288" height="112"></h2>
+    <div class="team">
+      <div class="team-text">
+        <p>Hi, I'm Pedro. This is a hobby project of mine, something I've been working on when the house goes quiet.</p>
+        <p>I'm building it with AI, both the code and image generation, I stitch and align every image myself, decide how things look, sound and feel, Claude writes most of the code, and then we go back and forth over all the little details until the ball moves exactly like it did in 1994.</p>
+        <p>Most of it gets made in the gaps between everything else, especially during the naps of my baby daughter, the real boss of the project, who decides when development starts and mostly, when it stops.</p>
+        <p>If you played Pinball Fantasies back then, I hope this feels a bit like coming home. And if you didn't, welcome to Party Land.</p>
+      </div>
+      <figure class="portrait">
+        <img src="img/pedro-and-aurora-retro.webp" alt="Pedro holding Aurora, in pixel art" width="600" height="784">
+        <figcaption class="dmd-text">PEDRO &amp; AURORA</figcaption>
+      </figure>
+    </div>
   </section>
 
 </main>
 
 <footer class="footer">
-  <p><a href="https://github.com/pedrocatalao/pinball-fantasies-encore">Source on GitHub</a> &middot; code GPL-3.0 &middot; artwork CC BY-SA 4.0</p>
+  <p><a href="https://github.com/pedrocatalao/pinball-fantasies-encore">Source on GitHub</a> <a class="stars" id="stars" href="https://github.com/pedrocatalao/pinball-fantasies-encore/stargazers" title="Stars on GitHub" hidden>&#9733; <span id="star-count"></span></a> &middot; code GPL-3.0 &middot; artwork CC BY-SA 4.0</p>
   <p class="muted small"><em>Pinball Fantasies</em> was made by Digital Illusions and published by 21st Century Entertainment. Encore! is an unofficial fan project, not affiliated with them.</p>
 </footer>
+</div>
 
 <script src="app.js"></script>
 </body>
