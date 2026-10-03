@@ -102,6 +102,22 @@ it keep the set they have. Going back to older
 pictures is running it from an older checkout: they are all still there, so it only writes the
 set.
 
+## A newer release
+
+A release build (one made by the release workflows, which give it the release's version) asks
+`GET /v1/release` at start whether there is a newer release, and offers to open its page. The
+Worker answers from GitHub's list of releases, asking it at most every ten minutes. The few
+lines the game shows about what is new come from the release's notes, in a comment so that the
+page does not show them; capitals, digits and `. : - ? >` only, six lines of 34 letters at most:
+
+```
+<!-- game
+ONLINE HIGH SCORES
+HD ART THAT UPDATES ITSELF
+F11 FOR FULLSCREEN
+-->
+```
+
 ## Trying it locally
 
 ```bash

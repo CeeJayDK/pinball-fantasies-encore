@@ -16,6 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # The release's tag (v1.2.3) when building one, so the game knows which it is; empty otherwise.
+  ENCORE_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
   SDL_VERSION: 3.4.16
 
 jobs:
@@ -34,7 +36,7 @@ jobs:
 
       - name: Configure
         shell: pwsh
-        run: cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH="$pwd/sdl3/SDL3-$env:SDL_VERSION/cmake"
+        run: cmake -S . -B build -A x64 -DCMAKE_PREFIX_PATH="$pwd/sdl3/SDL3-$env:SDL_VERSION/cmake" -DENCORE_VERSION="$($env:ENCORE_VERSION -replace '^v','')"
 
       - name: Build
         run: cmake --build build --config RelWithDebInfo -j3

@@ -19,6 +19,7 @@
 #include "core/Png.h"
 #include "game/Art.h"
 #include "game/Fantasy.h"
+#include "game/Release.h"
 #include "platform/DataLocator.h"
 #include "platform/ImageFile.h"
 
@@ -169,6 +170,14 @@ bool App::init() {
       if (!set) log::info("HD pictures: no word from the server (" + error + ")");
       return set;
     });
+  // And, for a release, whether there is a newer one.
+  if (!thisRelease().empty() && !options_.video && !options_.screenshot)
+    releaseCheck_ = std::async(std::launch::async, [] {
+      std::string error;
+      auto release = fetchLatestRelease(&error);
+      if (!release) log::info("new release: no word from the server (" + error + ")");
+      return release;
+    });
 
   if (!window_.create("Pinball Fantasies: Encore!", 640 * std::max(1, options_.windowScale) / 2,
                       480 * std::max(1, options_.windowScale) / 2))
@@ -241,6 +250,11 @@ bool App::init() {
   if (options_.resolution) config_.options.resolution = *options_.resolution;
 
   if (!offerArt()) return false;
+  // Gone to fetch the new release: the game ends here, as when it is quit.
+  if (!offerRelease()) {
+    running_ = false;
+    return true;
+  }
   loadHdPictures();
   {
     const auto saved = file::readAll(saveDir_ / "hd.txt");
@@ -656,7 +670,7 @@ bool App::askToDownload() {
 /// A question in the intro's letters, a line or more of it, with YES and NO under it: the
 /// arrows or Tab move between them, Enter or Space takes the one chosen, Y and N answer at
 /// once, Escape (or closing the window) is no.
-bool App::askYesNo(std::initializer_list<std::string_view> lines) {
+bool App::askYesNo(std::span<const std::string_view> lines) {
   bool yes = true;
   for (;;) {
     SDL_Event event;
@@ -686,7 +700,10 @@ bool App::askYesNo(std::initializer_list<std::string_view> lines) {
       palette_[0x20 + i] = i == 0 ? palette_[0] : Rgb{lift(c.r), lift(c.g), lift(c.b)};
       palette_[0x30 + i] = i == 0 ? palette_[0] : Rgb{sink(c.r), sink(c.g), sink(c.b)};
     }
-    const int top = frame_.height() / 2 - 3 * kLetterH;
+    // A short question sits a little above the middle; a long one is centred, to fit.
+    const int lineH = kLetterH + 6;
+    const int top = lines.size() <= 3 ? frame_.height() / 2 - 3 * kLetterH
+                                      : (frame_.height() - static_cast<int>(lines.size() + 2) * lineH) / 2;
     int y = top;
     for (const auto line : lines) {
       putTextCentred(frame_, askFont_, line, y);
@@ -830,6 +847,38 @@ bool App::offerArt() {
   }
   if (auto now = installedArt(saveDir_)) artDir_ = now->dir;
   return true;
+}
+
+/// A release newer than this one: what it brings, and whether to open its page. Asked once for
+/// each version, whatever the answer; the game does not update itself. False when the page was
+/// opened, which ends the game, so that the new version can be put in its place.
+bool App::offerRelease() {
+  if (!releaseCheck_.valid() || askFont_.width == 0) return true;
+  // The question about the pictures has usually given it all the time it needs.
+  if (releaseCheck_.wait_for(std::chrono::seconds(1)) != std::future_status::ready) return true;
+  const auto release = releaseCheck_.get();
+  if (!release || !newerVersion(release->version, thisRelease())) return true;
+  const std::string offered = offeredRelease(saveDir_);
+  if (!offered.empty() && !newerVersion(release->version, offered)) return true;
+
+  std::vector<std::string> lines{"NEW VERSION " + release->version};
+  if (!release->lines.empty()) {
+    lines.emplace_back();
+    lines.insert(lines.end(), release->lines.begin(), release->lines.end());
+  }
+  lines.emplace_back();
+  lines.emplace_back("OPEN THE DOWNLOAD PAGE?");
+  std::vector<std::string_view> views(lines.begin(), lines.end());
+  const bool open = askYesNo(views);
+  rememberOffered(saveDir_, release->version);
+  log::info("new release " + release->version + (open ? ": opening its page, and ending" : ": not now"));
+  if (!open) return true;
+  // If no browser could be asked to open it, the game carries on rather than just vanishing.
+  if (!SDL_OpenURL(release->url.c_str())) {
+    log::error(std::string("cannot open the page: ") + SDL_GetError());
+    return true;
+  }
+  return false;
 }
 
 void App::render(double now) {

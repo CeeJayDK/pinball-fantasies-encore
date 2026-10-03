@@ -12,6 +12,7 @@
 //   GET  /v1/runs/<id>                             a game, and its rank once verified
 //   GET  /v1/runs/<id>/replay                      a verified game's recording
 //   GET  /v1/fantasy                               where the game fetches its first-start archive
+//   GET  /v1/release                               the newest release, for the game to offer (below)
 //   GET  /v1/art                                   the current set of HD pictures, as text (below)
 //   GET  /v1/art/<sha256>.png                      one of its pictures, by its contents
 //   HEAD /v1/art/<sha256>.png                      whether a picture is here already
@@ -371,6 +372,66 @@ async function putFile(env: Env, req: Request, name: string): Promise<Response> 
   return json({ name, sha256: hash, size: data.length });
 }
 
+// ---- the newest release -------------------------------------------------------------------
+
+// The game asks at start whether there is a release newer than itself, and shows a few lines
+// about it in its own letters. Those come from the release's notes on GitHub, in a comment there
+// (so the page does not show them):
+//
+//   <!-- game
+//   ONLINE HIGH SCORES
+//   HD ART THAT UPDATES ITSELF
+//   -->
+//
+// The game reads, as text:
+//
+//   version 1.0.0
+//   url https://github.com/.../releases/tag/v1.0.0
+//   line ONLINE HIGH SCORES
+
+/** What the game's letters can show (putChar), and how many fit on its screen. */
+const LETTERS = /[^A-Z0-9 .:\-?>]/g;
+const LINE_LENGTH = 34;
+const MAX_LINES = 6;
+
+function releaseLines(body: string): string[] {
+  const block = /<!--\s*game\s*\n([\s\S]*?)-->/.exec(body);
+  if (!block) return [];
+  const lines = block[1]
+    .split("\n")
+    .map((l) => l.toUpperCase().replace(LETTERS, "").replace(/ +/g, " ").trim().slice(0, LINE_LENGTH));
+  while (lines.length && !lines[0]) lines.shift();
+  while (lines.length && !lines[lines.length - 1]) lines.pop();
+  return lines.slice(0, MAX_LINES);
+}
+
+/** The newest release that is not a draft, pre-releases included as on the page; GitHub is asked
+ *  at most every ten minutes, whatever the number of games starting. */
+async function latestRelease(env: Env, ctx: ExecutionContext): Promise<Response> {
+  const cache = caches.default;
+  const key = new Request("https://cache.encore/v1/release");
+  const cached = await cache.match(key);
+  if (cached) return cached;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "pinball-fantasies-encore-server",
+  };
+  if (env.GITHUB_DISPATCH_TOKEN) headers.Authorization = `Bearer ${env.GITHUB_DISPATCH_TOKEN}`;
+  const r = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/releases?per_page=10`, { headers });
+  if (!r.ok) return fail(502, `GitHub answered ${r.status}`);
+  const releases = await r.json<{ draft: boolean; tag_name: string; html_url: string; body: string | null }[]>();
+  const release = releases.find((x) => !x.draft);
+  const version = release?.tag_name.replace(/^v/, "");
+  if (!release || !version || !/^\d+\.\d+\.\d+$/.test(version)) return fail(404, "no release");
+  const text = [`version ${version}`, `url ${release.html_url}`, ...releaseLines(release.body ?? "").map((l) => `line ${l}`)];
+  const answer = new Response(text.join("\n") + "\n", {
+    headers: { "Content-Type": "text/plain", "Cache-Control": "public, max-age=600", ...CORS },
+  });
+  ctx.waitUntil(cache.put(key, answer.clone()));
+  return answer;
+}
+
 // ---- the HD pictures ------------------------------------------------------------------------
 
 /** As the game names its pictures (HdPicture, the flippers, the ball): playfield1_on.png. */
@@ -483,6 +544,7 @@ export default {
         return env.FANTASY_URL
           ? new Response(env.FANTASY_URL, { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store", ...CORS } })
           : fail(404, "nothing to fetch");
+      if (get && path === "/v1/release") return await latestRelease(env, ctx);
       if (get && path === "/v1/art") return await currentArt(env, url);
       if ((get || req.method === "HEAD") && (m = /^\/v1\/art\/([0-9a-f]{64})\.png$/.exec(path)))
         return await picture(env, m[1], req.method === "HEAD");

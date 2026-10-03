@@ -91,6 +91,7 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
   src/platform/Http.cpp
   src/game/Art.cpp
   src/game/Fantasy.cpp
+  src/game/Release.cpp
   src/game/Online.cpp
   src/gfx/Gl.cpp
   src/gfx/Renderer.cpp
@@ -123,15 +124,23 @@ if(WIN32)
 else()
   target_link_libraries(pinball-fantasies PRIVATE ${CMAKE_DL_LIBS})
 endif()
-target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1)
+# The release this build is, as 1.2.3: the release builds give it from the release's tag. Any
+# other build is of no release, and never asks whether there is a newer one.
+set(ENCORE_VERSION "" CACHE STRING "the release this build is, as 1.2.3 (given by the release builds)")
+if(ENCORE_VERSION)
+  set(PFR_BUNDLE_VERSION "${ENCORE_VERSION}")
+else()
+  set(PFR_BUNDLE_VERSION "${PROJECT_VERSION}")
+endif()
+target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 ENCORE_VERSION="${ENCORE_VERSION}")
 set_target_properties(pinball-fantasies PROPERTIES OUTPUT_NAME "Pinball Fantasies")
 
 if(APPLE)
   set_target_properties(pinball-fantasies PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Pinball Fantasies"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.encore.pinball-fantasies"
-    MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${PFR_BUNDLE_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PFR_BUNDLE_VERSION}"
     MACOSX_BUNDLE_ICON_FILE "icon"
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in")
 

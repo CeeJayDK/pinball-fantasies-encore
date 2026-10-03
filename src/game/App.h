@@ -7,10 +7,12 @@
 #include <initializer_list>
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "data/GameFiles.h"
 #include "game/Art.h"
+#include "game/Release.h"
 #include "game/Config.h"
 #include "game/Online.h"
 #include "gfx/Framebuffer.h"
@@ -68,9 +70,11 @@ class App {
   void playSilently(Player& player);
   void render(double now);
   bool askToDownload();
-  bool askYesNo(std::initializer_list<std::string_view> lines);
+  bool askYesNo(std::span<const std::string_view> lines);
+  bool askYesNo(std::initializer_list<std::string_view> lines) { return askYesNo(std::span(lines.begin(), lines.size())); }
   void drawWaiting(double seconds, std::string_view line, std::string_view detail = {});
   bool offerArt();
+  bool offerRelease();
   void openIntro(int returningFrom);
   void openTable(int index, const Replay* recording = nullptr);
   bool openReplay(const std::filesystem::path& path);
@@ -92,6 +96,7 @@ class App {
   std::filesystem::path shaderDir_, saveDir_;
   std::filesystem::path artDir_;  ///< the fetched HD pictures in use, or empty for none
   std::future<std::optional<ArtSet>> artCheck_;  ///< the server's current set, being asked for
+  std::future<std::optional<ReleaseInfo>> releaseCheck_;  ///< the newest release, being asked for
   GameFiles files_;
   Config config_;
   Window window_;
