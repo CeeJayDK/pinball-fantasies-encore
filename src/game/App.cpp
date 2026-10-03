@@ -64,7 +64,7 @@ AskFont loadAskFont(const std::filesystem::path& path) {
 }
 
 /// One letter of the intro's font, whose cells are 18 x 14 and are shown twice as tall.
-/// It holds capitals, digits and four marks, and nothing else is drawn.
+/// It holds capitals, digits and five marks (the ? added for this version), and nothing else is drawn.
 void putChar(Framebuffer& fb, const AskFont& font, u8 chr, int x, int y, u8 bank) {
   int idx = -1;
   if (chr >= '0' && chr <= '9') idx = chr - '0';
@@ -73,6 +73,7 @@ void putChar(Framebuffer& fb, const AskFont& font, u8 chr, int x, int y, u8 bank
   else if (chr == ':') idx = 37;
   else if (chr == '-') idx = 38;
   else if (chr == '>') idx = 39;
+  else if (chr == '?') idx = 40;
   if (idx < 0) return;
   const int fx = idx % 20 * 32, fy = idx / 20 * 14;
   for (int cy = 0; cy < 14; ++cy)
@@ -642,7 +643,7 @@ void App::update(double dt) {
 /// system's: two lines and a choice, answered with the arrow keys and enter, or with Y and
 /// N, or turned down with escape.
 bool App::askToDownload() {
-  return askYesNo({"YOU LEGALLY OWN", "PINBALL FANTASIES", "TO PLAY ENCORE"});
+  return askYesNo({"YOU LEGALLY OWN", "PINBALL FANTASIES", "TO PLAY ENCORE?"});
 }
 
 /// A question in the intro's letters, a line or more of it, with YES and NO under it: the
@@ -767,8 +768,8 @@ bool App::offerArt() {
   if (declinedArt(saveDir_) >= set->version) return true;
 
   const u64 bytes = artBytesToFetch(*set, have);
-  const bool wanted = have ? askYesNo({"UPDATE THE", "HD GFX ART", megabytes(bytes)})
-                           : askYesNo({"DOWNLOAD THE", "HD GFX ART", megabytes(bytes)});
+  const bool wanted = have ? askYesNo({"UPDATE THE", "HD GFX ART?", megabytes(bytes)})
+                           : askYesNo({"DOWNLOAD THE", "HD GFX ART?", megabytes(bytes)});
   if (!wanted) {
     declineArt(saveDir_, set->version);
     log::info("HD pictures: version " + std::to_string(set->version) + " turned down");
