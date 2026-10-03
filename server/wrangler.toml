@@ -7,6 +7,8 @@ compatibility_date = "2025-09-01"
 # The archive the game offers to fetch on its first start (GET /v1/fantasy). To move it, change
 # this and `npx wrangler deploy`: the game asks for it each time, so no release is needed.
 FANTASY_URL = "https://files.catbox.moe/d28arv.zip"
+# Where the checking job is, for starting it when a game arrives (GITHUB_DISPATCH_TOKEN).
+GITHUB_REPO = "pedrocatalao/pinball-fantasies-encore"
 
 [[d1_databases]]
 binding = "DB"
@@ -14,6 +16,11 @@ database_name = "encore-scores"
 # Printed by `npx wrangler d1 create encore-scores`.
 database_id = "39690902-9678-465c-a52c-e1dcf9e6e496"
 migrations_dir = "migrations"
+
+# The HD pictures and their manifests: `npx wrangler r2 bucket create encore-art`.
+[[r2_buckets]]
+binding = "ART"
+bucket_name = "encore-art"
 
 # The project's page (../site), served as it is; what is not a file there comes to the Worker.
 [assets]

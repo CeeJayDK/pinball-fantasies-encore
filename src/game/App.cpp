@@ -3,18 +3,21 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <ctime>
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 #include "core/Error.h"
 #include "core/File.h"
 #include "core/Log.h"
 #include "core/Png.h"
+#include "game/Art.h"
 #include "game/Fantasy.h"
 #include "platform/DataLocator.h"
 #include "platform/ImageFile.h"
@@ -155,10 +158,16 @@ bool App::init() {
     return false;
   }
   saveDir_ = preferencesDir();
-
-  // Prefer the shaders in the source tree while developing, so edits take effect at once.
-  const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "shaders";
-  shaderDir_ = present(source) ? source : executableDir() / "shaders";
+  shaderDir_ = executableDir() / "shaders";
+  // Whether the server has newer HD pictures is asked at once, so that the answer is usually
+  // there by the time the question could be put.
+  if (!options_.hdDir && !options_.video && !options_.screenshot)
+    artCheck_ = std::async(std::launch::async, [] {
+      std::string error;
+      auto set = fetchArtSet(&error);
+      if (!set) log::info("HD pictures: no word from the server (" + error + ")");
+      return set;
+    });
 
   if (!window_.create("Pinball Fantasies: Encore!", 640 * std::max(1, options_.windowScale) / 2,
                       480 * std::max(1, options_.windowScale) / 2))
@@ -200,7 +209,8 @@ bool App::init() {
   {
     // The letters come with this version, not from the original, so the question can be put
     // before a single game file is there.
-    askFont_ = loadAskFont(hdPicturePath("font.png"));
+    askFont_ = loadAskFont(options_.hdDir && present(*options_.hdDir / "font.png") ? *options_.hdDir / "font.png"
+                                                                                  : executableDir() / "font.png");
     // Without letters there is no way to put the question, and no question means no offer.
     if (askFont_.width == 0) log::error("the letters could not be read; not offering the download");
     if (askFont_.width != 0 && !downloadFantasyOnce(
@@ -222,6 +232,7 @@ bool App::init() {
   config_ = Config::load(saveDir_, files_.directory);
   if (options_.resolution) config_.options.resolution = *options_.resolution;
 
+  if (!offerArt()) return false;
   loadHdPictures();
   {
     const auto saved = file::readAll(saveDir_ / "hd.txt");
@@ -258,14 +269,12 @@ void App::setCrt(bool on) {
 
 /// High-resolution replacements for the intro's pictures, named after HdPicture
 /// (slide1.png ... slide5.png, left.png, table1.png ... table4.png, hiscores.png). Each file
-/// must show the whole original picture, edge to edge, at any size. The application carries
-/// its own (assets/hd), and only --hd-dir puts another set in their place. What the download
-/// leaves in the preferences folder is not read: fetching it is the experiment for now, and
-/// choosing between sets comes later.
+/// must show the whole original picture, edge to edge, at any size. They come from --hd-dir
+/// when it is given (assets/hd, to see changes to them at once), and otherwise from the set
+/// fetched from the server (game/Art.h); with neither, the original pictures are shown.
 std::filesystem::path App::hdPicturePath(const std::string& name) const {
-  if (options_.hdDir && present(*options_.hdDir / name)) return *options_.hdDir / name;
-  const std::filesystem::path source = std::filesystem::path(ENCORE_SOURCE_DIR) / "assets" / "hd";
-  return (present(source) ? source : executableDir() / "hd") / name;
+  if (options_.hdDir) return *options_.hdDir / name;
+  return artDir_.empty() ? std::filesystem::path() : artDir_ / name;
 }
 
 void App::loadHdPictures() {
@@ -633,6 +642,13 @@ void App::update(double dt) {
 /// system's: two lines and a choice, answered with the arrow keys and enter, or with Y and
 /// N, or turned down with escape.
 bool App::askToDownload() {
+  return askYesNo({"YOU LEGALLY OWN", "PINBALL FANTASIES", "TO PLAY ENCORE"});
+}
+
+/// A question in the intro's letters, a line or more of it, with YES and NO under it: the
+/// arrows or Tab move between them, Enter or Space takes the one chosen, Y and N answer at
+/// once, Escape (or closing the window) is no.
+bool App::askYesNo(std::initializer_list<std::string_view> lines) {
   bool yes = true;
   for (;;) {
     SDL_Event event;
@@ -663,10 +679,12 @@ bool App::askToDownload() {
       palette_[0x30 + i] = i == 0 ? palette_[0] : Rgb{sink(c.r), sink(c.g), sink(c.b)};
     }
     const int top = frame_.height() / 2 - 3 * kLetterH;
-    putTextCentred(frame_, askFont_, "YOU LEGALLY OWN", top);
-    putTextCentred(frame_, askFont_, "PINBALL FANTASIES", top + kLetterH + 6);
-    putTextCentred(frame_, askFont_, "TO PLAY ENCORE", top + kLetterH*2 + 12);
-    const int row = top + 4 * (kLetterH + 6);
+    int y = top;
+    for (const auto line : lines) {
+      putTextCentred(frame_, askFont_, line, y);
+      y += kLetterH + 6;
+    }
+    const int row = y + kLetterH + 6;
     const int left = (frame_.width() - 11 * kLetterW) / 2;
     putText(frame_, askFont_, "YES", left, row, yes ? 0x20 : 0x30);
     putText(frame_, askFont_, "NO", left + 7 * kLetterW, row, yes ? 0x30 : 0x20);
@@ -683,7 +701,7 @@ bool App::askToDownload() {
 /// While a set of pictures is being fetched: a line of text and a ring of dots turning, in
 /// the game's own window, so the wait does not look like a hang. The game has drawn nothing
 /// yet at this point, so the palette is this drawing's own.
-void App::drawWaiting(double seconds, std::string_view line) {
+void App::drawWaiting(double seconds, std::string_view line, std::string_view detail) {
   constexpr int kDots = 8, kSize = 10;
   constexpr double kRadius = 44.0;
   frame_.clear(0);
@@ -700,11 +718,97 @@ void App::drawWaiting(double seconds, std::string_view line) {
                    cy + static_cast<int>(std::sin(angle) * kRadius) - kSize / 2, kSize, kSize};
     frame_.fillRect(dot, static_cast<u8>(i + 1));
   }
+  if (!detail.empty()) putTextCentred(frame_, askFont_, detail, cy + static_cast<int>(kRadius) + kLetterH);
   int w = 0, h = 0;
   window_.drawableSize(w, h);
   renderer_.setPalette(palette_);
   renderer_.draw(frame_, w, h, std::max(0.0, seconds));
   window_.swap();
+}
+
+namespace {
+
+/// Bytes as whole megabytes for the screens, rounded up: 1 MB at the least.
+std::string megabytes(u64 bytes) { return std::to_string(std::max<u64>(1, (bytes + 1048575) / 1048576)) + " MB"; }
+
+}  // namespace
+
+/// The HD pictures: the set fetched before, if there is one, and the server's newer set when
+/// there is one and the player wants it. The first time, nothing is there and the question is
+/// whether to fetch the pictures at all; after that, whether to fetch the new version. Turned
+/// down, a version is not offered again. False only when the window was closed meanwhile.
+bool App::offerArt() {
+  if (options_.hdDir) return true;
+  auto have = installedArt(saveDir_);
+  if (have) artDir_ = have->dir;
+  if (!artCheck_.valid() || askFont_.width == 0) return true;
+
+  // Usually the answer is in already; if not, it is waited for a little, and otherwise asked
+  // for again at the next start.
+  const auto start = std::chrono::steady_clock::now();
+  while (artCheck_.wait_for(std::chrono::milliseconds(16)) != std::future_status::ready) {
+    const double waited = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    if (waited > 3.0) {
+      log::info("HD pictures: the server is slow to answer; asking again next time");
+      return true;
+    }
+    SDL_Event event;
+    while (SDL_PollEvent(&event))
+      if (event.type == SDL_EVENT_QUIT) return false;
+    if (waited > 0.3) drawWaiting(waited, "LOOKING FOR HD GFX ART");
+  }
+  const auto set = artCheck_.get();
+  if (!set) return true;
+  if (set->format > kArtFormat) {
+    log::info("HD pictures: version " + std::to_string(set->version) + " needs a newer game");
+    return true;
+  }
+  if (have && have->set.version >= set->version) return true;
+  if (declinedArt(saveDir_) >= set->version) return true;
+
+  const u64 bytes = artBytesToFetch(*set, have);
+  const bool wanted = have ? askYesNo({"UPDATE THE", "HD GFX ART", megabytes(bytes)})
+                           : askYesNo({"DOWNLOAD THE", "HD GFX ART", megabytes(bytes)});
+  if (!wanted) {
+    declineArt(saveDir_, set->version);
+    log::info("HD pictures: version " + std::to_string(set->version) + " turned down");
+    return true;
+  }
+
+  // Fetched in the background while the screen shows how far it has got; Escape stops it, and
+  // the pictures there were before stay.
+  ArtProgress progress;
+  progress.total = bytes;
+  std::string error;
+  bool fetched = false;
+  std::atomic<bool> finished{false};
+  std::thread worker([&] {
+    fetched = fetchArt(saveDir_, *set, have, progress, &error);
+    finished = true;
+  });
+  bool closed = false;
+  const auto began = std::chrono::steady_clock::now();
+  while (!finished) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_EVENT_QUIT) closed = true;
+      if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) progress.cancel = true;
+      if (closed) progress.cancel = true;
+    }
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count();
+    const u64 done = progress.done;
+    drawWaiting(seconds, "DOWNLOADING HD GFX ART",
+                progress.cancel ? std::string("STOPPING") : (std::to_string(done / 1048576) + " OF " + megabytes(bytes)));
+    SDL_Delay(16);
+  }
+  worker.join();
+  if (closed) return false;
+  if (!fetched) {
+    log::error("HD pictures: version " + std::to_string(set->version) + " not fetched: " + error);
+    return true;
+  }
+  if (auto now = installedArt(saveDir_)) artDir_ = now->dir;
+  return true;
 }
 
 void App::render(double now) {

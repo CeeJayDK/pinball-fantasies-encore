@@ -89,6 +89,7 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
   src/platform/AudioDevice.cpp
   src/platform/ImageFile.cpp
   src/platform/Http.cpp
+  src/game/Art.cpp
   src/game/Fantasy.cpp
   src/game/Online.cpp
   src/gfx/Gl.cpp
@@ -122,7 +123,7 @@ if(WIN32)
 else()
   target_link_libraries(pinball-fantasies PRIVATE ${CMAKE_DL_LIBS})
 endif()
-target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1)
 set_target_properties(pinball-fantasies PROPERTIES OUTPUT_NAME "Pinball Fantasies")
 
 if(APPLE)
@@ -156,9 +157,11 @@ if(APPLE)
   add_dependencies(pinball-fantasies encore_icon)
 endif()
 
-# Shaders and the replacement pictures travel with the application: inside the bundle on
-# macOS, beside the executable elsewhere. This runs on every build, not only when the
-# executable is relinked, so editing a shader alone still reaches the application.
+# Shaders and the letters of the screens before the game (font.png) travel with the
+# application: inside the bundle on macOS, beside the executable elsewhere. The HD pictures do
+# not: the game fetches them from the server (src/game/Art.h), or reads them with --hd-dir.
+# This runs on every build, not only when the executable is relinked, so editing a shader
+# alone still reaches the application.
 if(APPLE)
   set(PFR_RESOURCE_DIR "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources")
 else()
@@ -168,10 +171,10 @@ endif()
 add_custom_target(encore_shaders ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory
           "${CMAKE_SOURCE_DIR}/shaders" "${PFR_RESOURCE_DIR}/shaders"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/assets/hd" "${PFR_RESOURCE_DIR}/hd"
+  COMMAND ${CMAKE_COMMAND} -E copy
+          "${CMAKE_SOURCE_DIR}/assets/hd/font.png" "${PFR_RESOURCE_DIR}/font.png"
   DEPENDS pinball-fantasies
-  COMMENT "Copying shaders and pictures next to the application")
+  COMMENT "Copying shaders and letters next to the application")
 
 if(APPLE)
   add_custom_command(TARGET encore_shaders POST_BUILD

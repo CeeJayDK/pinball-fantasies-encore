@@ -76,7 +76,7 @@ jobs:
         run: |
           test -x "build/Pinball Fantasies"
           test -f build/shaders/post.frag
-          test -f build/hd/playfield1_on.png
+          test -f build/font.png
           test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract
 
       # SDL travels in lib/ beside the binary, which is told to look there first, so the
@@ -86,7 +86,7 @@ jobs:
           dist="pinball-fantasies-encore"
           mkdir -p "$dist/lib"
           cp "build/Pinball Fantasies" "$dist/"
-          cp -r build/shaders build/hd "$dist/"
+          cp -r build/shaders build/font.png "$dist/"
           # To put it in the menu, with its icon: optional, and all under ~/.local.
           cp packaging/linux/install.sh assets/app/icon.png "$dist/"
           cp -L "$(ldd "build/Pinball Fantasies" | awk '/libSDL3/ {print $3}')" "$dist/lib/"

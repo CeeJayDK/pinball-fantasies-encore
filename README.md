@@ -58,7 +58,10 @@ on each other exactly, pixel area for pixel area, and why F10 can swap them mid-
   paused turns the trail off).
 - **A CRT look** (scanlines, shadow mask, glow) on F9, and the original crisp pixels without it.
 
-The redrawn pictures live in `assets/hd`; `--hd-dir` points the game at your own instead.
+The redrawn pictures live in `assets/hd`, but they are not in the downloads: the first time it
+starts, the game offers to fetch them (about 31 MB), and later offers each new version of
+them. Until then, or if you say no, it shows the original pictures. `--hd-dir` points it at a
+folder of pictures instead, such as `assets/hd` while drawing them.
 
 ### The same screens, either way
 

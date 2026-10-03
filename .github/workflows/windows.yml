@@ -48,7 +48,7 @@ jobs:
           foreach ($f in @(
             "build/RelWithDebInfo/Pinball Fantasies.exe",
             "build/RelWithDebInfo/shaders/post.frag",
-            "build/RelWithDebInfo/hd/playfield1_on.png",
+            "build/RelWithDebInfo/font.png",
             "build/RelWithDebInfo/encore-play.exe",
             "build/RelWithDebInfo/encore-assets.exe",
             "build/RelWithDebInfo/encore-extract.exe")) {
@@ -63,7 +63,7 @@ jobs:
           New-Item -ItemType Directory -Path $dist | Out-Null
           Copy-Item "build/RelWithDebInfo/Pinball Fantasies.exe" $dist
           Copy-Item -Recurse "build/RelWithDebInfo/shaders" $dist
-          Copy-Item -Recurse "build/RelWithDebInfo/hd" $dist
+          Copy-Item "build/RelWithDebInfo/font.png" $dist
           Copy-Item "sdl3/SDL3-$env:SDL_VERSION/lib/x64/SDL3.dll" $dist
           Compress-Archive -Path $dist -DestinationPath "pinball-fantasies-encore-windows-x64.zip"
 

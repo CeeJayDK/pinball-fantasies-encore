@@ -11,6 +11,7 @@ one the replay arrives at.
 - `migrations/`: the D1 database.
 - `verify.sh`: the checking, as the job runs it.
 - `upload-game-files.sh`: puts the game's table files on the server, for the job.
+- `publish-art.sh`: publishes the HD pictures the game fetches (see below).
 
 The Worker, its database, the recordings (a few KB each) and the game's table files (about
 3 MB, readable only with the verifier's token) all fit in Cloudflare's free plan.
@@ -50,12 +51,53 @@ Secrets and variables → Actions**: a **secret** `VERIFIER_TOKEN` (the same sec
 default branch, or by hand from the Actions tab. GitHub stops scheduled jobs in a repository
 with no activity for 60 days; the Actions tab turns it back on.
 
+GitHub runs schedules late, and sometimes not at all, so the Worker also starts the job itself
+as soon as a game arrives, when it has a token for it. Make one on GitHub under **Settings →
+Developer settings → Personal access tokens → Fine-grained tokens**: only this repository, with
+the permission **Actions: Read and write**, and as long an expiry as it allows. Then:
+
+```bash
+npx wrangler secret put GITHUB_DISPATCH_TOKEN
+```
+
+Without it, or once it has expired, games simply wait for the schedule.
+
 After a change to the Worker or a new migration:
 
 ```bash
 npx wrangler d1 migrations apply encore-scores --remote
 npx wrangler deploy
 ```
+
+## The HD pictures
+
+The HD pictures are not in the releases: the game fetches them from here. They are kept in an
+R2 bucket, each under the SHA-256 of its contents, and a *set* is a manifest naming them;
+`GET /v1/art` gives the current set, as text, which the game compares with what it has. Publishing gives
+a set the next version number, unless it is the same pictures as the current one.
+
+Once, to make the bucket (R2 wants a payment method on the account, though the pictures stay
+far inside its free allowance) and the publisher's secret (another `openssl rand -hex 32`):
+
+```bash
+npx wrangler r2 bucket create encore-art
+npx wrangler secret put PUBLISH_TOKEN
+npx wrangler deploy
+```
+
+Then, from the repository root, whenever `assets/hd` has changed:
+
+```bash
+ENCORE_API=https://pinball-fantasies-encore.<your subdomain>.workers.dev PUBLISH_TOKEN=<the secret> \
+  server/publish-art.sh
+```
+
+Only the pictures the server does not have are uploaded. When the pictures need code that
+games out there do not have (a new kind of picture, say), raise `kArtFormat` in
+`src/game/Art.h` and publish with `ART_FORMAT=` the same number: games that do not understand
+it keep the set they have. Going back to older
+pictures is running it from an older checkout: they are all still there, so it only writes the
+set.
 
 ## Trying it locally
 

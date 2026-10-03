@@ -48,7 +48,7 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 | `--crt`, `--no-crt` | CRT look (scanlines, shadow mask, glow); remembered |
 | `--hd`, `--no-hd` | the remastered pictures, or the originals; remembered |
 | `--trail`, `--no-trail` | the fading ghosts behind the ball; remembered |
-| `--hd-dir <dir>` | pictures to use instead of the application's own |
+| `--hd-dir <dir>` | HD pictures to use instead of the ones fetched from the server; `--hd-dir assets/hd` shows changes to them at once |
 | `--smooth` | soften the one pixel that straddles two source pixels; steadies scrolling |
 | `--square-pixels` | show the picture unstretched instead of filling a 4:3 screen |
 | `--fullscreen`, `--scale <n>` | window options; fullscreen is otherwise as it was left last time |
