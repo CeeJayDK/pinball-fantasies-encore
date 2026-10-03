@@ -278,12 +278,17 @@ code, .kbd {
   border-radius: 6px;
   color: var(--text);
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.08);
+  /* The banner's blue, lit from above. */
+  background: linear-gradient(180deg, rgba(128, 192, 216, 0.42), rgba(70, 132, 160, 0.22));
   line-height: 1.35;
 }
-.button:hover { border-color: #9fd3e6; color: var(--text); background: rgba(255, 255, 255, 0.14); }
+.button:hover {
+  border-color: #9fd3e6;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(150, 210, 232, 0.55), rgba(84, 150, 180, 0.32));
+}
 .button .platform { font-weight: 600; }
-.button .file { font-size: 13px; color: var(--muted); }
+.button .file { font-size: 13px; color: #c9d6dc; }
 
 #download .dmd-title { margin-bottom: 8px; }
 #release { margin-top: 0; margin-bottom: 0; }
