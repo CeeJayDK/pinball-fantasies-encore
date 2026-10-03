@@ -128,10 +128,11 @@ a { color: var(--amber); }
 .compare:has(input:focus-visible) { outline: 2px solid var(--amber); outline-offset: 2px; }
 
 /* Who makes it: the words, and the picture to their right. */
-.team { display: grid; grid-template-columns: 1fr 200px; gap: 24px; align-items: start; }
+/* The picture on the right, and the text flowing round it and on beneath it. */
+.team { display: flow-root; }
 .team p { font-size: 18px; line-height: 1.55; margin: 0 0 0.8em; }
 .team p:last-child { margin-bottom: 0; }
-.portrait { margin: 0; }
+.portrait { float: right; width: 200px; margin: 4px 0 12px 24px; }
 .portrait img {
   display: block;
   width: 100%;
@@ -141,7 +142,7 @@ a { color: var(--amber); }
 }
 .portrait figcaption { margin-top: 8px; text-align: center; font-size: 14px; }
 @media (max-width: 560px) {
-  .team { grid-template-columns: 1fr 130px; gap: 14px; }
+  .portrait { width: 130px; margin: 4px 0 8px 14px; }
   .team p { font-size: 16px; }
   .portrait figcaption { font-size: 11px; }
 }
