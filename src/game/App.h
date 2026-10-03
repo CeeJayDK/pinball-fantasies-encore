@@ -50,7 +50,7 @@ struct AppOptions {
 /// The letters the screens before the game are written with. They are the intro's own,
 /// kept as a picture beside the application (font.png, from assets/hd, 20 cells of 32 x 14 per
 /// row) so that they can be read before any file of the original game is, or even found, and
-/// before any HD picture is fetched.
+/// before any HD picture is fetched. The fetched set carries them too, and its copy is preferred.
 struct AskFont {
   int width = 0, height = 0;
   Bytes index;              ///< one colour slot per pixel

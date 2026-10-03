@@ -209,9 +209,16 @@ bool App::init() {
   // below. Turning the offer down ends the game.
   {
     // The letters come with this version, not from the original, so the question can be put
-    // before a single game file is there.
-    askFont_ = loadAskFont(options_.hdDir && present(*options_.hdDir / "font.png") ? *options_.hdDir / "font.png"
-                                                                                  : executableDir() / "font.png");
+    // before a single game file is there, or any HD picture. The fetched set has them too, so
+    // that they can change without a release: once there, they are used instead (and --hd-dir's
+    // before either). If those cannot be read, the application's own still can.
+    const std::filesystem::path own = executableDir() / "font.png";
+    std::filesystem::path letters = own;
+    if (options_.hdDir && present(*options_.hdDir / "font.png")) letters = *options_.hdDir / "font.png";
+    else if (const auto fetched = installedArt(saveDir_); fetched && present(fetched->dir / "font.png"))
+      letters = fetched->dir / "font.png";
+    askFont_ = loadAskFont(letters);
+    if (askFont_.width == 0 && letters != own) askFont_ = loadAskFont(own);
     // Without letters there is no way to put the question, and no question means no offer.
     if (askFont_.width == 0) log::error("the letters could not be read; not offering the download");
     if (askFont_.width != 0 && !downloadFantasyOnce(
@@ -765,9 +772,22 @@ bool App::offerArt() {
     return true;
   }
   if (have && have->set.version >= set->version) return true;
+
+  // A version with nothing new to download (a picture taken out, say) is not worth a question:
+  // it is put in place from the pictures there are.
+  const u64 bytes = artBytesToFetch(*set, have);
+  if (bytes == 0) {
+    ArtProgress progress;
+    std::string error;
+    if (fetchArt(saveDir_, *set, have, progress, &error)) {
+      if (auto now = installedArt(saveDir_)) artDir_ = now->dir;
+    } else {
+      log::error("HD pictures: version " + std::to_string(set->version) + " not put in place: " + error);
+    }
+    return true;
+  }
   if (declinedArt(saveDir_) >= set->version) return true;
 
-  const u64 bytes = artBytesToFetch(*set, have);
   const bool wanted = have ? askYesNo({"UPDATE THE", "HD GFX ART?", megabytes(bytes)})
                            : askYesNo({"DOWNLOAD THE", "HD GFX ART?", megabytes(bytes)});
   if (!wanted) {
