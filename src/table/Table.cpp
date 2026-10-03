@@ -29,7 +29,7 @@ constexpr std::array<u16, 36> kMatchTimingHigh = {22, 28, 25, 25, 22, 19, 18, 15
 
 }  // namespace
 
-Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64 seed)
+Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64 seed, const Replay::Carry* carry)
     : assets_(TableAssets::load(prg, table)),
       options_(config.options),
       highScores_(config.highScores[static_cast<std::size_t>(table)]),
@@ -38,6 +38,10 @@ Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64
   sequencer_ = std::make_shared<TableSequencer>(jingle(JingleBind::Attract).position, assets_.positionJingleStart,
                                                 jingle(JingleBind::Silence).position, options_.noMusic);
   player_ = std::make_unique<Player>(Mod::load(module), sequencer_);
+  replay_.table = table;
+  replay_.seed = seed;
+  replay_.options = options_;
+  replay_.highScores = highScores_;
 
   scroll_.speed = rawScrollSpeed(options_.scrollSpeed);
   scroll_.setResolution(options_.resolution, std::nullopt);
@@ -65,6 +69,16 @@ Table::Table(ByteView prg, ByteView module, const Config& config, int table, u64
   push_.speedRelease = speedFix(-200);
   ball_.maxSpeed = speedFix(4100);
   totalBalls_ = options_.balls;
+  if (carry) {
+    cheatNoTilt_ = carry->noTilt;
+    cheatSlowdown_ = carry->slowdown;
+    if (carry->balls) totalBalls_ = carry->balls;
+    if (carry->scrollPos != 0xffff) {
+      scroll_.pos = carry->scrollPos;
+      scroll_.rawPosF4 = carry->scrollRawF4;
+    }
+  }
+  replay_.carry = carryOver();
 
   ball_.setPos({280, 525});
   startScript(ScriptBind::Init);
@@ -559,8 +573,32 @@ std::vector<FlipperSide> Table::flipperSides() const {
 
 // ---- the frame ---------------------------------------------------------------------------
 
+/// The music as the game sees it this frame: the player's, or a recording's when playing
+/// one back; recorded whenever it moved on by itself since the game last looked.
+void Table::syncMusic() {
+  const u32 before = sequencer_->view();
+  if (playback_) {
+    const auto& events = playback_->events;
+    for (; playbackAt_ < events.size() && events[playbackAt_].frame <= frame_; ++playbackAt_)
+      if (events[playbackAt_].frame == frame_ && events[playbackAt_].kind == Replay::Event::Kind::Music)
+        sequencer_->setView(events[playbackAt_].value);
+  } else {
+    sequencer_->sync();
+  }
+  if (sequencer_->view() != before && !recorded_)
+    replay_.events.push_back({frame_, Replay::Event::Kind::Music, sequencer_->view()});
+}
+
+bool Table::startsGame(Key key) const {
+  return kbdState_ == KbdState::Main && startKeysActive_ && inAttract_ &&
+         ((key >= Key::F1 && key <= Key::F8) || (key >= Key::Digit1 && key <= Key::Digit8) || key == Key::Enter);
+}
+
 TableAction Table::runFrame() {
   using K = TableAction::Kind;
+  syncMusic();
+  ++frame_;
+  if (!recorded_) replay_.frames = frame_;
   if (kbdState_ == KbdState::Paused) {
     if (scrollKey_) {
       const int top = 576 - scroll_.windowHeight;
@@ -701,6 +739,9 @@ TableAction Table::runFrame() {
 }
 
 void Table::handleKey(Key key, bool pressed) {
+  if (!recorded_)
+    replay_.events.push_back(
+        {frame_, pressed ? Replay::Event::Kind::KeyDown : Replay::Event::Kind::KeyUp, static_cast<u32>(key)});
   auto flipperKey = [&](FlipperSide side) {
     const std::size_t s = static_cast<std::size_t>(side);
     if (pressed && flippersEnabled_ && !flipperState_[s]) {
@@ -799,6 +840,10 @@ void Table::handleKey(Key key, bool pressed) {
       break;
     case KbdState::GetName:
       if (chr && nameBuf_.size() < 3) nameBuf_.push_back(chr);
+      break;
+    case KbdState::AskOnline:
+      if (key == Key::Y) onlineAnswer_ = true;
+      if (key == Key::N) onlineAnswer_ = false;
       break;
   }
 }

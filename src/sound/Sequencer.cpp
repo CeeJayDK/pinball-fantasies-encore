@@ -23,10 +23,11 @@ TableSequencer::TableSequencer(u8 position, u8 positionJingleStart, u8 positionS
   s.music = position;
   s.noMusic = noMusic;
   state_.store(s.pack());
+  view_ = s.pack();
 }
 
 bool TableSequencer::playJingle(const Jingle& jingle, bool force, std::optional<u8> music) {
-  return update([&](State& s) {
+  return gameUpdate([&](State& s) {
     if (jingle.priority < s.priority && !force) return false;
     if (s.repeat == 0) s.music = s.position;
     s.position = jingle.position;
@@ -39,19 +40,19 @@ bool TableSequencer::playJingle(const Jingle& jingle, bool force, std::optional<
 }
 
 void TableSequencer::setMusic(u8 position) {
-  update([&](State& s) { s.music = position; return true; });
+  gameUpdate([&](State& s) { s.music = position; return true; });
 }
 
 void TableSequencer::resetPriority() {
-  update([](State& s) { s.priority = 0; return true; });
+  gameUpdate([](State& s) { s.priority = 0; return true; });
 }
 
 void TableSequencer::setNoMusic(bool flag) {
-  update([&](State& s) { s.noMusic = flag; return true; });
+  gameUpdate([&](State& s) { s.noMusic = flag; return true; });
 }
 
 void TableSequencer::forceEndLoop() {
-  update([](State& s) {
+  gameUpdate([](State& s) {
     if (s.repeat != 0) return false;
     s.repeat = 1;
     return true;

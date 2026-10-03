@@ -131,6 +131,7 @@ void Table::issueBallFinish() {
 void Table::issueBallRelease() { ballTeleport(Layer::Ground, assets_.issueBallReleasePos, {10, 0}); }
 
 void Table::abortGame() {
+  abandoned_ = true;
   ballTeleport(Layer::Ground, {300, 570}, {0, 0});
   kbdState_ = KbdState::Main;
   addTask(TaskKind::GameOver);

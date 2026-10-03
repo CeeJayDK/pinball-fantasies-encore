@@ -35,7 +35,15 @@ bool Table::runTask(Task& t) {
     case TaskKind::IssueBallSfx: playSfxBind(SfxBind::IssueBall); return false;
     case TaskKind::IssueBallRaiseSfx: playSfxBind(SfxBind::RaiseHitTargets); return false;
     case TaskKind::DrainSfx: playSfxBind(SfxBind::BallDrained); return false;
-    case TaskKind::GameOver:
+    case TaskKind::GameOver: {
+      if (!recorded_) {
+        Replay::Game g{frame_, abandoned_, {}, initials_};
+        for (const PlayerState& p : players_) g.scores.push_back(p.scoreMain);
+        replay_.games.push_back(std::move(g));
+        recorded_ = true;
+      }
+      abandoned_ = false;
+    }
       kbdState_ = KbdState::Main;
       inAttract_ = true;
       lightsReset();

@@ -40,14 +40,14 @@ if [ -f "$HERE/icon.png" ]; then
 fi
 
 # Written here rather than shipped ready-made, because Exec has to be the absolute path of
-# this particular install. The file is named after the app id, and StartupWMClass repeats it,
+# this particular install. %f is a recording dropped on the entry, which the game plays. The file is named after the app id, and StartupWMClass repeats it,
 # so the desktop puts the window under this entry and its icon.
 cat > "$APPS/$ID.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Pinball Fantasies: Encore!
 Comment=The 1994 pinball game, natively, with remastered artwork
-Exec="$DEST/Pinball Fantasies"
+Exec="$DEST/Pinball Fantasies" %f
 Icon=$ID
 StartupWMClass=$ID
 Terminal=false

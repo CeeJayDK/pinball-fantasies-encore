@@ -5,6 +5,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <ctime>
 #include <memory>
 #include <optional>
 #include <string_view>
@@ -157,7 +158,7 @@ bool App::init() {
   // Fullscreen or in a window, as it was left last time, unless told otherwise.
   {
     const auto saved = file::readAll(saveDir_ / "fullscreen.txt");
-    if (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1')) {
+    if (!options_.video && (options_.fullscreen || (saved && !saved->empty() && (*saved)[0] == '1'))) {
       // macOS slides into fullscreen over about a second, stretching whatever the window last
       // showed to the shape of the screen as it goes: the first frames of the intro would be
       // seen pulled wide and then snap back. So the window shows black while it goes, and
@@ -224,12 +225,18 @@ bool App::init() {
     ballTrail_ = options_.trail.value_or(!saved || saved->empty() || (*saved)[0] != '0');
     if (options_.trail) setBallTrail(*options_.trail);
   }
-  audio_.open(48000);
+  sound_ = audio_.open(48000);
+  // Whatever could not be sent last time goes now.
+  sender_ = std::make_unique<ScoreSender>(saveDir_);
+  sender_->send();
 
-  if (options_.table >= 1 && options_.table <= 4)
+  if (!options_.replays.empty() && openReplay(options_.replays[0])) {
+    nextReplay_ = 1;
+  } else if (options_.table >= 1 && options_.table <= 4) {
     openTable(options_.table - 1);
-  else
+  } else {
     openIntro(options_.skipIntro ? 0 : -1);
+  }
   return true;
 }
 
@@ -342,6 +349,7 @@ void App::resizeFrame(int width, int height, double pixelAspect) {
 void App::openIntro(int returningFrom) {
   audio_.setSource({});
   table_.reset();
+  replaying_ = fromReplay_ = false;
   // The slideshow plays to INTRO.MOD; coming back from a table the menu plays MOD2.MOD.
   const auto prg = file::readAll(files_.intro);
   const auto mod = file::readAll(returningFrom < 0 ? files_.introMusic : files_.menuMusic);
@@ -351,18 +359,159 @@ void App::openIntro(int returningFrom) {
   audio_.setSource([p = &intro_->player()](float* out, int frames) { p->render(out, frames); });
 }
 
-void App::openTable(int index) {
+/// A table to play on; with `recording`, the table that recording was played on, which then
+/// plays it back.
+void App::openTable(int index, const Replay* recording) {
   audio_.setSource({});
   intro_.reset();
+  table_.reset();
   const auto prg = file::readAll(files_.tables[static_cast<std::size_t>(index)]);
   const auto mod = file::readAll(files_.tableMusic[static_cast<std::size_t>(index)]);
   if (!prg || !mod) throw DataError("cannot read the table files");
-  const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
-  table_ = std::make_unique<Table>(*prg, *mod, config_, index, seed);
+  tablePrg_ = *prg;
+  tableMod_ = *mod;
+  if (recording) {
+    Config config = config_;
+    config.options = recording->options;
+    config.highScores[static_cast<std::size_t>(index)] = recording->highScores;
+    table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, recording->seed, &recording->carry);
+    table_->playBack(*recording);
+  } else {
+    const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
+    table_ = std::make_unique<Table>(tablePrg_, tableMod_, config_, index, seed);
+  }
+  // A game played back is the recording's, not one to keep or send.
+  recordingSaved_ = recording != nullptr;
+  replaying_ = fromReplay_ = recording != nullptr;
+  replayNext_ = 0;
+  replayFrame_ = 0;
   resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
   loadFlipperPictures(index);
   log::info("opened table " + std::to_string(index + 1));
+}
+
+/// Plays a recording, dropped on the program or its window or named on its command line, on
+/// the table it was played on. Once it is over the table stays, for a game of one's own.
+bool App::openReplay(const std::filesystem::path& path) {
+  const auto data = file::readAll(path);
+  auto recording = data ? Replay::load(*data) : std::nullopt;
+  if (!recording) {
+    log::error("not a recording this version can play: " + path.string());
+    return false;
+  }
+  audio_.setSource({});
+  table_.reset();  // before the recording it may be playing goes
+  replay_ = std::move(recording);
+  openTable(replay_->table, &*replay_);
+  if (options_.video) table_->player().setMasterVolume(0);  // filmed in silence
+  log::info("playing " + path.filename().string());
+  return true;
+}
+
+/// A recording has played to its end, or as far as it is filmed: on to the next one, if there
+/// is one; true when the table is no longer the one that was playing.
+bool App::recordingOver() {
+  replaying_ = false;
+  table_->stopPlayBack();
+  if (clip_) endClip();
+  if (nextReplay_ < options_.replays.size()) {
+    if (!openReplay(options_.replays[nextReplay_++])) return recordingOver();
+    return true;
+  }
+  if (options_.video) {
+    running_ = false;
+    return true;
+  }
+  log::info("the recording is over; the table is yours");
+  return false;
+}
+
+/// A drawn frame, to the clip being filmed: raw pixels down a pipe to ffmpeg, which makes the
+/// file, so every frame is in it however long the drawing took.
+void App::captureFrame(int width, int height) {
+  if (!clip_) {
+    std::error_code ec;
+    std::filesystem::create_directories(*options_.video, ec);
+    const auto out = *options_.video / ("clip" + std::to_string(++clips_) + ".mp4");
+    const std::string command = "ffmpeg -loglevel error -y -f rawvideo -pix_fmt rgb24 -s " + std::to_string(width) +
+                                "x" + std::to_string(height) + " -r 60 -i - -vf vflip -c:v libx264 -crf 16 " +
+                                "-pix_fmt yuv420p \"" + out.string() + "\"";
+#ifdef _WIN32
+    clip_ = _popen(command.c_str(), "wb");
+#else
+    clip_ = popen(command.c_str(), "w");
+#endif
+    if (!clip_) {
+      log::error("cannot start ffmpeg to film");
+      running_ = false;
+      return;
+    }
+    clipWidth_ = width;
+    clipHeight_ = height;
+    log::info("filming " + out.string());
+  }
+  if (width != clipWidth_ || height != clipHeight_) return;  // the window changed size: not this frame
+  clipFrame_.resize(static_cast<std::size_t>(width) * height * 3);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
+  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, clipFrame_.data());
+  std::fwrite(clipFrame_.data(), 1, clipFrame_.size(), clip_);
+}
+
+void App::endClip() {
+#ifdef _WIN32
+  _pclose(clip_);
+#else
+  pclose(clip_);
+#endif
+  clip_ = nullptr;
+}
+
+/// Every game is played on a table of its own, made as the key that starts it is pressed, so
+/// that its recording depends on nothing played before it. The new table takes over what the
+/// old one had that the game would play differently without: the options and high scores as
+/// they are now, any cheats typed while it waited, and where its screen was looking.
+void App::newGame() {
+  const int index = table_->tableIndex();
+  Config config = config_;
+  Replay::Carry carry = table_->carryOver();
+  if (fromReplay_) {
+    // After a recording, one's own options and high scores, and none of its cheats.
+    carry.noTilt = carry.slowdown = false;
+    carry.balls = 0;
+    fromReplay_ = false;
+  } else {
+    config.options = table_->options();
+    config.highScores[static_cast<std::size_t>(index)] = table_->highScores();
+  }
+  audio_.setSource({});
+  const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
+  table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, seed, &carry);
+  audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
+  recordingSaved_ = false;
+}
+
+/// The game just over, kept beside the high scores in replays/, named by Replay::fileName.
+void App::saveRecording() {
+  const std::time_t now = std::time(nullptr);
+  char stamp[32];
+  std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M", std::localtime(&now));
+  const Replay& r = table_->recording();
+  auto path = saveDir_ / "replays" / r.fileName(stamp);
+  // Two games ending in the same minute with the same score keep both.
+  for (int n = 2; std::filesystem::exists(path); ++n)
+    path = saveDir_ / "replays" / r.fileName(std::string(stamp) + "-" + std::to_string(n));
+  std::error_code ec;
+  std::filesystem::create_directories(path.parent_path(), ec);
+  if (!file::writeAll(path, r.save())) {
+    log::error("cannot write " + path.string());
+    return;
+  }
+  log::info("recorded: " + path.string());
+  if (table_->sendOnline() && sender_) {
+    sender_->queue(path);
+    sender_->send();
+  }
 }
 
 void App::handleKey(const SDL_Event& e) {
@@ -388,8 +537,22 @@ void App::handleKey(const SDL_Event& e) {
   const Key k = keyFor(e.key.key);
   if (k == Key::None) return;
   const bool down = e.type == SDL_EVENT_KEY_DOWN;
+  if (table_ && replaying_) {
+    // The recording plays the table; Escape stops it and goes back to the menu.
+    if (down && k == Key::Escape) openIntro(table_->tableIndex());
+    return;
+  }
+  if (table_ && down && table_->startsGame(k)) newGame();
   if (table_) table_->handleKey(k, down);
   else if (intro_) intro_->handleKey(k, down);
+}
+
+/// Without a sound card nothing would move the music on, and the game waits on it: a table's
+/// scripts for a jingle to end, the intro's pictures for the music to reach their moment. It
+/// is moved on here instead, a frame's worth at a time, and nobody hears it.
+void App::playSilently(Player& player) {
+  silence_.resize(800 * 2);  // 48000 a second, 60 frames
+  player.render(silence_.data(), 800);
 }
 
 void App::update(double dt) {
@@ -398,6 +561,7 @@ void App::update(double dt) {
     clock_ -= kFrame;
     if (intro_) {
       const IntroAction a = intro_->runFrame();
+      if (!sound_) playSilently(intro_->player());
       switch (a.kind) {
         case IntroAction::Kind::OpenTable:
           config_.options = intro_->options();
@@ -412,19 +576,40 @@ void App::update(double dt) {
         case IntroAction::Kind::None: break;
       }
     } else if (table_) {
+      if (replaying_) {
+        const auto& events = replay_->events;
+        for (; replayNext_ < events.size() && events[replayNext_].frame == replayFrame_; ++replayNext_)
+          if (events[replayNext_].kind != Replay::Event::Kind::Music)
+            table_->handleKey(static_cast<Key>(events[replayNext_].value),
+                              events[replayNext_].kind == Replay::Event::Kind::KeyDown);
+      }
       const TableAction a = table_->runFrame();
+      if (replaying_) {
+        ++replayFrame_;
+        const bool filmed =
+            options_.video && replayFrame_ >= static_cast<u32>((options_.videoFrom + options_.videoSeconds) * 60);
+        if ((replayFrame_ >= replay_->frames || filmed) && recordingOver()) return;
+      }
+      if (!sound_) playSilently(table_->player());
+      if (!recordingSaved_ && !table_->recording().games.empty()) {
+        saveRecording();
+        recordingSaved_ = true;
+      }
       const int index = table_->tableIndex();
       switch (a.kind) {
+        // A recording's table has the recording's options and high scores: none are kept.
         case TableAction::Kind::SaveOptions:
+          if (fromReplay_) break;
           config_.options = table_->options();
           Config::saveOptions(saveDir_, config_.options);
           break;
         case TableAction::Kind::SaveHighScores:
+          if (fromReplay_) break;
           config_.highScores[static_cast<std::size_t>(index)] = table_->highScores();
           Config::saveHighScores(saveDir_, index, table_->highScores());
           break;
         case TableAction::Kind::Quit:
-          config_.options = table_->options();
+          if (!fromReplay_) config_.options = table_->options();
           openIntro(index);
           return;
         case TableAction::Kind::None: break;
@@ -519,6 +704,13 @@ void App::render(double now) {
   HdFrame* const hd = renderer_.hasHdPictures() && renderer_.hdEnabled() ? &hd_ : nullptr;
   hd_.ownSprites = ownFlipperPictures_;
   hd_.ballTrail = ballTrail_;
+  // The frame drawn into is as big as the screen is now, not as it was after the last frame
+  // of the game: a resolution changed in the pause menu takes effect at once, and with the
+  // display faster than the game the screen is drawn again before another frame has run.
+  if (table_)
+    resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+  else if (intro_)
+    resizeFrame(intro_->width(), intro_->height(), 1.0);
   if (table_)
     table_->render(frame_.data(), colors.data(), hd);
   else if (intro_)
@@ -529,6 +721,7 @@ void App::render(double now) {
   renderer_.setPalette(palette_);
   const auto beforeDraw = std::chrono::steady_clock::now();
   renderer_.draw(frame_, w, h, now, &hd_);
+  if (options_.video && replaying_ && replayFrame_ >= static_cast<u32>(options_.videoFrom * 60)) captureFrame(w, h);
   if (options_.screenshot && ++frameCounter_ >= options_.screenshotFrame) {
     std::vector<u8> rgb(static_cast<std::size_t>(w) * h * 3);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -569,12 +762,17 @@ int App::run() {
         }
         if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_WINDOW_FOCUS_GAINED) SDL_HideCursor();
         if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) SDL_ShowCursor();
+        if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) openReplay(e.drop.data);
         handleKey(e);
       }
       const auto nowT = clock::now();
-      const double dt = std::min(0.1, std::chrono::duration<double>(nowT - last).count());
+      // Filming, every drawn frame is one of the game's, however long it takes; and what comes
+      // before the part filmed is played through without being drawn.
+      const double dt = options_.video ? kFrame : std::min(0.1, std::chrono::duration<double>(nowT - last).count());
       last = nowT;
       const auto beforeUpdate = clock::now();
+      if (options_.video)
+        while (running_ && replaying_ && replayFrame_ < static_cast<u32>(options_.videoFrom * 60)) update(kFrame);
       update(dt);
       if (options_.stats) {
         using ms = std::chrono::duration<double, std::milli>;
@@ -606,6 +804,7 @@ int App::run() {
     SDL_Quit();
     return 1;
   }
+  if (clip_) endClip();
   audio_.setSource({});
   audio_.close();
   SDL_Quit();

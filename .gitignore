@@ -5,6 +5,7 @@ build/
 !assets/hd/*.png
 !assets/app/*.png
 !assets/banner.png
+!site/**/*.png
 re/*.asm
 re/*.lst
 re/*.hex
@@ -15,3 +16,7 @@ __pycache__/
 # it is derived from the game's files, which are never redistributed.
 re/*
 !re/legacy-engine/
+# The server's tools and its local database
+server/node_modules/
+server/.wrangler/
+server/.dev.vars

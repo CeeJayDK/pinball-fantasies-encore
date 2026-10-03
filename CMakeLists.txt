@@ -10,6 +10,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
+# Only what checks recorded games, with no window, sound or graphics, so nothing but a C++
+# compiler and CMake is needed: the server's verifier builds this way.
+option(ENCORE_TOOLS_ONLY "Build only the core, the command-line tools and the tests" OFF)
+
+if(NOT ENCORE_TOOLS_ONLY)
 # SDL comes from the system (Homebrew, a distribution's package, the Windows development
 # files). On macOS it can instead be the official universal framework, which is what a build
 # for both Apple Silicon and Intel needs: -DENCORE_SDL3_FRAMEWORK=<path to SDL3.framework>.
@@ -29,6 +34,7 @@ endif()
 # while the second comes with libglvnd, which older systems do not have at all.
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package(OpenGL REQUIRED)
+endif()
 
 # ---------------------------------------------------------------------------
 # encore_core: everything that does not touch SDL or OpenGL. Unit-testable.
@@ -52,6 +58,7 @@ add_library(encore_core STATIC
   src/intro/IntroAssets.cpp
   src/intro/Intro.cpp
   src/table/Table.cpp
+  src/table/Replay.cpp
   src/table/TablePhysics.cpp
   src/table/TableScript.cpp
   src/table/TableTasks.cpp
@@ -71,6 +78,7 @@ else()
   target_compile_options(encore_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wno-sign-conversion)
 endif()
 
+if(NOT ENCORE_TOOLS_ONLY)
 # ---------------------------------------------------------------------------
 # Executable: SDL3 window, OpenGL renderer, audio device, game loop.
 # ---------------------------------------------------------------------------
@@ -80,8 +88,9 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
   src/platform/DataLocator.cpp
   src/platform/AudioDevice.cpp
   src/platform/ImageFile.cpp
-  src/platform/Download.cpp
+  src/platform/Http.cpp
   src/game/Fantasy.cpp
+  src/game/Online.cpp
   src/gfx/Gl.cpp
   src/gfx/Renderer.cpp
   src/gfx/ShaderProgram.cpp
@@ -91,6 +100,13 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
 # is fetched from the driver, so nothing here is platform-specific but the library names.
 # Windows carries its icon as a compiled-in resource, not a file beside the program. The .ico
 # is made once by tools/mkico.py and committed, so no image tooling has to be on the runner.
+# On macOS, a few lines that have to speak to AppKit itself, in Objective-C++.
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(pinball-fantasies PRIVATE src/platform/MacMenu.mm)
+  set_source_files_properties(src/platform/MacMenu.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  target_link_libraries(pinball-fantasies PRIVATE "-framework AppKit")
+endif()
 if(WIN32)
   enable_language(RC)
   target_sources(pinball-fantasies PRIVATE packaging/windows/pinball.rc)
@@ -115,7 +131,8 @@ if(APPLE)
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.encore.pinball-fantasies"
     MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
-    MACOSX_BUNDLE_ICON_FILE "icon")
+    MACOSX_BUNDLE_ICON_FILE "icon"
+    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in")
 
   # The application's icon, built from the one picture into the sizes the Finder asks for.
   set(ICON_SET "${CMAKE_BINARY_DIR}/icon.iconset")
@@ -160,6 +177,8 @@ if(APPLE)
   add_custom_command(TARGET encore_shaders POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${PFR_RESOURCE_DIR}/icon.icns")
 endif()
+
+endif()  # NOT ENCORE_TOOLS_ONLY
 
 # ---------------------------------------------------------------------------
 # Command-line tools (asset inspection, no SDL).

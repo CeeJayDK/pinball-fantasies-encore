@@ -1,0 +1,57 @@
+name: Verify scores
+
+# Plays again the games sent to the online high scores and tells the server what it found:
+# only then do they count. The recordings and the game's own table files both come from the
+# server (server/README.md); nothing of either is printed, and nothing is committed.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-scores
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    # Forks have neither the server nor its secret.
+    if: github.repository == 'pedrocatalao/pinball-fantasies-encore'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ENCORE_API: ${{ vars.ENCORE_API }}
+      VERIFIER_TOKEN: ${{ secrets.VERIFIER_TOKEN }}
+    steps:
+      # Most runs find nothing waiting, and stop here in a few seconds.
+      - name: Anything waiting?
+        id: waiting
+        run: |
+          n=$(curl -fsS -H "Authorization: Bearer $VERIFIER_TOKEN" "$ENCORE_API/v1/verifier/pending?limit=1" | jq '.runs | length')
+          echo "games=$n" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        if: steps.waiting.outputs.games != '0'
+
+      # The verifier is built from the same commit as the game it checks; a build kept from an
+      # earlier run of the same commit is used as it is.
+      - name: Keep the build
+        if: steps.waiting.outputs.games != '0'
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: verifier-${{ runner.os }}-${{ github.sha }}
+
+      - name: Build encore-play
+        if: steps.waiting.outputs.games != '0'
+        run: |
+          cmake -S . -B build -DENCORE_TOOLS_ONLY=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target encore-play -j4
+
+      - name: Verify
+        if: steps.waiting.outputs.games != '0'
+        env:
+          ENCORE_PLAY: build/encore-play
+        run: server/verify.sh
