@@ -42,6 +42,12 @@ a { color: var(--amber); }
   z-index: -1;
   background: radial-gradient(ellipse at 50% 40%, rgba(11, 8, 6, 0.74), rgba(11, 8, 6, 0.93));
 }
+
+/* Left alone (app.js), the page fades back slowly and the game shows through; it comes back
+   quickly at the first touch. */
+.bg-shade, .masthead, main, .footer { transition: opacity 0.4s ease; }
+body.idle .bg-shade { opacity: 0.55; transition-duration: 2.5s; }
+body.idle .masthead, body.idle main, body.idle .footer { opacity: 0.45; transition-duration: 2.5s; }
 a:hover { color: #ffc070; }
 
 main, .masthead, .footer { max-width: 920px; margin: 0 auto; padding: 0 16px; }
@@ -69,21 +75,23 @@ main, .masthead, .footer { max-width: 920px; margin: 0 auto; padding: 0 16px; }
 
 .masthead { padding-top: 28px; }
 
-.dmd-hero {
-  padding: 26px 20px 12px;
-  text-align: center;
+/* The banner, with the dot matrix scrolling the tables' names attached to its foot. */
+/* As wide as everything below it, the tables' banners included. */
+.hero { width: 100%; }
+.hero img { display: block; width: 100%; height: auto; }
+.marquee-strip {
+  margin-top: -1px;
+  padding: 8px 0 6px;
   overflow: hidden;
+  border-radius: 0 0 8px 8px;
+  border-top: none;
 }
-.dmd-small { font-size: clamp(18px, 4.6vw, 34px); }
-.dmd-big { font-size: clamp(56px, 16vw, 132px); line-height: 1; margin: 6px 0 12px; }
 
 .marquee {
   display: flex;
   width: max-content;
   white-space: nowrap;
   font-size: clamp(13px, 2.6vw, 18px);
-  border-top: 1px solid #1d120b;
-  padding-top: 10px;
   animation: marquee 28s linear infinite;
 }
 .marquee .dmd-text { font-weight: 700; }
@@ -146,17 +154,22 @@ code, .kbd {
 .button {
   display: flex;
   flex-direction: column;
-  padding: 7px 12px;
-  border: 1px solid var(--amber-dim);
+  padding: 8px 12px 6px;
+  border: 1px solid #3a210d;
   border-radius: 6px;
-  color: var(--text);
   text-decoration: none;
-  background: #140d08;
-  line-height: 1.35;
+  background:
+    radial-gradient(circle, var(--dot-off) 0 34%, transparent 40%) 0 0 / 5px 5px,
+    var(--panel);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.8);
+  font-family: "Doto", ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
 }
-.button:hover { border-color: var(--amber); color: var(--text); background: #1c120a; }
-.button .platform { font-weight: 600; }
-.button .file { font-size: 13px; color: var(--muted); }
+.button:hover { border-color: var(--amber-dim); }
+.button .platform { font-weight: 900; font-size: 19px; color: var(--amber); text-shadow: var(--glow); }
+.button .file { font-weight: 800; font-size: 12px; letter-spacing: 0.02em; white-space: nowrap; color: var(--amber-dim); }
 
 #download .dmd-title { margin-bottom: 8px; }
 #release { margin: 0; }
@@ -213,11 +226,22 @@ code, .kbd {
   border-radius: 50%;
   border: 1px solid var(--amber-dim);
   background: rgba(10, 5, 3, 0.82);
-  color: var(--amber);
-  font: 900 30px/1 "Doto", ui-monospace, monospace;
-  text-shadow: var(--glow);
+  padding: 0;
+  display: grid;
+  place-items: center;
   cursor: pointer;
   z-index: 1;
+}
+/* Drawn rather than typed, so they sit in the middle of the circle whatever the font. */
+.arrow svg {
+  width: 55%;
+  height: 55%;
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 3px rgba(255, 140, 30, 0.6));
 }
 .arrow:hover { background: rgba(28, 16, 8, 0.95); border-color: var(--amber); }
 .arrow.prev { left: 10px; }
@@ -247,8 +271,9 @@ code, .kbd {
   display: grid;
   grid-template-columns: 2.4em minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 4px 16px;
+  gap: 0 16px;
   padding: 8px 0;
+  line-height: 1.25;
   border-bottom: 1px dashed #2a160a;
 }
 .board li:last-child { border-bottom: none; }
@@ -264,17 +289,26 @@ code, .kbd {
 .board .rank { color: var(--amber-dim); text-shadow: none; }
 .board .tag { font-size: 15px; color: var(--amber-dim); text-shadow: none; margin-left: 6px; }
 .board .score { text-align: right; font-variant-numeric: tabular-nums; }
-.board .meta { grid-column: 2 / 4; font-size: 13px; color: var(--muted); }
+.board .meta {
+  grid-column: 2 / 4;
+  font-family: "Doto", ui-monospace, monospace;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--amber-dim);
+}
+.board .meta span { white-space: nowrap; }
 .board .replay {
   margin-left: 10px;
-  font-size: 12px;
-  color: var(--muted);
-  border: 1px solid var(--line);
+  color: var(--amber-dim);
+  border: 1px solid #3a210d;
   border-radius: 4px;
-  padding: 2px 7px;
+  padding: 1px 7px 0;
   text-decoration: none;
+  white-space: nowrap;
 }
-.board .replay:hover { color: var(--amber); border-color: var(--amber-dim); }
+.board .replay:hover { color: var(--amber); border-color: var(--amber-dim); text-shadow: var(--glow); }
 
 .board-empty { font-size: 26px; text-align: center; margin: 28px 0; }
 
@@ -282,7 +316,7 @@ code, .kbd {
 
 @media (max-width: 560px) {
   body { font-size: 16px; }
-  .arrow { width: 34px; height: 34px; font-size: 22px; }
+  .arrow { width: 34px; height: 34px; }
   .arrow.prev { left: 6px; }
   .arrow.next { right: 6px; }
   .lead { font-size: 19px; }

@@ -23,6 +23,19 @@ const el = (tag, props = {}, ...children) => {
 
 if (reducedMotion) $("bg-video").pause();
 
+// Left alone for a while, the page steps back and lets the game play through; anything done
+// brings it forward again.
+const IDLE_MS = 15000;
+let idleTimer = 0;
+function wake() {
+  document.body.classList.remove("idle");
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add("idle"), IDLE_MS);
+}
+for (const event of ["pointermove", "pointerdown", "keydown", "wheel", "scroll", "touchstart"])
+  addEventListener(event, wake, { passive: true });
+wake();
+
 // ---- downloads --------------------------------------------------------------------------
 
 // The newest release, pre-releases included (GitHub's "latest" leaves those out).
@@ -108,8 +121,10 @@ function row(table, s) {
     el("span", { className: "rank" }, String(s.rank)),
     el("span", { className: "who" }, s.initials, el("span", { className: "tag" }, s.tag)),
     el("span", { className: "score" }, Number(s.score).toLocaleString("en-US")),
-    // The date's hyphens are ones a line cannot break at.
-    el("span", { className: "meta" }, `${s.balls} balls · ${s.angle} angle · ${day(s.at).replace(/-/g, "‑")}`,
+    // Each part kept whole on a line; the line breaks between them, if it must.
+    el("span", { className: "meta" },
+      el("span", {}, `${s.balls} balls`), " · ", el("span", {}, `${s.angle} angle`), " · ",
+      el("span", {}, day(s.at)),
       el("a", { className: "replay", href: `/v1/runs/${s.run}/replay`, download: name, title: "Download the recording" }, "RPL")),
   );
 }
