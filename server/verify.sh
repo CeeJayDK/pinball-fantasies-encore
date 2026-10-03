@@ -3,7 +3,7 @@
 # with encore-play --verify against the game's own files, and reports what it found. The
 # GitHub Actions job runs this every few minutes; it can as well be run by hand.
 #
-#   ENCORE_API       the Worker, e.g. https://pinball-fantasies-encore.<you>.workers.dev
+#   ENCORE_API       the Worker, e.g. https://thebestpinball.com
 #   VERIFIER_TOKEN   the Worker's secret of the same name
 #   ENCORE_PLAY      the encore-play program, built from the same version as the game
 #   GAME_DIR         the folder with the game's TABLE1.PRG ... TABLE4.MOD; without it they

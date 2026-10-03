@@ -3,7 +3,7 @@
 # them: on the server, readable only with the verifier's token. Run it once, from a machine
 # that has the game.
 #
-#   ENCORE_API       the Worker, e.g. https://pinball-fantasies-encore.<you>.workers.dev
+#   ENCORE_API       the Worker, e.g. https://thebestpinball.com
 #   VERIFIER_TOKEN   the Worker's secret of the same name
 #   upload-game-files.sh <the game's folder>
 set -euo pipefail

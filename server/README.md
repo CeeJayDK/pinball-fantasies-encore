@@ -36,12 +36,15 @@ npx wrangler deploy
 
 For `VERIFIER_TOKEN`, paste a long random secret, for example the output of
 `openssl rand -hex 32`. Keep it: the checking job needs the same one. `deploy` prints the
-Worker's address, `https://pinball-fantasies-encore.<your subdomain>.workers.dev`.
+Worker's address, `https://pinball-fantasies-encore.<your subdomain>.workers.dev`, and the
+project's own, `https://thebestpinball.com` (the `routes` in `wrangler.toml`: take them out,
+or put your own domain there, if you set up a server of your own). Either reaches it; the
+examples below use the project's.
 
 Then put the game's table files on the server, from a machine that has the game:
 
 ```bash
-ENCORE_API=https://pinball-fantasies-encore.<your subdomain>.workers.dev VERIFIER_TOKEN=<the secret> \
+ENCORE_API=https://thebestpinball.com VERIFIER_TOKEN=<the secret> \
   ./upload-game-files.sh <the game's folder>
 ```
 
@@ -91,7 +94,7 @@ repository **secret** `PUBLISH_TOKEN`, beside the `ENCORE_API` variable. To publ
 own machine instead, from the repository root:
 
 ```bash
-ENCORE_API=https://pinball-fantasies-encore.<your subdomain>.workers.dev PUBLISH_TOKEN=<the secret> \
+ENCORE_API=https://thebestpinball.com PUBLISH_TOKEN=<the secret> \
   server/publish-art.sh
 ```
 

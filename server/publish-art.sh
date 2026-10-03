@@ -4,7 +4,7 @@
 # published as the next version. Going back is running it on the older pictures (from an
 # older checkout): they are all still there, so only the set is written.
 #
-#   ENCORE_API      the Worker, e.g. https://pinball-fantasies-encore.<you>.workers.dev
+#   ENCORE_API      the Worker, e.g. https://thebestpinball.com
 #   PUBLISH_TOKEN   the Worker's secret of the same name
 #   ART_FORMAT      optional, 1 if not given: what a game must understand to use these
 #                   pictures (kArtFormat in src/game/Art.h); older games keep the set they have

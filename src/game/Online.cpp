@@ -16,7 +16,7 @@ namespace pfr {
 
 std::string onlineApi() {
   if (const char* a = std::getenv("ENCORE_API")) return a;
-  return "https://pinball-fantasies-encore.pedrocatalao-9f8.workers.dev";
+  return "https://thebestpinball.com";
 }
 
 namespace {
