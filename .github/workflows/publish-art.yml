@@ -1,0 +1,37 @@
+name: Publish HD art
+
+# Puts the HD pictures in assets/hd on the server, as the set every game is offered
+# (server/README.md): whenever they change on main, or by hand from the Actions tab. Only the
+# pictures the server does not have are uploaded, and the same pictures again publish nothing.
+on:
+  push:
+    branches: [main]
+    paths: ["assets/hd/**"]
+  workflow_dispatch:
+    inputs:
+      format:
+        description: "Art format (kArtFormat in src/game/Art.h); raise it only for pictures that need a newer game"
+        required: false
+        default: "1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-art
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Forks have neither the server nor its secret.
+    if: github.repository == 'pedrocatalao/pinball-fantasies-encore'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Publish
+        env:
+          ENCORE_API: ${{ vars.ENCORE_API }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+          ART_FORMAT: ${{ github.event.inputs.format || '1' }}
+        run: server/publish-art.sh

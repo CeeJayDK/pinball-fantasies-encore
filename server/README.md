@@ -85,7 +85,10 @@ npx wrangler secret put PUBLISH_TOKEN
 npx wrangler deploy
 ```
 
-Then, from the repository root, whenever `assets/hd` has changed:
+A GitHub Actions job (`.github/workflows/publish-art.yml`) publishes them whenever `assets/hd`
+changes on the default branch, or by hand from the Actions tab; it needs the same token as a
+repository **secret** `PUBLISH_TOKEN`, beside the `ENCORE_API` variable. To publish from your
+own machine instead, from the repository root:
 
 ```bash
 ENCORE_API=https://pinball-fantasies-encore.<your subdomain>.workers.dev PUBLISH_TOKEN=<the secret> \
