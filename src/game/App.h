@@ -3,11 +3,14 @@
 // screen or a table, both at the original's 60 frames a second.
 #include <cstdio>
 #include <filesystem>
+#include <future>
+#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <vector>
 
 #include "data/GameFiles.h"
+#include "game/Art.h"
 #include "game/Config.h"
 #include "game/Online.h"
 #include "gfx/Framebuffer.h"
@@ -33,7 +36,7 @@ struct AppOptions {
   std::optional<bool> crt;               ///< overrides the saved CRT look
   std::optional<bool> hd;                ///< overrides the saved choice of replacement pictures
   std::optional<bool> trail;             ///< overrides the saved choice of the ball's trail
-  std::optional<std::filesystem::path> hdDir;  ///< where replacement pictures are read from
+  std::optional<std::filesystem::path> hdDir;  ///< where replacement pictures are read from, instead of the fetched set
   int windowScale = 3;
   bool stats = false;                    ///< log how long each frame takes
   std::optional<std::filesystem::path> screenshot;  ///< render one frame, save it, quit
@@ -45,8 +48,9 @@ struct AppOptions {
 };
 
 /// The letters the screens before the game are written with. They are the intro's own,
-/// kept as a picture in assets/hd (font.png, 20 cells of 32 x 14 per row) so that they can
-/// be read before any file of the original game is, or even found.
+/// kept as a picture beside the application (font.png, from assets/hd, 20 cells of 32 x 14 per
+/// row) so that they can be read before any file of the original game is, or even found, and
+/// before any HD picture is fetched.
 struct AskFont {
   int width = 0, height = 0;
   Bytes index;              ///< one colour slot per pixel
@@ -64,7 +68,9 @@ class App {
   void playSilently(Player& player);
   void render(double now);
   bool askToDownload();
-  void drawWaiting(double seconds, std::string_view line);
+  bool askYesNo(std::initializer_list<std::string_view> lines);
+  void drawWaiting(double seconds, std::string_view line, std::string_view detail = {});
+  bool offerArt();
   void openIntro(int returningFrom);
   void openTable(int index, const Replay* recording = nullptr);
   bool openReplay(const std::filesystem::path& path);
@@ -84,6 +90,8 @@ class App {
 
   AppOptions options_;
   std::filesystem::path shaderDir_, saveDir_;
+  std::filesystem::path artDir_;  ///< the fetched HD pictures in use, or empty for none
+  std::future<std::optional<ArtSet>> artCheck_;  ///< the server's current set, being asked for
   GameFiles files_;
   Config config_;
   Window window_;

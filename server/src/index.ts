@@ -12,6 +12,11 @@
 //   GET  /v1/runs/<id>                             a game, and its rank once verified
 //   GET  /v1/runs/<id>/replay                      a verified game's recording
 //   GET  /v1/fantasy                               where the game fetches its first-start archive
+//   GET  /v1/art                                   the current set of HD pictures, as text (below)
+//   GET  /v1/art/<sha256>.png                      one of its pictures, by its contents
+//   HEAD /v1/art/<sha256>.png                      whether a picture is here already
+//   PUT  /v1/publish/art/<sha256>  <picture>       keep a picture              (publisher token)
+//   PUT  /v1/publish/art  <manifest JSON>          make a set the current one  (publisher token)
 //   GET  /v1/verifier/pending                      games waiting to be checked  (verifier token)
 //   GET  /v1/verifier/runs/<id>/replay             any game's recording         (verifier token)
 //   POST /v1/verifier/runs/<id>  <verdict JSON>    what the verifier found      (verifier token)
@@ -24,6 +29,19 @@
 // knows it by its tag, five hexadecimal digits given out the first time it sends a game. A
 // score shows the initials typed for it, which anyone may type, and the tag: "RDX (4e87a)".
 // The verifier's token is a Worker secret, VERIFIER_TOKEN.
+//
+// The HD pictures are not part of a release: they live in an R2 bucket, each under the SHA-256
+// of its contents, so a picture is uploaded once and every set that has it shares it. A set is
+// a manifest naming its pictures; publishing one gives it the next version number and makes it
+// the current one, and the game asks for that. Going back is publishing the older pictures
+// again, which only writes a manifest. The publisher's token is a Worker secret, PUBLISH_TOKEN.
+// A set has a format, which a game must understand to use it: it goes up only when pictures
+// need code a game does not have (a new kind of picture, say), and older games keep theirs.
+// The game reads the set as text, a line for each picture after two of its own:
+//
+//   version 7
+//   format 1
+//   <sha256> <size> <name> <url>
 
 export interface Env {
   DB: D1Database;
@@ -31,6 +49,9 @@ export interface Env {
   /** Where the game fetches the archive it offers on its first start (wrangler.toml [vars]), so
    *  that a new address needs a deploy here and not a release of the game. */
   FANTASY_URL: string;
+  /** The HD pictures and their manifests (wrangler.toml [[r2_buckets]]). */
+  ART: R2Bucket;
+  PUBLISH_TOKEN: string;
 }
 
 /** Recording formats a verifier can play (Replay::kFormat in the game). */
@@ -323,6 +344,103 @@ async function putFile(env: Env, req: Request, name: string): Promise<Response> 
   return json({ name, sha256: hash, size: data.length });
 }
 
+// ---- the HD pictures ------------------------------------------------------------------------
+
+/** As the game names its pictures (HdPicture, the flippers, the ball): playfield1_on.png. */
+const ART_NAME = /^[a-z0-9_]{1,64}\.png$/;
+const SHA256 = /^[0-9a-f]{64}$/;
+const MAX_PICTURE = 32 * 1024 * 1024;
+
+interface ArtFile {
+  name: string;
+  size: number;
+  sha256: string;
+}
+interface ArtSet {
+  version: number;
+  format: number;
+  publishedAt: number;
+  files: ArtFile[];
+}
+
+const pictureKey = (hash: string) => `pictures/${hash}`;
+
+/** The current set, with where each picture is fetched from; nothing yet is a 404. */
+async function currentArt(env: Env, url: URL): Promise<Response> {
+  const current = await env.ART.get("current.json");
+  if (!current) return fail(404, "no pictures published yet");
+  const set = await current.json<ArtSet>();
+  const lines = [`version ${set.version}`, `format ${set.format}`];
+  for (const f of set.files) lines.push(`${f.sha256} ${f.size} ${f.name} ${url.origin}/v1/art/${f.sha256}.png`);
+  return new Response(lines.join("\n") + "\n", {
+    headers: { "Content-Type": "text/plain", "Cache-Control": "no-store", ...CORS },
+  });
+}
+
+/** A picture never changes under its name, so it may be kept anywhere for as long as wanted. */
+async function picture(env: Env, hash: string, head: boolean): Promise<Response> {
+  const headers = { "Content-Type": "image/png", "Cache-Control": "public, max-age=31536000, immutable", ...CORS };
+  if (head) {
+    const found = await env.ART.head(pictureKey(hash));
+    return found ? new Response(null, { headers: { ...headers, "Content-Length": String(found.size) } }) : fail(404, "no such picture");
+  }
+  const found = await env.ART.get(pictureKey(hash));
+  return found ? new Response(found.body, { headers }) : fail(404, "no such picture");
+}
+
+function isPublisher(env: Env, req: Request): boolean {
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer /, "");
+  return !!env.PUBLISH_TOKEN && sameSecret(token, env.PUBLISH_TOKEN);
+}
+
+/** A picture is kept under what it is, so one sent under another hash is turned away. */
+async function putPicture(env: Env, req: Request, hash: string): Promise<Response> {
+  const data = new Uint8Array(await req.arrayBuffer());
+  if (data.length === 0 || data.length > MAX_PICTURE) return fail(413, "empty, or too big");
+  if ((await sha256(data)) !== hash) return fail(400, "the picture is not what its name says");
+  if (!(data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47)) return fail(400, "not a PNG");
+  await env.ART.put(pictureKey(hash), data, { httpMetadata: { contentType: "image/png" } });
+  return json({ sha256: hash, size: data.length });
+}
+
+/** A new set, from { format?, files: [{ name, size, sha256 }] }: every picture in it must be
+ *  here already. It becomes the next version and the current one. */
+async function publishArt(env: Env, req: Request): Promise<Response> {
+  let body: { format?: unknown; files?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return fail(400, "not JSON");
+  }
+  const format = body.format ?? 1;
+  if (typeof format !== "number" || !Number.isInteger(format) || format < 1) return fail(400, "format must be 1 or more");
+  if (!Array.isArray(body.files) || body.files.length === 0 || body.files.length > 256) return fail(400, "no files, or too many");
+  const files: ArtFile[] = [];
+  const names = new Set<string>();
+  for (const f of body.files as Partial<ArtFile>[]) {
+    if (typeof f.name !== "string" || !ART_NAME.test(f.name) || names.has(f.name)) return fail(400, `bad or repeated name: ${f.name}`);
+    if (typeof f.sha256 !== "string" || !SHA256.test(f.sha256)) return fail(400, `bad hash for ${f.name}`);
+    const found = await env.ART.head(pictureKey(f.sha256));
+    if (!found) return fail(409, `${f.name} has not been uploaded`);
+    names.add(f.name);
+    files.push({ name: f.name, size: found.size, sha256: f.sha256 });
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  const bytes = files.reduce((n, f) => n + f.size, 0);
+  // The same pictures again are not news: no new version, so no game is asked to fetch them.
+  const previousObject = await env.ART.get("current.json");
+  const previous = previousObject ? await previousObject.json<ArtSet>() : null;
+  const same = (a: ArtFile[], b: ArtFile[]) => a.length === b.length && a.every((f, i) => f.name === b[i].name && f.sha256 === b[i].sha256);
+  if (previous && previous.format === format && same(previous.files, files))
+    return json({ version: previous.version, files: files.length, bytes, unchanged: true });
+  const version = previous ? previous.version + 1 : 1;
+  const set: ArtSet = { version, format, publishedAt: now(), files };
+  const text = JSON.stringify(set);
+  await env.ART.put(`sets/${version}.json`, text, { httpMetadata: { contentType: "application/json" } });
+  await env.ART.put("current.json", text, { httpMetadata: { contentType: "application/json" } });
+  return json({ version, files: files.length, bytes });
+}
+
 // ---- routing -------------------------------------------------------------------------------
 
 export default {
@@ -338,6 +456,14 @@ export default {
         return env.FANTASY_URL
           ? new Response(env.FANTASY_URL, { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store", ...CORS } })
           : fail(404, "nothing to fetch");
+      if (get && path === "/v1/art") return await currentArt(env, url);
+      if ((get || req.method === "HEAD") && (m = /^\/v1\/art\/([0-9a-f]{64})\.png$/.exec(path)))
+        return await picture(env, m[1], req.method === "HEAD");
+      if (path.startsWith("/v1/publish/")) {
+        if (!isPublisher(env, req)) return fail(401, "publisher only");
+        if (req.method === "PUT" && (m = /^\/v1\/publish\/art\/([0-9a-f]{64})$/.exec(path))) return await putPicture(env, req, m[1]);
+        if (req.method === "PUT" && path === "/v1/publish/art") return await publishArt(env, req);
+      }
       if (get && (m = /^\/v1\/players\/([^/]+)$/.exec(path))) return await playerPage(env, decodeURIComponent(m[1]));
       if (post && path === "/v1/runs") return await sendRun(env, req);
       if (get && (m = /^\/v1\/runs\/(\d+)$/.exec(path))) return await getRun(env, Number(m[1]));

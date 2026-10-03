@@ -30,7 +30,7 @@ void usage() {
             "  --no-crt         the original crisp pixels\n"
             "  --hd, --no-hd    high-resolution pictures in the intro and menu, or the originals (F10); remembered\n"
             "  --trail, --no-trail  the fading ghosts behind the ball (F8 while paused); remembered\n"
-            "  --hd-dir <dir>   pictures to use instead of the application's own (default: hd/ in the preferences folder)\n"
+            "  --hd-dir <dir>   HD pictures to use instead of the ones fetched from the server (assets/hd, say)\n"
             "  --res <mode>     screen mode: normal (320x240), high (320x350) or full (whole table)\n"
             "  --scale <n>      window scale factor (default 3)\n"
             "  --screenshot <f> render a frame to a PNG file and quit\n"

@@ -15,6 +15,11 @@ database_name = "encore-scores"
 database_id = "39690902-9678-465c-a52c-e1dcf9e6e496"
 migrations_dir = "migrations"
 
+# The HD pictures and their manifests: `npx wrangler r2 bucket create encore-art`.
+[[r2_buckets]]
+binding = "ART"
+bucket_name = "encore-art"
+
 # The project's page (../site), served as it is; what is not a file there comes to the Worker.
 [assets]
 directory = "../site"
