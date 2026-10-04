@@ -78,8 +78,17 @@ int main(int argc, char** argv) {
     }
     encore::Physics::Controls controls;
     int same = 0;
+    // ENCORE_FLIP=<seed>: both are given the same flipper keys, pressed and let go at random.
+    unsigned rng = 0;
+    const bool flip = std::getenv("ENCORE_FLIP") != nullptr;
+    if (flip) rng = static_cast<unsigned>(std::atoi(std::getenv("ENCORE_FLIP"))) * 2654435761u + 1;
+    auto random = [&] { rng = rng * 1664525u + 1013904223u; return rng >> 16; };
     for (int i = 0; i < frames; ++i, ++same) {
       frameNow = i;
+      if (flip && i > 60) {
+        if (random() % 23 == 0) { controls.leftFlipper = !controls.leftFlipper; m.key(controls.leftFlipper ? 0x2a : 0xaa); }
+        if (random() % 23 == 0) { controls.rightFlipper = !controls.rightFlipper; m.key(controls.rightFlipper ? 0x36 : 0xb6); }
+      }
       m.frame();
       physics.clearContact();
       physics.frameStart(ball, controls);
