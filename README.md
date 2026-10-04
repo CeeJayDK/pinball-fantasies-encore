@@ -18,12 +18,12 @@ of the original is emulated, and nothing of it is included here.
 
 Unpack and run, no installation. The newest version, whichever it is:
 
-<table align="center"><tr>
-<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-macos-universal.zip"><b>macOS</b><br><sub>Universal</sub></a></td>
-<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-windows-x64.zip"><b>Windows</b><br><sub>x64</sub></a></td>
-<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-x86_64.tar.gz"><b>Linux</b><br><sub>x86_64</sub></a></td>
-<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-arm64.tar.gz"><b>Linux</b><br><sub>arm64</sub></a></td>
-</tr></table>
+<p align="center">
+<a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-macos-universal.zip"><img src="https://img.shields.io/badge/macOS-Universal-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=apple" alt="Download for macOS (Universal)"></a>
+<a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-windows-x64.zip"><img src="https://img.shields.io/badge/Windows-x64-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0yIDMuNWw4LjUtMS4ydjguM0gyek0xMS41IDIuMkwyMiAuOHY5LjhIMTEuNXpNMiAxMS42aDguNXY4LjNMMiAxOC43ek0xMS41IDExLjZIMjJ2OS43bC0xMC41LTEuNHoiLz48L3N2Zz4%3D" alt="Download for Windows (x64)"></a>
+<a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-x86_64.tar.gz"><img src="https://img.shields.io/badge/Linux-x86__64-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=linux" alt="Download for Linux (x86_64)"></a>
+<a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-arm64.tar.gz"><img src="https://img.shields.io/badge/Linux-arm64-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=linux" alt="Download for Linux (arm64)"></a>
+</p>
 
 **This build has been played on macOS only.** The Linux and Windows ones are built and tested
 by the machines that make them, nothing more: they compile, their tests pass, and no one has
