@@ -1,0 +1,97 @@
+#pragma once
+// The referee's machine (docs/own-engine.md): just enough of a PC for one of the game's table
+// programs to run as it did in 1994: memory, the video card, DOS's file and memory calls, the
+// launcher's services (int 65h) and the sound driver's (int 66h). The sound driver is the
+// game's own silent one, NOSOUND.SDR, done here by hand from its listing: it plays nothing and
+// calls the table back at fixed points of every video frame, which is the table's clock.
+#include <cstdio>
+#include <filesystem>
+#include <map>
+#include <string>
+#include <vector>
+
+#include "Cpu.h"
+#include "Vga.h"
+
+namespace oracle {
+
+class Machine : public Bus {
+ public:
+  /// The options as PINBALL.CFG holds them: balls (0 three, 1 five), angle, scrolling,
+  /// music off, resolution (0 normal, 1 high), mono.
+  struct Config {
+    u8 bytes[6] = {0, 0, 1, 0, 1, 0};
+  };
+
+  Machine(const std::filesystem::path& gameDir, int table, const Config& config);
+
+  /// One video frame: the keys given since the last one, the driver's callbacks in the order
+  /// of their scanlines, then the program's own loop for a while.
+  void frame();
+  /// A key goes down or up, as the keyboard says it: a scancode, with bit 7 set for up.
+  void key(u8 scancode) { keys_.push_back(scancode); }
+  bool exited() const { return exited_; }
+
+  u8 peek8(u16 seg, u16 off) const { return mem_[((u32{seg} << 4) + off) & 0xfffff]; }
+  u16 peek16(u16 seg, u16 off) const { return static_cast<u16>(peek8(seg, off) | (peek8(seg, static_cast<u16>(off + 1)) << 8)); }
+  /// A segment value of the program's as its listing has it (relative to where it is loaded).
+  u16 seg(u16 relative) const { return static_cast<u16>(base_ + relative); }
+
+  Cpu cpu{*this};
+  Vga vga;
+  bool log = false;            ///< every service call, to stderr
+  std::uint64_t loopBudget = 20000;  ///< instructions of the program's own loop per frame
+  u32 frames = 0;
+
+  // Bus
+  u8 read(u32 address) override;
+  void write(u32 address, u8 value) override;
+  u8 portIn(u16 port) override;
+  void portOut(u16 port, u8 value) override;
+  bool interrupt(u8 number) override;
+
+ private:
+  struct Callback {
+    u16 scanline = 0;
+    u8 priority = 0;
+    u16 seg = 0, off = 0;
+  };
+  void dos();
+  void driver();
+  void launcher();
+  void callBack(const Callback& c);
+  std::string string0(u16 seg, u16 off) const;
+  void setCarry(bool on) { cpu.setFlag(Cpu::CF, on); }
+
+  std::filesystem::path dir_;
+  int table_ = 0;
+  Config config_;
+  std::vector<u8> mem_;
+  u16 base_ = 0;       ///< the segment the program's image is loaded at
+  u16 nextFree_ = 0;   ///< for DOS's memory calls
+  bool exited_ = false;
+  std::vector<u8> keys_;
+  u8 keyPort_ = 0;
+
+  // files, by handle
+  struct File {
+    std::filesystem::path path;
+    std::vector<u8> data;
+    std::size_t at = 0;
+    bool written = false;
+  };
+  std::map<u16, File> files_;
+  u16 nextHandle_ = 5;
+
+  // the sound driver's state
+  bool callbacksOn_ = true;
+  bool haveFrameCallback_ = false;
+  Callback frameCallback_;
+  std::vector<Callback> lineCallbacks_;  ///< sorted by scanline
+  u16 musicSeg_ = 0, musicOff_ = 0;      ///< the callback given by function 0x13
+  u8 driverStatus_ = 0xff;               ///< what the next call returns in AL, once
+  u32 ticks_ = 0;
+  bool polling_ = false;
+};
+
+}  // namespace oracle

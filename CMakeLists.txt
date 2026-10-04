@@ -232,5 +232,9 @@ add_test(NAME engine COMMAND encore-engine-tests)
 add_executable(encore-trace tools/trace.cpp)
 target_link_libraries(encore-trace PRIVATE encore_core)
 
+# The referee: the game's own table programs, run in a small machine of ours (docs/own-engine.md).
+add_executable(encore-oracle tools/oracle/main.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
+target_link_libraries(encore-oracle PRIVATE encore_core)
+
 add_executable(encore-extract tools/extract.cpp)
 target_link_libraries(encore-extract PRIVATE encore_core)
