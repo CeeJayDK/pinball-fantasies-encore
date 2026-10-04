@@ -216,5 +216,8 @@ target_link_libraries(encore-assets PRIVATE encore_core)
 add_executable(encore-play tools/play.cpp)
 target_link_libraries(encore-play PRIVATE encore_core)
 
+add_executable(encore-trace tools/trace.cpp)
+target_link_libraries(encore-trace PRIVATE encore_core)
+
 add_executable(encore-extract tools/extract.cpp)
 target_link_libraries(encore-extract PRIVATE encore_core)
