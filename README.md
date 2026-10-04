@@ -159,3 +159,10 @@ fits pictures badly. [NOTICE.md](NOTICE.md) says which is which.
 
 *Pinball Fantasies* belongs to its respective owners and this project is not affiliated with
 them. No file of the original game is included here, or in anything built from it.
+
+## Thanks
+
+The engine stands on [Pinball Fantasies Reassembled](https://github.com/wanda-phi/pfr)
+(wanda-phi/pfr), a recreation of the DOS game's engine in Rust, worked out from the original
+code. Its table rules, scripts, physics and file formats were translated from it into this
+one.
