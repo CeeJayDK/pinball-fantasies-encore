@@ -1,37 +1,37 @@
 // encore-oracle-physics: our ball physics against the original's, frame by frame.
 //
-// The referee plays Party Land: starts a game, pulls the plunger for `pull` frames and lets go.
+// The referee plays a table: starts a game, pulls the plunger for `pull` frames and lets go.
 // At the frame of the launch our physics is given the ball as the original has it; from then
 // on each runs by itself and the two balls are compared after every frame, until they part,
 // the ball is lost, or something happens that only the table's rules know about.
 //
-//   encore-oracle-physics <game folder> [pull frames] [frames]
+//   encore-oracle-physics <game folder> <table 1-4> [pull frames] [frames] [bounces]
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 #include "Machine.h"
+#include "Symbols.h"
 #include "engine/data/Bumpers.h"
 #include "engine/data/TableData.h"
 #include "engine/sim/Physics.h"
 
-namespace {
-// Party Land's variables, in its data segment (re/fantasy/TABLE1_segments.txt).
-constexpr oracle::u16 kData = 0x19b5;
-constexpr oracle::u16 kSpin = 0x2ede, kX = 0x2ee0, kY = 0x2ee2, kXFixed = 0x2ee4, kYFixed = 0x2ee8, kVx = 0x2eec, kVy = 0x2eee,
-                      kLayer = 0x331a, kHidden = 0x2f2a;
-}  // namespace
-
 int main(int argc, char** argv) {
-  if (argc < 2) {
-    std::puts("usage: encore-oracle-physics <game folder> [pull frames] [frames]");
+  if (argc < 3) {
+    std::puts("usage: encore-oracle-physics <game folder> <table 1-4> [pull frames] [frames] [bounces]");
     return 2;
   }
   const std::filesystem::path dir = argv[1];
-  const int pull = argc > 2 ? std::atoi(argv[2]) : 100;
-  const int frames = argc > 3 ? std::atoi(argv[3]) : 2000;
+  const int tableIndex = std::atoi(argv[2]) - 1;
+  if (tableIndex < 0 || tableIndex > 3) return 2;
+  const oracle::Symbols& sym = oracle::kSymbols[tableIndex];
+  const oracle::u16 kSpin = sym.spin, kX = sym.x, kY = sym.y, kXFixed = sym.xFixed, kYFixed = sym.yFixed, kVx = sym.vx, kVy = sym.vy,
+                    kLayer = sym.layer, kHidden = sym.hidden;
+  const int pull = argc > 3 ? std::atoi(argv[3]) : 100;
+  const int frames = argc > 4 ? std::atoi(argv[4]) : 2000;
   try {
-    oracle::Machine m(dir, 0, {});
-    const oracle::u16 ds = m.seg(kData);
+    oracle::Machine m(dir, tableIndex, {});
+    const oracle::u16 ds = m.seg(sym.data);
     auto w = [&](oracle::u16 off) { return static_cast<oracle::i16>(m.peek16(ds, off)); };
     auto d = [&](oracle::u16 off) { return static_cast<oracle::i32>(m.peek16(ds, off) | (oracle::u32{m.peek16(ds, static_cast<oracle::u16>(off + 2))} << 16)); };
 
@@ -47,10 +47,10 @@ int main(int argc, char** argv) {
     int f = up + 2;
     for (; f < up + 200 && w(kVy) >= 0; ++f) m.frame();
 
-    const encore::TableData table = encore::TableData::load(dir / "TABLE1.PRG", 0);
+    const encore::TableData table = encore::TableData::load(dir / ("TABLE" + std::to_string(tableIndex + 1) + ".PRG"), tableIndex);
     encore::Physics physics;
     physics.init(table, true);
-    const auto bumpers = encore::extractBumpers(table.dataSegment, 0);
+    const auto bumpers = encore::extractBumpers(table.dataSegment, tableIndex);
     physics.setBumpers(&bumpers);
     encore::Ball ball;
     ball.xFixed = d(kXFixed);
@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 
     // With a third argument of "bounces", every bounce of both is printed.
     int frameNow = 0;
-    if (argc > 4) {
+    if (argc > 5 && tableIndex == 0) {
       m.cpu.watch[(oracle::u32{m.seg(0x10)} << 16) | 0x8e95] = [&] {
         std::printf("  %4d original bounce at (%d,%d) speed (%d,%d) angle %03x probes %d material %d flipper (%d,%d)\n", frameNow, w(kX), w(kY),
                     w(kVx), w(kVy), m.peek16(ds, 0x6890), m.peek8(ds, 0x6892), m.peek8(ds, 0x2edc), w(0x6894), w(0x6896));
