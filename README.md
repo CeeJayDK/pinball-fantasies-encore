@@ -25,9 +25,8 @@ Unpack and run, no installation. The newest version, whichever it is:
 <a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-arm64.tar.gz"><img src="https://img.shields.io/badge/Linux-arm64-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=linux" alt="Download for Linux (arm64)"></a>
 </p>
 
-**This build has been played on macOS only.** The Linux and Windows ones are built and tested
-by the machines that make them, nothing more: they compile, their tests pass, and no one has
-yet sat down in front of them. If something is wrong there, that is the news I am after.
+Played on macOS, Windows and Linux. If something is wrong on yours, an
+[issue](https://github.com/pedrocatalao/pinball-fantasies-encore/issues) is the news I am after.
 
 On macOS the application is not signed, so the system refuses it the first time — see
 [a downloaded build on macOS](#a-downloaded-build-on-macos) below. On Linux, `./install.sh`
