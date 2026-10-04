@@ -553,15 +553,29 @@ void App::saveRecording() {
   }
 }
 
+/// What belongs to the window rather than to the game, on every screen, the questions before the
+/// game included: fullscreen on F11 (and Command+F on a Mac, as Windows keeps Windows+F for
+/// itself), and fullscreen remembered for next time however it came about -- the key, or the
+/// system's own button on the title bar. True when the event was one of these.
+bool App::windowEvent(const SDL_Event& e) {
+  if (e.type == SDL_EVENT_KEY_DOWN && !e.key.repeat &&
+      (e.key.key == SDLK_F11 || (e.key.key == SDLK_F && (e.key.mod & SDL_KMOD_GUI)))) {
+    window_.setFullscreen(!window_.fullscreen());
+    return true;
+  }
+  if (e.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || e.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) {
+    const bool on = e.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN;
+    if (window_.fullscreen() != on) window_.setFullscreen(on);
+    const char c = on ? '1' : '0';
+    file::writeAll(saveDir_ / "fullscreen.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
+    return true;
+  }
+  return false;
+}
+
 void App::handleKey(const SDL_Event& e) {
   if (e.type != SDL_EVENT_KEY_DOWN && e.type != SDL_EVENT_KEY_UP) return;
   if (e.key.repeat) return;
-  // F11 everywhere; Command+F too on a Mac (Windows keeps Windows+F for itself).
-  if (e.type == SDL_EVENT_KEY_DOWN &&
-      (e.key.key == SDLK_F11 || (e.key.key == SDLK_F && (e.key.mod & SDL_KMOD_GUI)))) {
-    window_.setFullscreen(!window_.fullscreen());
-    return;
-  }
   if (e.type == SDL_EVENT_KEY_DOWN && e.key.key == SDLK_F9) {
     setCrt(!renderer_.crt());
     return;
@@ -676,7 +690,7 @@ bool App::askYesNo(std::span<const std::string_view> lines) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_EVENT_QUIT) return false;
-      if (event.type != SDL_EVENT_KEY_DOWN) continue;
+      if (windowEvent(event) || event.type != SDL_EVENT_KEY_DOWN) continue;
       switch (event.key.key) {
         case SDLK_LEFT: case SDLK_RIGHT: case SDLK_UP: case SDLK_DOWN: case SDLK_TAB: yes = !yes; break;
         case SDLK_Y: return true;
@@ -778,8 +792,10 @@ bool App::offerArt() {
       return true;
     }
     SDL_Event event;
-    while (SDL_PollEvent(&event))
+    while (SDL_PollEvent(&event)) {
       if (event.type == SDL_EVENT_QUIT) return false;
+      windowEvent(event);
+    }
     if (waited > 0.3) drawWaiting(waited, "LOOKING FOR HD GFX ART");
   }
   const auto set = artCheck_.get();
@@ -830,6 +846,7 @@ bool App::offerArt() {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_EVENT_QUIT) closed = true;
+      if (windowEvent(event)) continue;
       if (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) progress.cancel = true;
       if (closed) progress.cancel = true;
     }
@@ -934,16 +951,9 @@ int App::run() {
       SDL_Event e;
       while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_QUIT) running_ = false;
+        if (windowEvent(e)) continue;
         // Nothing in the game is played with the mouse, so the pointer keeps out of the way
         // while it is over the window, and comes back when it leaves or the window does.
-        // However it came about -- the key, or the system's own button on the title bar -- the
-        // window's state is the one kept for next time, and the one the key switches from.
-        if (e.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN || e.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) {
-          const bool on = e.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN;
-          if (window_.fullscreen() != on) window_.setFullscreen(on);
-          const char c = on ? '1' : '0';
-          file::writeAll(saveDir_ / "fullscreen.txt", ByteView(reinterpret_cast<const u8*>(&c), 1));
-        }
         if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_WINDOW_FOCUS_GAINED) SDL_HideCursor();
         if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) SDL_ShowCursor();
         if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) openReplay(e.drop.data);

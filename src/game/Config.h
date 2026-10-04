@@ -19,7 +19,7 @@ enum class Angle : u8 { Low, High, Higher };
 inline Angle nextAngle(Angle a) { return a == Angle::High ? Angle::Higher : a == Angle::Higher ? Angle::Low : Angle::High; }
 
 struct Options {
-  u8 balls = 3;
+  u8 balls = 5;  // the original's setup says 3; five is the game most people want
   Angle angle = Angle::High;
   ScrollSpeed scrollSpeed = ScrollSpeed::Medium;
   Resolution resolution = Resolution::Normal;

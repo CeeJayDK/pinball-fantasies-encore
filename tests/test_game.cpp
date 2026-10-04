@@ -39,7 +39,14 @@ struct Outcome {
   Bcd best;
   int triggers = 0;
 };
-Outcome play(int table, int frames, u64 seed, Replay* recording = nullptr, const Config& config = Config::defaults(),
+// The games played here are of three balls, the original's setting, short enough to end within
+// the frames given; the game itself starts with five.
+Config threeBalls() {
+  Config c = Config::defaults();
+  c.options.balls = 3;
+  return c;
+}
+Outcome play(int table, int frames, u64 seed, Replay* recording = nullptr, const Config& config = threeBalls(),
              const std::function<void(Table&)>& each = {}) {
   Table t(read("TABLE" + std::to_string(table + 1) + ".PRG"), read("TABLE" + std::to_string(table + 1) + ".MOD"),
           config, table, seed);

@@ -83,6 +83,7 @@ class App {
   void endClip();
   void newGame();
   void saveRecording();
+  bool windowEvent(const SDL_Event& e);
   void handleKey(const SDL_Event& e);
   void resizeFrame(int width, int height, double pixelAspect);
   void setCrt(bool on);
