@@ -49,9 +49,14 @@ class Physics {
 
   void init(const TableData& table, bool highResolution);
 
-  /// Once per video frame, before the sub-steps: picks the gravity zone and decays the tilt.
-  void beginFrame(Ball& ball);
-  /// One physics sub-step. There are three per frame in high resolution, four otherwise.
+  /// A video frame, in the two parts the original runs it in (TABLE1 cs:0x41c6 and cs:0x55db,
+  /// its callbacks at the start of the frame and part way down it). The first is two
+  /// sub-steps (cs:0x87db), then the tilt's decay, the gravity under the ball (cs:0x59d9) and
+  /// the change of layer (cs:0x5d24), in that order; the table's rules run after it. The
+  /// second is one more sub-step in high resolution and two otherwise.
+  void frameStart(Ball& ball, const Controls& controls);
+  void frameEnd(Ball& ball, const Controls& controls);
+  /// One physics sub-step.
   void subStep(Ball& ball, const Controls& controls);
 
   int subStepsPerFrame() const { return highResolution_ ? 3 : 4; }

@@ -236,5 +236,9 @@ target_link_libraries(encore-trace PRIVATE encore_core)
 add_executable(encore-oracle tools/oracle/main.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
 target_link_libraries(encore-oracle PRIVATE encore_core)
 
+add_executable(encore-oracle-physics tools/oracle/physics.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
+target_include_directories(encore-oracle-physics PRIVATE tools/oracle)
+target_link_libraries(encore-oracle-physics PRIVATE encore_engine)
+
 add_executable(encore-extract tools/extract.cpp)
 target_link_libraries(encore-extract PRIVATE encore_core)

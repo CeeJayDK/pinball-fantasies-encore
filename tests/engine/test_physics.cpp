@@ -115,18 +115,19 @@ TEST(physics_free_fall_accumulates_gravity_each_substep) {
     }
   CHECK(found);
   if (!found) return;
-  const i32 startFixed = b.yFixed;
   b.active = true;
   Physics::Controls c;
-  p.beginFrame(b);
+  p.frameStart(b, c);   // ends by picking the gravity under the ball
+  const i32 startFixed = b.yFixed;
+  const int startSpeed = b.vy;
   p.subStep(b, c);
-  const int gravityPerStep = b.vy;   // the zone's downward pull, one sub-step's worth
+  const int gravityPerStep = b.vy - startSpeed;   // the zone's downward pull, one sub-step's worth
   CHECK(gravityPerStep >= 8 && gravityPerStep <= 16);
   for (int i = 1; i < 10; ++i) p.subStep(b, c);
-  CHECK_EQ(b.vy, gravityPerStep * 10);
+  CHECK_EQ(b.vy - startSpeed, gravityPerStep * 10);
   // Position is advanced before gravity is added, so ten sub-steps move the ball
-  // 0+g+2g+...+9g = 45g sub-pixel units, well under a whole pixel.
-  CHECK_EQ(b.yFixed - startFixed, 45 * gravityPerStep);
+  // 0+g+2g+...+9g = 45g sub-pixel units beyond what its speed alone would, well under a pixel.
+  CHECK_EQ(b.yFixed - startFixed, 10 * startSpeed + 45 * gravityPerStep);
 }
 
 TEST(physics_ball_bounces_off_the_playfield_walls) {
@@ -141,12 +142,10 @@ TEST(physics_ball_bounces_off_the_playfield_walls) {
   Physics::Controls c;
   bool bounced = false;
   for (int frame = 0; frame < 400 && !bounced && !b.lost; ++frame) {
-    p.beginFrame(b);
-    for (int s = 0; s < p.subStepsPerFrame(); ++s) {
-      const i16 before = b.vy;
-      p.subStep(b, c);
-      if (before > 0 && b.vy < 0) bounced = true;   // reversed direction: a real bounce
-    }
+    const i16 before = b.vy;
+    p.frameStart(b, c);
+    p.frameEnd(b, c);
+    if (before > 0 && b.vy < 0) bounced = true;   // reversed direction: a real bounce
   }
   CHECK(bounced);
 }

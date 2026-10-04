@@ -191,10 +191,17 @@ void Physics::updateLayer(Ball& ball) const {
   }
 }
 
-void Physics::beginFrame(Ball& ball) {
+void Physics::frameStart(Ball& ball, const Controls& controls) {
+  subStep(ball, controls);
+  subStep(ball, controls);
   decayTilt();
-  updateLayer(ball);
   selectGravity(ball);
+  updateLayer(ball);
+}
+
+void Physics::frameEnd(Ball& ball, const Controls& controls) {
+  subStep(ball, controls);
+  if (!highResolution_) subStep(ball, controls);
 }
 
 Contact Physics::probe(const Ball& ball) const {

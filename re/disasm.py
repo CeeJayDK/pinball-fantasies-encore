@@ -2,7 +2,7 @@
 """Disassembles the game's programs into re/fantasy: per program, the segment map, a raw and an
 annotated listing of each code segment, and a hex dump of every other segment.
   python3 re/disasm.py <the game's folder>"""
-import struct, subprocess, sys, pathlib
+import re, struct, subprocess, sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 def mz(path):
@@ -23,6 +23,23 @@ def mz(path):
         if at >= 3 and image[at - 3] in (0x9a, 0xea): code.add(value)
     segs = sorted(s for s in segs if s * 16 < len(image))
     return image, hdrpar * 16, cs, ip, segs, code
+
+target = re.compile(r'^\S+\s+\S+\s+(?:call|jmp|j\w+|loop\w*|jcxz)(?: near| short| word)? 0x([0-9a-f]+)$')
+
+def disassemble(binf):
+    """ndisasm reads straight through, and loses its place wherever data sits between
+    routines. Every address the code jumps to or calls is certainly an instruction, so those
+    are given back to it as places to start afresh, until no new ones turn up."""
+    size = binf.stat().st_size
+    sync, text = set(), ''
+    for _ in range(6):
+        args = ['ndisasm', '-b16'] + [a for t in sorted(sync) for a in ('-s', hex(t))] + [str(binf)]
+        text = subprocess.run(args, capture_output=True, text=True).stdout
+        found = {int(m.group(1), 16) for line in text.splitlines() if (m := target.match(line))}
+        found = {t for t in found if t < size}
+        if found <= sync: break
+        sync |= found
+    return text
 
 def hexdump(data):
     out = []
@@ -47,7 +64,7 @@ def main(game, out):
             name = f'{path.stem}_SDR'
             binf = out / f'{name}.bin'; binf.write_bytes(image)
             asm = out / f'{name}.asm'
-            asm.write_text(subprocess.run(['ndisasm', '-b16', str(binf)], capture_output=True, text=True).stdout)
+            asm.write_text(disassemble(binf))
             subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / 'annot.py'), str(asm), str(out / f'{name}.lst')], capture_output=True)
             (out / f'{name}_segments.txt').write_text(f'{path.name}: unpacked {len(image)} bytes; entry cs:ip={rcs:04x}:{rip:04x}; {len(relocs)} relocations\n')
             print(path.name, 'unpacked', len(image), f'entry {rcs:04x}:{rip:04x}')
@@ -66,7 +83,7 @@ def main(game, out):
                 binf = out / f'{name}_seg{seg:04x}.bin'
                 binf.write_bytes(data)
                 asm = out / f'{name}_seg{seg:04x}.asm'
-                asm.write_text(subprocess.run(['ndisasm', '-b16', str(binf)], capture_output=True, text=True).stdout)
+                asm.write_text(disassemble(binf))
                 subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / 'annot.py'), str(asm),
                                 str(out / f'{name}_seg{seg:04x}.lst')], capture_output=True)
             elif data[:4] != b'FORM':

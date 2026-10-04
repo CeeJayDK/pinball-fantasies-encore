@@ -120,8 +120,8 @@ void Play::update(const PlayInput& input, double dt) {
 
   events_.clear();
   physics_.clearContact();
-  physics_.beginFrame(ball_);
-  for (int i = 0; i < physics_.subStepsPerFrame(); ++i) physics_.subStep(ball_, controls);
+  physics_.frameStart(ball_, controls);
+  physics_.frameEnd(ball_, controls);
   collectTriggers();
   refreshDisplay();
   if (ball_.lost) {
