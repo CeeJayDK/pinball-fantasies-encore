@@ -28,3 +28,30 @@ only *run*, to compare what the two do with the same recorded game.
    old engine, its generator and every mention of it removed.
 
 A difference found in step 2 is settled by the disassembly, not by either engine.
+
+## The referee
+
+`encore-oracle` (tools/oracle) runs the game's own table programs in a small machine of ours:
+an 80186, the video card's planes and registers, the DOS and launcher calls the tables make,
+and the silent sound driver (NOSOUND.SDR) done by hand from its listing. It is a test tool and
+is never part of the game. What it does with the same keys is what the new engine must do.
+
+## How the tables' logic is written
+
+The original keeps everything a table knows in one data segment, and its scripts, lists and
+tables are data in that segment too. The new engine keeps the same memory: a table starts from
+the bytes of the program's data segment, and each routine of the original is written again by
+hand as a C++ function that reads and writes it. That has three consequences:
+
+- **Nothing is transcribed.** Scripts, trigger lists, light tables and starting values are read
+  from the player's own files, where the original reads them.
+- **Everything can be checked.** After every frame the engine's memory is compared with the
+  referee's, byte for byte; a difference names the variable and the frame.
+- **One engine, four tables.** The four programs hold the same engine at different addresses.
+  Names (`re/symbols`) are given to Party Land's addresses as they are understood, and
+  `re/align.py` carries them to the other three.
+
+Drawing is the exception: the original draws through the video card's registers, and the engine
+draws from what the table knows instead (which lights are lit, where the ball and flippers
+are, the display's dots), as the HD pictures need anyway. The ball's physics (`src/engine/sim`)
+is also written on its own, and checked against the referee ball for ball.
