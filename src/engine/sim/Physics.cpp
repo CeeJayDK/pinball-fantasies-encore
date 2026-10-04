@@ -277,6 +277,7 @@ int Physics::flipperImpulse(const Ball&, int px, int py, int& fx, int& fy) const
 }
 
 void Physics::bounce(Ball& ball, const Contact& c) {
+  if (onBounce) onBounce(ball, c);
   const Material& m = materials_[static_cast<std::size_t>(c.materialClass) & 7];
   const int vx = clampVelocity(ball.vx + flipperVx_);
   const int vy = clampVelocity(ball.vy + flipperVy_ + tableVelocity_);
@@ -313,12 +314,18 @@ void Physics::bounce(Ball& ball, const Contact& c) {
   }
 
   if (m.restitution != 0) vn -= vn * 256 / m.restitution;
-  const i32 k = vn >= -1023 ? ((-vn) >> 6) + 1 : 1;
-  const i32 f0 = static_cast<i32>(m.tangentGain) * k;
-  const i32 f1 = static_cast<i32>(m.spinGain) * k;
-  const i32 d = ball.spin + tableVelocity_ - vt;
-  if (f0 != 0) vt += d * 256 / f0;
-  if (f1 != 0) ball.spin = static_cast<i16>(ball.spin - d * 256 / f1);
+  // The two gains are scaled by the softness of the hit in 16-bit registers (cs:0x8f95), so
+  // steel's, at 10000 and 2500, wrap round for all but the hardest hits, and are then taken
+  // as signed divisors. A gain of zero leaves the dividend's low word as the "quotient".
+  i16 f0 = m.tangentGain, f1 = m.spinGain;
+  if (vn >= -1023) {
+    const u16 k = static_cast<u16>(((-vn) >> 6) + 1);
+    f0 = static_cast<i16>(static_cast<u16>(f0) * k);
+    f1 = static_cast<i16>(static_cast<u16>(f1) * k);
+  }
+  const i32 d = static_cast<i16>(ball.spin + tableVelocity_ - vt) * 256;
+  vt += f0 != 0 ? static_cast<i16>(d / f0) : static_cast<i16>(d);
+  ball.spin = static_cast<i16>(ball.spin - (f1 != 0 ? static_cast<i16>(d / f1) : static_cast<i16>(d)));
   vt = vt * 0x800 / 0x801;
 
   int nvx = static_cast<int>((cosA * vn - sinA * vt) >> 15);

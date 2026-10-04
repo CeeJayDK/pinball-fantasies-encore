@@ -91,6 +91,9 @@ class Physics {
   /// Installs the table's bumpers and kickers. The list must outlive the simulation.
   void setBumpers(const std::vector<Bumper>* bumpers) { bumpers_ = bumpers; }
 
+  /// For tools: called with every contact that reaches the bounce.
+  std::function<void(const Ball&, const Contact&)> onBounce;
+
   const Limits& limits() const { return limits_; }
   const TableLayout& layout() const { return layout_; }
 

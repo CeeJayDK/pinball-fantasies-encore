@@ -332,6 +332,9 @@ u16 Cpu::callInterrupt(u16 seg, u16 off, std::uint64_t limit) { return callRouti
 void Cpu::step() {
   startIp_ = ip;
   if (s[CS] < 0x50) throw CpuError("the program went astray, to " + where());
+  if (!watch.empty()) {
+    if (auto it = watch.find((u32{s[CS]} << 16) | ip); it != watch.end()) it->second();
+  }
   history_[historyAt_] = (u32{s[CS]} << 16) | ip;
   historyAt_ = (historyAt_ + 1) % kHistory;
   segOverride_ = -1;

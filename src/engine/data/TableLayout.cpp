@@ -145,7 +145,7 @@ std::vector<Rect> TableLayout::readZoneList(ByteView d, std::size_t offset) {
     const i16 x2 = static_cast<i16>(rd16le(d, o + 4));
     const i16 y2 = static_cast<i16>(rd16le(d, o + 6));
     if (!(x1 >= 0 && x1 < x2 && y1 >= 0 && y1 < y2)) break;
-    out.push_back({x1, y1, x2 - x1, y2 - y1});
+    out.push_back({x1, y1, x2 - x1 + 1, y2 - y1 + 1});  // both edges are inside (cs:0x5d57)
   }
   return out;
 }

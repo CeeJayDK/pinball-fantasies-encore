@@ -3,6 +3,8 @@
 // game's programs use, which are the 8086's and the 80186's. It knows nothing of the machine
 // around it: memory, ports and interrupts are the Bus's.
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <stdexcept>
 #include <string>
 
@@ -44,6 +46,8 @@ class Cpu {
   u16 ip = 0;
   u16 flags = 2;
   bool halted = false;
+  /// Called when the instruction at a place (segment << 16 | offset) is about to run.
+  std::map<u32, std::function<void()>> watch;
   std::uint64_t executed = 0;
 
   u8 lo(Reg x) const { return static_cast<u8>(r[x]); }

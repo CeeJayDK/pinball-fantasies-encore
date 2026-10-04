@@ -10,6 +10,7 @@
 #include <cstdlib>
 
 #include "Machine.h"
+#include "engine/data/Bumpers.h"
 #include "engine/data/TableData.h"
 #include "engine/sim/Physics.h"
 
@@ -49,6 +50,8 @@ int main(int argc, char** argv) {
     const encore::TableData table = encore::TableData::load(dir / "TABLE1.PRG", 0);
     encore::Physics physics;
     physics.init(table, true);
+    const auto bumpers = encore::extractBumpers(table.dataSegment, 0);
+    physics.setBumpers(&bumpers);
     encore::Ball ball;
     ball.xFixed = d(kXFixed);
     ball.yFixed = d(kYFixed);
@@ -61,9 +64,22 @@ int main(int argc, char** argv) {
     ball.active = true;
     std::printf("launched at frame %d: (%d,%d) speed (%d,%d) spin %d layer %d\n", f, ball.x, ball.y, ball.vx, ball.vy, ball.spin, ball.upper);
 
+    // With a third argument of "bounces", every bounce of both is printed.
+    int frameNow = 0;
+    if (argc > 4) {
+      m.cpu.watch[(oracle::u32{m.seg(0x10)} << 16) | 0x8e95] = [&] {
+        std::printf("  %4d original bounce at (%d,%d) speed (%d,%d) angle %03x probes %d material %d flipper (%d,%d)\n", frameNow, w(kX), w(kY),
+                    w(kVx), w(kVy), m.peek16(ds, 0x6890), m.peek8(ds, 0x6892), m.peek8(ds, 0x2edc), w(0x6894), w(0x6896));
+      };
+      physics.onBounce = [&](const encore::Ball& b, const encore::Contact& c) {
+        std::printf("  %4d ours     bounce at (%d,%d) speed (%d,%d) angle %03x probes %d material %d\n", frameNow, b.x, b.y, b.vx, b.vy, c.angle,
+                    c.count, c.materialClass);
+      };
+    }
     encore::Physics::Controls controls;
     int same = 0;
     for (int i = 0; i < frames; ++i, ++same) {
+      frameNow = i;
       m.frame();
       physics.clearContact();
       physics.frameStart(ball, controls);
