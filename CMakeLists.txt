@@ -216,6 +216,19 @@ target_link_libraries(encore-assets PRIVATE encore_core)
 add_executable(encore-play tools/play.cpp)
 target_link_libraries(encore-play PRIVATE encore_core)
 
+# The engine being written (docs/own-engine.md), beside the one it will replace.
+file(GLOB ENCORE_ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/audio/*.cpp src/engine/data/*.cpp src/engine/sim/*.cpp src/engine/game/*.cpp)
+# The front end (intro, menu) comes last, and is not built until then.
+list(FILTER ENCORE_ENGINE_SOURCES EXCLUDE REGEX "game/(Menu|Intro|Session)\\.cpp$")
+add_library(encore_engine STATIC ${ENCORE_ENGINE_SOURCES})
+target_link_libraries(encore_engine PUBLIC encore_core)
+file(GLOB ENCORE_ENGINE_TESTS CONFIGURE_DEPENDS tests/engine/*.cpp)
+add_executable(encore-engine-tests tests/main.cpp ${ENCORE_ENGINE_TESTS})
+target_include_directories(encore-engine-tests PRIVATE tests)
+target_compile_definitions(encore-engine-tests PRIVATE ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_link_libraries(encore-engine-tests PRIVATE encore_engine)
+add_test(NAME engine COMMAND encore-engine-tests)
+
 add_executable(encore-trace tools/trace.cpp)
 target_link_libraries(encore-trace PRIVATE encore_core)
 

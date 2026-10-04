@@ -85,4 +85,4 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 | `src/core`, `src/data` | Types, files, PNG, deflate and zip, SHA-256, IFF pictures, the game-version check |
 | `tests` | Pure-logic tests, and tests that play full games when the game files are present |
 | `docs` | Notes from the reverse-engineering work |
-| `re/legacy-engine` | The earlier engine this translation replaced, kept for reference; not built |
+| `src/engine` | The engine of our own, being written to replace it ([own-engine.md](own-engine.md)) |

@@ -49,3 +49,8 @@ struct Rgb {
 };
 
 }  // namespace pfr
+
+/// The engine being written (docs/own-engine.md) is in a namespace of its own, and shares these.
+namespace encore {
+using namespace pfr;
+}
