@@ -19,6 +19,7 @@ re/*
 !re/disasm.py
 !re/annot.py
 !re/unexepack.py
+!re/align.py
 # The server's tools and its local database
 server/node_modules/
 server/.wrangler/
