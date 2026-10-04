@@ -84,8 +84,10 @@ def main(game, out):
                 binf.write_bytes(data)
                 asm = out / f'{name}_seg{seg:04x}.asm'
                 asm.write_text(disassemble(binf))
+                names = pathlib.Path(__file__).parent / 'symbols' / f'{name.lower()}.txt'
                 subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / 'annot.py'), str(asm),
-                                str(out / f'{name}_seg{seg:04x}.lst')], capture_output=True)
+                                str(out / f'{name}_seg{seg:04x}.lst')] + ([str(names)] if seg == cs and names.exists() else []),
+                               capture_output=True)
             elif data[:4] != b'FORM':
                 (out / f'{name}_seg{seg:04x}.hex').write_text(hexdump(data))
         (out / f'{name}_segments.txt').write_text('\n'.join(lines) + '\n')

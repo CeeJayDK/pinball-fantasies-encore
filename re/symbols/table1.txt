@@ -1,0 +1,61 @@
+# Names for places in TABLE1.PRG (the supported release), as they are worked out.
+# "c" lines name code in segment 0010, "d" lines name data in segment 19b5.
+# python3 re/disasm.py puts them into re/fantasy/TABLE1_seg0010.lst.
+
+# --- the frame
+c 2f9b entry
+c 35fd mainLoop                 ; reads keys, counts loops, polls the driver
+c 41c6 frameCallback            ; driver callback at the start of the frame
+c 55db midFrameCallback         ; driver callback part way down the frame
+c 3e44 keyboardInterrupt
+c 87c0 physicsOnce              ; guard against re-entry round physicsSteps
+c 87db physicsSteps             ; two sub-steps, or one in the mid-frame callback in high resolution
+c 8829 probeBall                ; carry clear when the ball touches something
+c 8e95 bounce
+c 9133 nudgeAndFlippers
+c 908f integrate
+c 9106 stampFlippers
+c 59aa afterSteps               ; tilt decay, bumper events, gravity, layer
+c 59d9 pickGravity
+c 5d24 changeLayer
+c 5989 runRules                 ; roll triggers, hit triggers, the table's own per-frame code, timers
+c 5d70 rollTriggers
+c 5cb9 hitTriggers
+c 5ace bumperEvent
+c 4018 scroll
+
+# --- the ball
+d 2ede spin
+d 2ee0 ballX
+d 2ee2 ballY
+d 2ee4 ballXFixed
+d 2ee8 ballYFixed
+d 2eec ballVx
+d 2eee ballVy
+d 2ef0 contactX
+d 2ef2 contactY
+d 2ef4 gravityX
+d 2ef6 gravityY
+d 2edc material
+d 331a layer                    ; 0 playfield, ff ramps
+d 2f2a ballHidden               ; ff: no ball in play, physics skipped
+d 239c ballLost
+d 6890 contactAngle
+d 6892 contactProbes
+d 6894 flipperVx
+d 6896 flipperVy
+d 2314 nudgeAccumulator
+d 2316 nudgeLift
+d 2318 tableVelocity
+d 2311 tilted
+d 2312 tiltCounter
+d 239b bumperPending
+d 239d bumperRecord
+
+# --- the machine and options
+d 2f28 keys                     ; bit 0 right flipper, bit 1 left, bit 2 one step in the mid-frame callback
+d 3554 highResolution
+d 33ed loopCounter              ; the program's source of chance
+d 23a7 plungerRoutine
+d 23a9 inMidFrame
+d 36e9 lastKey
