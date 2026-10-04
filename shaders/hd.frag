@@ -20,7 +20,12 @@ void main() {
   if ((m.b & 0xffu) != uId) discard;
   vec2 step = vec2((m.b & 0x100u) != 0u ? 0.5 : 1.0, (m.b & 0x200u) != 0u ? 0.5 : 1.0);
   vec2 src = vec2(m.rg) / 8.0 + fract(f) * step;
-  vec3 c = texture(uPicture, src / uSourceSize).rgb;
+  // How fast the picture passes under the screen, for choosing between its smaller copies
+  // (mipmaps). Left to the hardware it is read off the neighbouring pixels, and where those
+  // belong to another picture -- the playfield's edge against the plunger -- their places are
+  // far apart, the smallest copy is taken, and a line in the picture's average colour shows.
+  vec2 gx = dFdx(f) * step / uSourceSize, gy = dFdy(f) * step / uSourceSize;
+  vec3 c = textureGrad(uPicture, src / uSourceSize, gx, gy).rgb;
   if (uHasLit != 0u) {
     // How lit this spot is, read smoothly between the screen's pixels so that a lamp's edge
     // is a soft line rather than a staircase of the original's pixels. Only pixels of this
@@ -36,7 +41,7 @@ void main() {
       lit[i] = (other & 0xffu) == uId ? float((other >> 10u) & 0x3fu) : here;
     }
     float amount = mix(mix(lit[0], lit[1], t.x), mix(lit[2], lit[3], t.x), t.y) / 63.0;
-    c = mix(c, texture(uPictureLit, src / uSourceSize).rgb, amount);
+    c = mix(c, textureGrad(uPictureLit, src / uSourceSize, gx, gy).rgb, amount);
   }
   fragColor = vec4(mix(uFadeColor, c, uFade), 1.0);
 }
