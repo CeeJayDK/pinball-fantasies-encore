@@ -24,6 +24,7 @@ void Table::initGame() {
   matchDigit_.reset();
   scoreMain_ = Bcd::kZero;
   scoreBonus_ = Bcd::kZero;
+  scoreBonusSaved_ = Bcd::kZero;
   numCyclone_ = 0;
   bcdNumCyclone_ = Bcd::kZero;
   scoreCycloneBonus_ = Bcd::kZero;

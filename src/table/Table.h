@@ -531,6 +531,9 @@ class Table {
   std::vector<PlayerState> players_;
 
   Bcd scoreMain_, scoreBonus_, scoreJackpot_, scoreModeHit_, scoreModeRamp_, scoreRaisingMillions_;
+  /// The bonus as it was when last counted, which the count itself empties: what hold bonus
+  /// gives back at the next ball (0x33a7 in the original, beside the bonus at 0x339b).
+  Bcd scoreBonusSaved_;
   u16 numCyclone_ = 0, numCycloneTarget_ = 0;
   Bcd bcdNumCyclone_, scoreCycloneBonus_;
   bool holdBonus_ = false;

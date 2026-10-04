@@ -211,6 +211,25 @@ TEST(cheated_games_are_not_counted) {
   }
 }
 
+// The bonus is counted out of itself, so it cannot be counted twice. In this game (Party Land,
+// played for the online boards) the last ball drains, the match is won and gives a free ball,
+// and on that ball's drain the top score is passed: its extra ball goes to shoot again past the
+// step that used to empty the bonus, and the same 26,345,290 was counted again at the end.
+TEST(the_bonus_is_counted_once) {
+  if (!haveData()) return;
+  const auto data = file::readAll(std::filesystem::path(ENCORE_SOURCE_DIR) / "tests" / "recordings" / "match-then-top-score.RPL");
+  CHECK(data.has_value());
+  if (!data) return;
+  const auto rec = Replay::load(*data);
+  CHECK(rec.has_value());
+  if (!rec) return;
+  const Replay again = replay(read("TABLE1.PRG"), read("TABLE1.MOD"), *rec);
+  CHECK(again.games.size() == 1);
+  if (again.games.empty()) return;
+  CHECK(again.games[0].endFrame == rec->games[0].endFrame);
+  CHECK(again.games[0].scores[0] == Bcd::of("55734500"));
+}
+
 // A flipper's replacement picture turns about the point its own artwork hinges on, which is
 // not always the origin the table gives for it: the upper bats of Party Land and Speed Devils
 // draw the main bats' frames, hinged several pixels away from where their ball bounces off.

@@ -456,11 +456,13 @@ void Table::runUop(u16 pos) {
       for (int i = 0; i < numCyclone_; ++i) scoreCycloneBonus_ += Bcd::of("100000");
       scoreBonus_ += scoreCycloneBonus_;
       break;
+    // The bonus is counted out of itself into the score, as the original does (0x0317), so it is
+    // empty afterwards whichever way the script goes on; a copy is kept for hold bonus.
     case UopKind::AccBonus:
       task(S::AccBonus);
       scriptTask_.frame = 0;
       scriptTask_.digitIdx = 11;
-      scriptTask_.score = scoreBonus_;
+      scoreBonusSaved_ = scoreBonus_;
       break;
     case UopKind::CheckTopScore:
       if (!gotTopScore_ && scoreMain_ > highScores_[0].score) {
@@ -486,8 +488,9 @@ void Table::runUop(u16 pos) {
         runUop(scriptPos_);
       }
       break;
+    // The bonus was emptied by its count; with hold bonus the counted one comes back (0x0AB2).
     case UopKind::NextBall:
-      if (!holdBonus_) scoreBonus_ = Bcd::kZero;
+      if (holdBonus_) scoreBonus_ = scoreBonusSaved_;
       saveCurPlayer();
       if (extraBalls_ != 0) {
         --extraBalls_;
@@ -739,20 +742,20 @@ void Table::resetIdle() {
 bool Table::runAccBonus(ScriptTask& t) {
   if (++t.frame != 4) return true;
   t.frame = 0;
-  while (t.score.digits[t.digitIdx] == 0) {
+  while (scoreBonus_.digits[t.digitIdx] == 0) {
     if (t.digitIdx == 0) {
       dmPuts(DmFont::H11, {-32, 6}, "___________");
       return false;
     }
     --t.digitIdx;
   }
-  --t.score.digits[t.digitIdx];
-  if (t.score.digits[t.digitIdx] == 0 && !t.score.isZero()) t.frame = -10;
+  --scoreBonus_.digits[t.digitIdx];
+  if (scoreBonus_.digits[t.digitIdx] == 0 && !scoreBonus_.isZero()) t.frame = -10;
   Bcd delta;
   delta.digits[t.digitIdx] = 1;
   scoreMain_ += delta;
   playSfxBind(SfxBind::TickBonus);
-  dmPutBcd(DmFont::H8, {-32, 6}, t.score, false);
+  dmPutBcd(DmFont::H8, {-32, 6}, scoreBonus_, false);
   dmPutBcd(DmFont::H13, {64, 1}, scoreMain_, false);
   return true;
 }
