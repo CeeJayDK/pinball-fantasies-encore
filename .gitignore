@@ -20,6 +20,7 @@ re/*
 !re/annot.py
 !re/unexepack.py
 !re/align.py
+!re/gensymbols.py
 !re/symbols/
 # The server's tools and its local database
 server/node_modules/

@@ -48,6 +48,8 @@ class Cpu {
   bool halted = false;
   /// Called when the instruction at a place (segment << 16 | offset) is about to run.
   std::map<u32, std::function<void()>> watch;
+  /// Set by a watch to leave that instruction for later: step() returns without running it.
+  bool pause = false;
   std::uint64_t executed = 0;
 
   u8 lo(Reg x) const { return static_cast<u8>(r[x]); }

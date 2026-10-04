@@ -1,0 +1,104 @@
+#pragma once
+// A table program's memory, and the means to write its routines again (docs/own-engine.md).
+//
+// The original keeps all a table knows in its data segment, with a few variables among its
+// code. A Program starts from those bytes, as they are in the player's TABLEn.PRG, and the
+// engine's routines read and write them where the original's do.
+//
+// The four programs hold the same engine at different addresses. The engine's code is written
+// once, against Party Land's addresses, and every access goes through the table's map (found
+// by lining the programs up: re/align.py, Maps.inc). A table's own rules are written against
+// its own addresses, with the *Native accessors.
+#include <functional>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "core/Error.h"
+#include "core/Types.h"
+
+namespace encore {
+
+/// Party Land's names for places in its program (re/symbols/table1.txt).
+namespace at {
+#include "engine/table/Names.inc"
+}
+
+class Program {
+ public:
+  /// A 16-bit variable in the program's memory, little-endian as the original has it.
+  class Word {
+   public:
+    explicit Word(u8* p) : p_(p) {}
+    operator u16() const { return static_cast<u16>(p_[0] | (p_[1] << 8)); }
+    i16 s() const { return static_cast<i16>(static_cast<u16>(*this)); }
+    Word& operator=(u16 v) {
+      p_[0] = static_cast<u8>(v);
+      p_[1] = static_cast<u8>(v >> 8);
+      return *this;
+    }
+    Word& operator=(const Word& o) { return *this = static_cast<u16>(o); }
+    Word& operator+=(u16 v) { return *this = static_cast<u16>(*this + v); }
+    Word& operator-=(u16 v) { return *this = static_cast<u16>(*this - v); }
+    Word& operator++() { return *this += 1; }
+    Word& operator--() { return *this -= 1; }
+
+   private:
+    u8* p_;
+  };
+
+  /// `prg` is the whole TABLEn.PRG; `table` 0 to 3.
+  Program(ByteView prg, int table);
+  virtual ~Program() = default;
+
+  int table() const { return table_; }
+
+  // --- variables, by Party Land's address (plus an index, for tables of them)
+  u8& B(u16 a, u16 index = 0) { return ds_[static_cast<u16>(data(a) + index)]; }
+  Word W(u16 a, u16 index = 0) { return Word(&ds_[static_cast<u16>(data(a) + index)]); }
+  /// The same for the variables the program keeps among its code.
+  u8& CB(u16 a) { return cs_[codeData(a)]; }
+  Word CW(u16 a) { return Word(&cs_[codeData(a)]); }
+
+  // --- by this table's own address: what a pointer read from memory points at
+  u8& nativeB(u16 a) { return ds_[a]; }
+  Word nativeW(u16 a) { return Word(&ds_[a]); }
+
+  /// Party Land's address of some data, as this table has it: to keep as a pointer.
+  u16 A(u16 a) const { return data(a); }
+  /// Party Land's address of a routine, as this table has it: to keep as a pointer.
+  u16 F(u16 a) const;
+
+  /// Runs the routine at an address of this table's (a pointer read from its memory).
+  void call(u16 native);
+  /// Says which function is the routine at Party Land's address `a`, in every table.
+  void bind(u16 a, std::function<void()> fn);
+  void bindNative(u16 native, std::function<void()> fn) { routines_[native] = std::move(fn); }
+
+  /// The whole data segment, for the tools that compare it with the original's.
+  const std::vector<u8>& memory() const { return ds_; }
+  std::vector<u8>& memory() { return ds_; }
+  const std::vector<u8>& codeMemory() const { return cs_; }
+  std::vector<u8>& codeMemory() { return cs_; }
+  /// Segment values as the program's listing has them.
+  u16 dataSegment() const { return dataSegment_; }
+  /// For reports: Party Land's address for one of this table's, or 0xffff.
+  u16 partyLandData(u16 native) const;
+
+  // What the original passes between routines in registers, for those reached through
+  // pointers: a script's place in BX, a task's answer in SI, and so on.
+  u16 ax = 0, bx = 0, cx = 0, dx = 0, si = 0, di = 0, bp = 0;
+
+ protected:
+  u16 data(u16 a) const;
+  u16 codeData(u16 a) const;
+
+  int table_;
+  std::vector<u8> ds_, cs_;
+  u16 dataSegment_ = 0;
+
+ private:
+  std::unordered_map<u16, std::function<void()>> routines_;
+};
+
+}  // namespace encore

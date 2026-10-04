@@ -328,6 +328,23 @@ void Machine::driver() {
   }
 }
 
+void Machine::setLoop(u16 codeSegment, u16 offset) {
+  loopAt_ = (u32{seg(codeSegment)} << 16) | offset;
+  cpu.watch[loopAt_] = [this] {
+    if (++loops_ >= loopLimit_) cpu.pause = true;
+  };
+}
+
+void Machine::boot() {
+  if (!loopAt_) throw CpuError("boot() needs setLoop()");
+  loops_ = 0;
+  loopLimit_ = 1;
+  cpu.pause = false;
+  for (std::uint64_t i = 0; i < 400'000'000 && !cpu.pause && !exited_; ++i) cpu.step();
+  if (!cpu.pause) throw CpuError("the program never reached its loop");
+  ticks_ = 0;
+}
+
 void Machine::frame() {
   // Not in the middle of something the program does with interrupts off.
   for (int i = 0; i < 100000 && !cpu.flag(Cpu::IF) && !exited_; ++i) cpu.step();
@@ -344,7 +361,16 @@ void Machine::frame() {
     // the list may change under a callback
     for (std::size_t i = 0; i < lineCallbacks_.size(); ++i) callBack(lineCallbacks_[i]);
   }
-  if (!exited_) cpu.run(loopBudget);
+  if (loopAt_) {
+    // The loop is where boot() or the last frame left it: at its first instruction.
+    loops_ = -1;
+    loopLimit_ = loopsPerFrame;
+    cpu.pause = false;
+    for (std::uint64_t i = 0; i < 2'000'000 && !cpu.pause && !exited_; ++i) cpu.step();
+    loopLimit_ = 1 << 30;  // the callbacks and keys of the next frame are not counted
+  } else if (!exited_) {
+    cpu.run(loopBudget);
+  }
   ++frames;
 }
 

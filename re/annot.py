@@ -4,12 +4,12 @@ beside the instructions that use it.
   python3 re/annot.py <in.asm> <out.lst> [names.txt]"""
 import sys, re, collections
 src = sys.argv[1]; out = sys.argv[2]
-code, data = {}, {}
+code, data, csvars = {}, {}, {}
 if len(sys.argv) > 3:
     for line in open(sys.argv[3]):
         line = line.split('#')[0]
-        m = re.match(r'^([cd]) ([0-9a-f]+) (\w+)\s*(?:;\s*(.*))?$', line.strip())
-        if m: (code if m.group(1) == 'c' else data)[int(m.group(2), 16)] = (m.group(3), m.group(4) or '')
+        m = re.match(r'^([cdv]) ([0-9a-f]+) (\w+)(?:\s+@\d:[0-9a-f]+)*\s*(?:;\s*(.*))?$', line.strip())
+        if m: {'c': code, 'd': data, 'v': csvars}[m.group(1)][int(m.group(2), 16)] = (m.group(3), m.group(4) or '')
 lines = []
 for line in open(src):
     try: addr = int(line[:8], 16)
@@ -52,7 +52,8 @@ with open(out, 'w') as o:
         m = callre.match(ins) or jre.match(ins)
         if m and int(m.group(1), 16) in code: notes.append(code[int(m.group(1), 16)][0])
         for m in memre.finditer(ins):
-            if not m.group(1) and int(m.group(2), 16) in data: notes.append(data[int(m.group(2), 16)][0])
+            table = csvars if m.group(1) else data
+            if int(m.group(2), 16) in table: notes.append(table[int(m.group(2), 16)][0])
         o.write(pre + f'{addr:04X}  {ins}' + (f'{" " * max(1, 40 - len(ins))}; {", ".join(notes)}' if notes else '') + '\n')
 with open(out + '.xref', 'w') as o:
     for a in sorted(datarefs):

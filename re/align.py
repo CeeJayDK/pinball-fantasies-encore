@@ -27,7 +27,8 @@ def kind(ins):
     kinds = []
     for m in num.finditer(ins):
         if re.match(r'^(j\w+|call|loop\w*)\b', ins) and '[' not in ins: kinds.append('code')
-        elif '[' in ins[:m.start()] and ']' in ins[m.end():] and ins.rfind('[', 0, m.start()) > ins.rfind(']', 0, m.start()): kinds.append('data')
+        elif '[' in ins[:m.start()] and ']' in ins[m.end():] and ins.rfind('[', 0, m.start()) > ins.rfind(']', 0, m.start()):
+            kinds.append('csdata' if ins[ins.rfind('[', 0, m.start()):m.start()].startswith('[cs:') else 'data')
         else: kinds.append('imm')
     return kinds
 
@@ -37,8 +38,10 @@ def main(a, b):
     nb = [num.sub('#', i) for _, i in B]
     sm = difflib.SequenceMatcher(None, na, nb, autojunk=False)
     votes = {'code': collections.defaultdict(collections.Counter), 'data': collections.defaultdict(collections.Counter),
+             'csdata': collections.defaultdict(collections.Counter),
              'imm': collections.defaultdict(collections.Counter)}
     addr = {}
+    follows = {A[i][0]: (A[i + 1][0],) for i in range(len(A) - 1)}
     matched = 0
     for i, j, n in sm.get_matching_blocks():
         if n < 6: continue   # short runs match by chance
@@ -50,17 +53,21 @@ def main(a, b):
                 votes[kd][int(x, 16)][int(y, 16)] += 1
     with open(here / f'map_{a}_{b}.txt', 'w') as o:
         o.write(f'# TABLE{a} -> TABLE{b}: {matched} of {len(A)} instructions lined up\n')
-        o.write('# code: where an instruction of A is in B\n')
-        prev = None
+        o.write('# code: a run of instructions of A (first, last), and where the first is in B\n')
+        # as runs: first and last instruction of A, and where the first is in B
+        run = None
         for aa in sorted(addr):
             d = addr[aa] - aa
-            if d != prev: o.write(f'code {aa:04x} {addr[aa]:04x}\n')   # only where the distance changes
-            prev = d
-        for kd in ('data', 'imm'):
+            if run and run[2] == d and aa in follows.get(run[1], ()): run[1] = aa
+            else:
+                if run: o.write(f'code {run[0]:04x} {run[1]:04x} {run[0] + run[2]:04x}\n')
+                run = [aa, aa, d]
+        if run: o.write(f'code {run[0]:04x} {run[1]:04x} {run[0] + run[2]:04x}\n')
+        for kd in ('data', 'csdata', 'imm'):
             o.write(f'# {kd}: number in A, number in B, how often (other candidates)\n')
             for x in sorted(votes[kd]):
                 c = votes[kd][x].most_common()
-                if kd == 'imm' and (x < 0x100 or (len(c) == 1 and c[0][0] == x)): continue
+                if kd == 'imm' and x < 0x100: continue
                 rest = ' '.join(f'{y:x}x{n}' for y, n in c[1:4])
                 o.write(f'{kd} {x:04x} {c[0][0]:04x} {c[0][1]}' + (f'  ({rest})' if rest else '') + '\n')
     print(f'TABLE{a} -> TABLE{b}: {matched} of {len(A)} instructions lined up; {len(votes["data"])} data addresses')

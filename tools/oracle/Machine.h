@@ -28,6 +28,13 @@ class Machine : public Bus {
   /// One video frame: the keys given since the last one, the driver's callbacks in the order
   /// of their scanlines, then the program's own loop for a while.
   void frame();
+  /// Where the program's own loop begins (an offset in its code segment). Given this, the
+  /// machine keeps to a fixed timetable, so that the same keys always give the same game:
+  /// boot() runs the program's start-up to the first arrival there, with no callbacks; each
+  /// frame() then ends when the loop has come round `loopsPerFrame` times.
+  void setLoop(u16 codeSegment, u16 offset);
+  void boot();
+  int loopsPerFrame = 8;
   /// A key goes down or up, as the keyboard says it: a scancode, with bit 7 set for up.
   void key(u8 scancode) { keys_.push_back(scancode); }
   bool exited() const { return exited_; }
@@ -92,6 +99,8 @@ class Machine : public Bus {
   u8 driverStatus_ = 0xff;               ///< what the next call returns in AL, once
   u32 ticks_ = 0;
   bool polling_ = false;
+  u32 loopAt_ = 0;
+  int loops_ = 0, loopLimit_ = 1 << 30;
 };
 
 }  // namespace oracle

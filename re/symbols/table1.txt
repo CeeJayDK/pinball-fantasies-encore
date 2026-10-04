@@ -1,6 +1,16 @@
 # Names for places in TABLE1.PRG (the supported release), as they are worked out.
-# "c" lines name code in segment 0010, "d" lines name data in segment 19b5.
+# "c" lines name code in segment 0010, "d" lines name data in segment 19b5, "v" lines name
+# variables the program keeps among its code, "i" lines name values the code carries, such as
+# the segments themselves. "@2:1234" after a name gives its address in another table by hand.
 # python3 re/disasm.py puts them into re/fantasy/TABLE1_seg0010.lst.
+
+# --- segments
+i 19b5 dataSegment
+i 0c0f flipperPictures
+i 2056 spriteBank
+i 3b74 wallsGround
+i 4114 marksGround
+i 46b4 wallsRamps
 
 # --- the frame
 c 2f9b entry
