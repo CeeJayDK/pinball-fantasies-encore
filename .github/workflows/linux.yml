@@ -92,6 +92,10 @@ jobs:
           # To put it in the menu, with its icon: optional, and all under ~/.local.
           cp packaging/linux/install.sh assets/app/icon.png "$dist/"
           cp -L "$(ldd "build/Pinball Fantasies" | awk '/libSDL3/ {print $3}')" "$dist/lib/"
+          # The build keeps its debugging information inside the files, most of their size;
+          # players have no use for it.
+          strip "$dist/Pinball Fantasies"
+          strip --strip-unneeded "$dist/lib/"libSDL3.so*
           patchelf --set-rpath '$ORIGIN/lib' "$dist/Pinball Fantasies"
           tar czf "pinball-fantasies-encore-linux-${{ matrix.arch }}.tar.gz" "$dist"
           ldd "$dist/Pinball Fantasies" | grep -i sdl
