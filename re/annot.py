@@ -25,9 +25,22 @@ for addr, hexs, ins in lines:
     if m: jumps[int(m.group(1), 16)].append(addr)
     for m in memre.finditer(ins):
         if not m.group(1): datarefs[int(m.group(2), 16)].append(addr)
+# A run of the same instruction over and over is data, or padding: one line says so.
+runs = {}
+i = 0
+while i < len(lines):
+    j = i
+    while j + 1 < len(lines) and lines[j + 1][2] == lines[i][2] and lines[j + 1][0] not in calls and lines[j + 1][0] not in jumps: j += 1
+    if j - i >= 4:
+        runs[lines[i][0]] = (j - i + 1, lines[j][0])
+        for k in range(i + 1, j + 1): runs[lines[k][0]] = None
+    i = j + 1
 with open(out, 'w') as o:
     for addr, hexs, ins in lines:
         if ins == 'nop': continue
+        if addr in runs:
+            if runs[addr]: o.write(f'{addr:04X}  {ins}   ; the same {runs[addr][0]} times, to {runs[addr][1]:04X}\n')
+            continue
         pre = ''
         name = code.get(addr)
         if addr in calls or name:
