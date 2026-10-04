@@ -16,6 +16,10 @@ __pycache__/
 # it is derived from the game's files, which are never redistributed.
 re/*
 !re/legacy-engine/
+# ...but not the tools that make it
+!re/disasm.py
+!re/annot.py
+!re/unexepack.py
 # The server's tools and its local database
 server/node_modules/
 server/.wrangler/
