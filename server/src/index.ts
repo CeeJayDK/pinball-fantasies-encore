@@ -6,6 +6,7 @@
 // found, and only then does its score count.
 //
 //   GET  /                                         the project's page, from ../site (wrangler.toml)
+//   GET  /media/<file>                             its videos, a part of one when asked (Range)
 //   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player and initials
 //   GET  /v1/players/<tag>                         a player's verified games
 //   POST /v1/runs               <recording>        send a game                  (player token)
@@ -54,6 +55,8 @@ export interface Env {
   FANTASY_URL: string;
   /** The HD pictures and their manifests (wrangler.toml [[r2_buckets]]). */
   ART: R2Bucket;
+  /** The page's own files (wrangler.toml [assets]). */
+  ASSETS: Fetcher;
   PUBLISH_TOKEN: string;
   /** A GitHub token that may start the checking job (Actions: read and write, on this
    *  repository alone); without it, games wait for the job's schedule. */
@@ -372,6 +375,33 @@ async function putFile(env: Env, req: Request, name: string): Promise<Response> 
   return json({ name, sha256: hash, size: data.length });
 }
 
+// ---- the page's videos ---------------------------------------------------------------------
+
+/** A video from the page's files, whole or the part asked for. Safari on an iPhone plays a video
+ *  only from a server that answers for parts of it (Range, 206), which the files alone do not. */
+async function media(env: Env, req: Request): Promise<Response> {
+  const whole = await env.ASSETS.fetch(new Request(req.url, { method: "GET" }));
+  if (!whole.ok) return whole;
+  const headers = new Headers(whole.headers);
+  headers.set("Accept-Ranges", "bytes");
+  const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.get("Range") ?? "");
+  if (!range || (!range[1] && !range[2])) {
+    return new Response(req.method === "HEAD" ? null : whole.body, { status: 200, headers });
+  }
+  const data = await whole.arrayBuffer();
+  const size = data.byteLength;
+  // bytes=10-19, bytes=10- (to the end), bytes=-20 (the last 20).
+  let start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+  let end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+  if (start >= size || start > end) {
+    headers.set("Content-Range", `bytes */${size}`);
+    return new Response(null, { status: 416, headers });
+  }
+  headers.set("Content-Range", `bytes ${start}-${end}/${size}`);
+  headers.set("Content-Length", String(end - start + 1));
+  return new Response(req.method === "HEAD" ? null : data.slice(start, end + 1), { status: 206, headers });
+}
+
 // ---- the newest release -------------------------------------------------------------------
 
 // The game asks at start whether there is a release newer than itself, and shows a few lines
@@ -544,6 +574,7 @@ export default {
         return env.FANTASY_URL
           ? new Response(env.FANTASY_URL, { headers: { "Content-Type": "text/plain", "Cache-Control": "no-store", ...CORS } })
           : fail(404, "nothing to fetch");
+      if ((get || req.method === "HEAD") && path.startsWith("/media/")) return await media(env, req);
       if (get && path === "/v1/release") return await latestRelease(env, ctx);
       if (get && path === "/v1/art") return await currentArt(env, url);
       if ((get || req.method === "HEAD") && (m = /^\/v1\/art\/([0-9a-f]{64})\.png$/.exec(path)))
