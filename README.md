@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/banner.png" alt="Pinball Fantasies: Encore!" width="820"></p>
+<p align="center"><img src="docs/readme-header.png" alt="Pinball Fantasies: Encore!" width="820"></p>
 
 # Pinball Fantasies: Encore!
 
@@ -16,14 +16,14 @@ of the original is emulated, and nothing of it is included here.
 
 ## Download
 
-Version **0.9.0**, a first cut for testing — unpack and run, no installation:
+Unpack and run, no installation. The newest version, whichever it is:
 
-| | |
-| --- | --- |
-| macOS (Apple Silicon and Intel) | [pinball-fantasies-encore-macos-universal.zip](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-macos-universal.zip) |
-| Linux x86_64 | [pinball-fantasies-encore-linux-x86_64.tar.gz](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-linux-x86_64.tar.gz) |
-| Linux arm64 | [pinball-fantasies-encore-linux-arm64.tar.gz](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-linux-arm64.tar.gz) |
-| Windows x64 | [pinball-fantasies-encore-windows-x64.zip](https://github.com/pedrocatalao/pinball-fantasies-encore/releases/download/v0.9.0/pinball-fantasies-encore-windows-x64.zip) |
+<table align="center"><tr>
+<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-macos-universal.zip"><b>macOS</b><br><sub>Universal</sub></a></td>
+<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-windows-x64.zip"><b>Windows</b><br><sub>x64</sub></a></td>
+<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-x86_64.tar.gz"><b>Linux</b><br><sub>x86_64</sub></a></td>
+<td align="center" width="190"><a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-arm64.tar.gz"><b>Linux</b><br><sub>arm64</sub></a></td>
+</tr></table>
 
 **This build has been played on macOS only.** The Linux and Windows ones are built and tested
 by the machines that make them, nothing more: they compile, their tests pass, and no one has
@@ -65,17 +65,13 @@ folder of pictures instead, such as `assets/hd` while drawing them.
 
 ### The same screens, either way
 
-Each picture is one frame drawn twice, and the line sweeps across it: the 1994 artwork on
-the left of the line, the remastered one on the right. Everything else -- the geometry, the
-lamps, the scrolling, the physics -- is the same on both sides. The right-hand half is not
-the left one enlarged: it is its own picture, drawn to sit over the original's shapes.
+The same moment on Stones 'n' Bones, drawn twice, with the line sweeping across it: the 1994
+artwork on the left of the line, the remastered one on the right. Everything else -- the
+geometry, the lamps, the scrolling, the physics -- is the same on both sides. The right-hand
+side is not the left one enlarged: it is its own picture, drawn to sit over the original's
+shapes.
 
-<p>
-<img src="docs/sweep-intro.png" alt="The opening slide" width="370">
-<img src="docs/sweep-menu.png" alt="The table chooser" width="370">
-<img src="docs/sweep-party.png" alt="Party Land" width="370">
-<img src="docs/sweep-stones.png" alt="Stones n Bones" width="370">
-</p>
+<p align="center"><img src="docs/readme-compare.png" alt="Stones 'n' Bones, the 1994 picture and the remastered one, a line sweeping between them" width="720"></p>
 
 ## Game files
 
