@@ -57,6 +57,10 @@ class Engine : public Program {
   /// names, and the place to go to instead. For a driver that plays; the silent one is
   /// answered through `pollCallsMusic`.
   u8 musicAsks(u8 place) { return musicCallback(place); }
+  /// The original lets the number of players be put below the player whose turn it is while
+  /// more may still join, and then goes astray (docs/own-engine.md). With this, such a key
+  /// is taken for no key.
+  bool refuseFewerPlayers = false;
   /// The program asked to end.
   bool exited() const { return exited_; }
   /// Where the moving things were when the original last drew them (which is not always

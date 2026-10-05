@@ -10,7 +10,7 @@
 #include "gfx/HdLayer.h"
 #include "intro/IntroAssets.h"
 #include "sound/Player.h"
-#include "table/Keys.h"
+#include "core/Keys.h"
 
 namespace pfr {
 

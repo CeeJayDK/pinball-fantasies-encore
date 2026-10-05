@@ -361,6 +361,7 @@ void Engine::playersKey() {
   if (al >= 0x3b && al <= 0x42) {
     B(at::lastKey) = 0xff;
     if (B(0x33e3) == 0) return;
+    if (refuseFewerPlayers && B(0x3713) != 0xff && al - 0x3a < B(0x371a)) return;
     B(0x33e3) = 0;
     B(0x3714) = al;
     B(0x3715) = al;
@@ -370,6 +371,7 @@ void Engine::playersKey() {
   B(at::lastKey) = 0xff;
   if (B(0x3716) >= 8) return;
   if (B(0x33e3) == 0) return;
+  if (refuseFewerPlayers && B(0x3713) != 0xff && (B(0x3717) != 0 ? 0 : B(0x3716)) + 1 < B(0x371a)) return;
   if (B(0x3717) != 0) {
     B(0x3716) = 0;
     B(0x3717) = 0;

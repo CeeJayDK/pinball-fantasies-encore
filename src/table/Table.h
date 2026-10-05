@@ -15,7 +15,7 @@
 #include "game/Config.h"
 #include "gfx/HdLayer.h"
 #include "sound/Player.h"
-#include "table/Keys.h"
+#include "core/Keys.h"
 #include "table/Replay.h"
 #include "table/TableStates.h"
 
