@@ -116,7 +116,7 @@ if(WIN32)
   set_source_files_properties(packaging/windows/pinball.rc PROPERTIES OBJECT_DEPENDS
     "${CMAKE_SOURCE_DIR}/packaging/windows/pinball.ico")
 endif()
-target_link_libraries(pinball-fantasies PRIVATE encore_core SDL3::SDL3 OpenGL::GL)
+target_link_libraries(pinball-fantasies PRIVATE encore_engine encore_core SDL3::SDL3 OpenGL::GL)
 # Fetching a set of pictures uses what the platform already has, so there is nothing to
 # install: libcurl ships with macOS and every Linux, WinHTTP is part of Windows.
 if(WIN32)

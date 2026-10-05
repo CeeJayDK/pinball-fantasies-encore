@@ -321,12 +321,12 @@ void App::loadHdPictures() {
 void App::loadFlipperPictures(int table) {
   renderer_.clearSpritePictures();
   const auto cutOut = table_->flipperPictures();
-  const auto sides = table_->flipperSides();
+  const auto sides = table_->flipperIsLeft();
   ownFlipperPictures_ = 0;
   std::array<int, 2> seen{};
   int own = 0;
   for (std::size_t f = 0; f < cutOut.size(); ++f) {
-    const bool left = sides[f] == FlipperSide::Left;
+    const bool left = sides[f];
     const int nth = ++seen[left ? 0 : 1];
     const std::string name = "flipper" + std::to_string(table + 1) + (left ? "_left" : "_right") +
                              (nth > 1 ? std::to_string(nth) : "") + ".png";
@@ -400,7 +400,7 @@ void App::openIntro(int returningFrom) {
 
 /// A table to play on; with `recording`, the table that recording was played on, which then
 /// plays it back.
-void App::openTable(int index, const Replay* recording) {
+void App::openTable(int index, const encore::Recording* recording) {
   audio_.setSource({});
   intro_.reset();
   table_.reset();
@@ -409,23 +409,26 @@ void App::openTable(int index, const Replay* recording) {
   if (!prg || !mod) throw DataError("cannot read the table files");
   tablePrg_ = *prg;
   tableMod_ = *mod;
+  tableIndex_ = index;
+  encore::TableGame::Setup setup;
   if (recording) {
-    Config config = config_;
-    config.options = recording->options;
-    config.highScores[static_cast<std::size_t>(index)] = recording->highScores;
-    table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, recording->seed, &recording->carry);
-    table_->playBack(*recording);
+    setup.options = recording->options;
+    setup.highScores = recording->highScores;
+    setup.chance = recording->chance;
+    setup.carry = recording->carry;
   } else {
-    const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
-    table_ = std::make_unique<Table>(tablePrg_, tableMod_, config_, index, seed);
+    setup.options = config_.options;
+    setup.highScores = config_.highScores[static_cast<std::size_t>(index)];
+    setup.chance = static_cast<u16>(std::chrono::steady_clock::now().time_since_epoch().count());
   }
+  table_ = std::make_unique<encore::TableGame>(tablePrg_, tableMod_, index, setup);
   // A game played back is the recording's, not one to keep or send.
   recordingSaved_ = recording != nullptr;
   replaying_ = fromReplay_ = recording != nullptr;
   replayNext_ = 0;
   replayFrame_ = 0;
   resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
-  audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
+  audio_.setSource([t = table_.get()](float* out, int frames) { t->sound(out, frames); });
   loadFlipperPictures(index);
   log::info("opened table " + std::to_string(index + 1));
 }
@@ -434,7 +437,7 @@ void App::openTable(int index, const Replay* recording) {
 /// the table it was played on. Once it is over the table stays, for a game of one's own.
 bool App::openReplay(const std::filesystem::path& path) {
   const auto data = file::readAll(path);
-  auto recording = data ? Replay::load(*data) : std::nullopt;
+  auto recording = data ? encore::Recording::load(*data) : std::nullopt;
   if (!recording) {
     log::error("not a recording this version can play: " + path.string());
     return false;
@@ -443,7 +446,7 @@ bool App::openReplay(const std::filesystem::path& path) {
   table_.reset();  // before the recording it may be playing goes
   replay_ = std::move(recording);
   openTable(replay_->table, &*replay_);
-  if (options_.video) table_->player().setMasterVolume(0);  // filmed in silence
+  if (options_.video) table_->silent = true;  // filmed in silence
   log::info("playing " + path.filename().string());
   return true;
 }
@@ -452,7 +455,6 @@ bool App::openReplay(const std::filesystem::path& path) {
 /// is one; true when the table is no longer the one that was playing.
 bool App::recordingOver() {
   replaying_ = false;
-  table_->stopPlayBack();
   if (clip_) endClip();
   if (nextReplay_ < options_.replays.size()) {
     if (!openReplay(options_.replays[nextReplay_++])) return recordingOver();
@@ -511,22 +513,24 @@ void App::endClip() {
 /// old one had that the game would play differently without: the options and high scores as
 /// they are now, any cheats typed while it waited, and where its screen was looking.
 void App::newGame() {
-  const int index = table_->tableIndex();
-  Config config = config_;
-  Replay::Carry carry = table_->carryOver();
+  const int index = tableIndex_;
+  encore::TableGame::Setup setup;
+  setup.options = config_.options;
+  setup.highScores = config_.highScores[static_cast<std::size_t>(index)];
+  setup.carry = table_->carryOver();
   if (fromReplay_) {
     // After a recording, one's own options and high scores, and none of its cheats.
-    carry.noTilt = carry.slowdown = false;
-    carry.balls = 0;
+    setup.carry.noTilt = setup.carry.otherSteps = false;
+    setup.carry.balls = 0;
     fromReplay_ = false;
   } else {
-    config.options = table_->options();
-    config.highScores[static_cast<std::size_t>(index)] = table_->highScores();
+    setup.options = table_->options();
+    setup.highScores = table_->highScores();
   }
+  setup.chance = static_cast<u16>(std::chrono::steady_clock::now().time_since_epoch().count());
   audio_.setSource({});
-  const u64 seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
-  table_ = std::make_unique<Table>(tablePrg_, tableMod_, config, index, seed, &carry);
-  audio_.setSource([p = &table_->player()](float* out, int frames) { p->render(out, frames); });
+  table_ = std::make_unique<encore::TableGame>(tablePrg_, tableMod_, index, setup);
+  audio_.setSource([t = table_.get()](float* out, int frames) { t->sound(out, frames); });
   recordingSaved_ = false;
 }
 
@@ -535,7 +539,7 @@ void App::saveRecording() {
   const std::time_t now = std::time(nullptr);
   char stamp[32];
   std::strftime(stamp, sizeof stamp, "%Y%m%d-%H%M", std::localtime(&now));
-  const Replay& r = table_->recording();
+  const encore::Recording& r = table_->recording();
   auto path = saveDir_ / "replays" / r.fileName(stamp);
   // Two games ending in the same minute with the same score keep both.
   for (int n = 2; present(path); ++n)
@@ -594,11 +598,11 @@ void App::handleKey(const SDL_Event& e) {
   const bool down = e.type == SDL_EVENT_KEY_DOWN;
   if (table_ && replaying_) {
     // The recording plays the table; Escape stops it and goes back to the menu.
-    if (down && k == Key::Escape) openIntro(table_->tableIndex());
+    if (down && k == Key::Escape) openIntro(tableIndex_);
     return;
   }
   if (table_ && down && table_->startsGame(k)) newGame();
-  if (table_) table_->handleKey(k, down);
+  if (table_) table_->key(k, down);
   else if (intro_) intro_->handleKey(k, down);
 }
 
@@ -634,40 +638,34 @@ void App::update(double dt) {
       if (replaying_) {
         const auto& events = replay_->events;
         for (; replayNext_ < events.size() && events[replayNext_].frame == replayFrame_; ++replayNext_)
-          if (events[replayNext_].kind != Replay::Event::Kind::Music)
-            table_->handleKey(static_cast<Key>(events[replayNext_].value),
-                              events[replayNext_].kind == Replay::Event::Kind::KeyDown);
+          table_->key(events[replayNext_].key, events[replayNext_].down);
       }
-      const TableAction a = table_->runFrame();
+      table_->frame();
       if (replaying_) {
         ++replayFrame_;
         const bool filmed =
             options_.video && replayFrame_ >= static_cast<u32>((options_.videoFrom + options_.videoSeconds) * 60);
         if ((replayFrame_ >= replay_->frames || filmed) && recordingOver()) return;
       }
-      if (!sound_) playSilently(table_->player());
+      if (!sound_) table_->noSound();
       if (!recordingSaved_ && !table_->recording().games.empty()) {
         saveRecording();
         recordingSaved_ = true;
       }
-      const int index = table_->tableIndex();
-      switch (a.kind) {
-        // A recording's table has the recording's options and high scores: none are kept.
-        case TableAction::Kind::SaveOptions:
-          if (fromReplay_) break;
-          config_.options = table_->options();
-          Config::saveOptions(saveDir_, config_.options);
-          break;
-        case TableAction::Kind::SaveHighScores:
-          if (fromReplay_) break;
-          config_.highScores[static_cast<std::size_t>(index)] = table_->highScores();
-          Config::saveHighScores(saveDir_, index, table_->highScores());
-          break;
-        case TableAction::Kind::Quit:
-          if (!fromReplay_) config_.options = table_->options();
-          openIntro(index);
-          return;
-        case TableAction::Kind::None: break;
+      const int index = tableIndex_;
+      // A recording's table has the recording's options and high scores: none are kept.
+      if (table_->optionsChanged() && !fromReplay_) {
+        config_.options = table_->options();
+        Config::saveOptions(saveDir_, config_.options);
+      }
+      if (table_->highScoresChanged() && !fromReplay_) {
+        config_.highScores[static_cast<std::size_t>(index)] = table_->highScores();
+        Config::saveHighScores(saveDir_, index, table_->highScores());
+      }
+      if (table_->left()) {
+        if (!fromReplay_) config_.options = table_->options();
+        openIntro(index);
+        return;
       }
       if (table_) resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
     }
@@ -912,8 +910,10 @@ void App::render(double now) {
     resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   else if (intro_)
     resizeFrame(intro_->width(), intro_->height(), 1.0);
-  if (table_)
-    table_->render(frame_.data(), colors.data(), hd);
+  if (table_) {
+    table_->ballTrail = ballTrail_;
+    table_->draw(frame_.data(), colors.data(), hd);
+  }
   else if (intro_)
     intro_->render(frame_.data(), colors.data(), hd);
   palette_.set(0, std::vector<Rgb>(colors.begin(), colors.end()));
