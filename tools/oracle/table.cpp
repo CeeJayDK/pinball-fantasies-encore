@@ -60,6 +60,8 @@ int main(int argc, char** argv) {
       e.codeMemory()[a] = m.peek8(cs, static_cast<oracle::u16>(a));
     }
     e.colours() = m.vga.dac;
+    for (int p = 0; p < 2; ++p)
+      for (unsigned a = 0; a < 0x4000; ++a) e.displayMemory()[static_cast<std::size_t>(p)][a] = m.vga.planes[static_cast<std::size_t>(p * 2)][a];
 
     // The data segment ends where the next begins; the code's variables are among its code.
     const unsigned dataEnd = 0x6c00, codeEnd = 0xac00;
@@ -76,7 +78,7 @@ int main(int argc, char** argv) {
       bool differs = false;
       auto report = [&](const char* what, unsigned a, unsigned ours, unsigned theirs) {
         differs = true;
-        if (!seen.insert((what[0] << 20) | a).second) return;
+        if (!seen.insert((static_cast<unsigned>(what[0] + what[9]) << 20) | a).second) return;
         ++reported;
         if (what[0] == 'd') {
           const encore::u16 pl = e.partyLandData(static_cast<encore::u16>(a));
@@ -99,6 +101,15 @@ int main(int argc, char** argv) {
           if (all) e.codeMemory()[a] = theirs;
         }
       }
+      for (int p = 0; p < 2; ++p)
+        for (unsigned a = 0; a < 0x1000; ++a) {
+          const oracle::u8 theirs = m.vga.planes[static_cast<std::size_t>(p * 2)][a];
+          encore::u8& ours = e.displayMemory()[static_cast<std::size_t>(p)][a];
+          if (ours != theirs) {
+            report(p ? "display, third plane," : "display, first plane,", a, ours, theirs);
+            if (all) ours = theirs;
+          }
+        }
       for (unsigned a = 0; a < 768; ++a)
         if (e.colours()[a] != m.vga.dac[a]) {
           report("colour byte", a, e.colours()[a], m.vga.dac[a]);

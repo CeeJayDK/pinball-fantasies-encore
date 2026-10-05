@@ -42,6 +42,11 @@ class Engine : public Program {
   /// The row of the picture at the top of the screen.
   u16 screenRow() const { return screenRow_; }
 
+  /// The display's memory as the original lays it out in the video card: two planes (the
+  /// card's first and third), 168 bytes a row, each byte a dot, 0xf2 lit and 0x60 not.
+  const std::array<std::array<u8, 0x4000>, 2>& displayMemory() const { return vram_; }
+  std::array<std::array<u8, 0x4000>, 2>& displayMemory() { return vram_; }
+
   /// The video card's colours as the table has set them: 256 of red, green, blue, 0-63.
   const std::array<u8, 768>& colours() const { return dac_; }
   std::array<u8, 768>& colours() { return dac_; }
@@ -93,6 +98,24 @@ class Engine : public Program {
   void displayInverse();       // cs:4cd4
   void displaySteady();        // cs:4d34
 
+  // --- the display (EngineDisplay.cpp): scripts of steps, each a routine and its arguments
+  void bindDisplay();
+  void displayStep();               // cs:444c
+  void startScript(u16 native);     // cs:44b0
+  void runStep(u16 native);         // cs:44c3
+  void nextStep(u16 size);          // cs:5344 and its like: the step after this one
+  void drawChar(u8 c, u16& at);     // cs:6ccd
+  void drawText(u16 nativeText, u16 at);    // cs:6ca5
+  void drawNumber(u16 nativeDigits, u16 at);  // cs:6c0f
+  void drawCommas(u16 nativeDigits, u16 base);  // cs:6d6f
+  void forgetNumber();              // cs:6bbc
+  void drawScore(u16 nativeDigits, u16 at);   // the tables' second code segment
+  void fillDisplay(u16 at, u16 width, u16 rows);  // cs:49eb
+  void setFont(int which);          // 0 to 3: 13, 11, 8 and 5 dots high
+  /// Runs one of the original's pictures that are code: a row of "store this register there".
+  void compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane);
+  u8& dot(int plane, u16 offset) { return vram_[plane][offset & 0x3fff]; }
+
   /// A routine not written yet: says so, with its place.
   void todo(u16 partyLandAddress) { call(F(partyLandAddress)); }
   void effect(u16 record);  ///< plays the four-byte effect record at Party Land's address
@@ -100,6 +123,7 @@ class Engine : public Program {
   bool high() { return B(at::highResolution) == 0xff; }
 
   std::array<u8, 768> dac_{};
+  std::array<std::array<u8, 0x4000>, 2> vram_{};
   SoundDriver silent_;
   bool exited_ = false;
   u16 screenRow_ = 0;

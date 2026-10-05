@@ -5,6 +5,7 @@ namespace encore {
 
 Engine::Engine(ByteView prg, int table) : Program(prg, table) {
   bind(0x69fc, [] {});  // the original's "nothing": a lone ret, which empty slots point at
+  bindDisplay();
 }
 
 void Engine::effect(u16 record) {
@@ -141,7 +142,7 @@ void Engine::frameCallback() {
     const u8 al = CB(0x444a);
     CB(0x444a) = 0xff;
     if (al != 0xff) {
-      todo(0x444c);
+      displayStep();
       CB(0x444a) = 0;
     }
   }
@@ -170,8 +171,7 @@ void Engine::midFrameCallback() {
     B(0x3714) = 0;
     B(0x3716) = static_cast<u8>(al - 0x3a);
     B(0x1d9b) = static_cast<u8>(al - 0x3a + 0x37);
-    bx = A(0x1aea);
-    todo(0x44b0);
+    startScript(A(0x1aea));
     effect(0xc65);
     B(0x33e3) = 0;
     addTimer(F(0x61e9));
@@ -188,7 +188,7 @@ void Engine::attractFrame() {
     const u8 al = CB(0x444a);
     CB(0x444a) = 0xff;
     if (al != 0xff) {
-      todo(0x444c);
+      displayStep();
       CB(0x444a) = 0;
     }
   }
@@ -206,8 +206,7 @@ void Engine::attractMidFrame() {
     B(0x3714) = 0;
     B(0x3716) = static_cast<u8>(al - 0x3a);
     B(0x1d9b) = static_cast<u8>(al - 0x3a + 0x37);
-    bx = A(0x1adc);
-    todo(0x44b0);
+    startScript(A(0x1adc));
     effect(0xc65);
     W(0x3383) = 0xffff;
     B(0x3713) = 0;  // cs:5ff9
@@ -269,8 +268,7 @@ void Engine::mainLoop() {
         if (CB(0x3195) != 0xff) {
           CB(0x3475) = 0;
           CB(0x3195) = 0xff;
-          bx = A(0x4414);
-          todo(0x44b0);
+          startScript(A(0x4414));
         }
       }
     } else if (B(0x33ce) != 0xff) {

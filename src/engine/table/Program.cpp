@@ -61,6 +61,8 @@ Program::Program(ByteView prg, int table) : table_(table & 3), ds_(0x10000, 0), 
     const std::size_t n = std::min<std::size_t>(0x10000, prg.size() - from);
     std::copy_n(prg.begin() + static_cast<std::ptrdiff_t>(from), n, into.begin());
   };
+  image_.assign(prg.begin() + static_cast<std::ptrdiff_t>(header), prg.end());
+  image_.resize(image_.size() + 0x10000, 0);
   segment(kCodeSegment, cs_);
   segment(dataSegment_, ds_);
 }
@@ -72,6 +74,13 @@ u16 Program::data(u16 a) const {
   if (auto it = m.data[t].find(a); it != m.data[t].end()) return it->second;
   if (auto it = m.value[t].find(a); it != m.value[t].end()) return it->second;
   lost("data", a, table_);
+}
+
+u16 Program::S(u16 segment) const {
+  if (table_ == 0) return segment;
+  const auto& m = maps().value[static_cast<std::size_t>(table_ - 1)];
+  if (auto it = m.find(segment); it != m.end()) return it->second;
+  lost("segment", segment, table_);
 }
 
 u16 Program::codeData(u16 a) const {

@@ -64,6 +64,13 @@ class Program {
   u8& nativeB(u16 a) { return ds_[a]; }
   Word nativeW(u16 a) { return Word(&ds_[a]); }
 
+  /// The program's other segments (pictures of the display's animations, the score's digits),
+  /// by this table's own segment value: the byte at an offset in one.
+  u8& farB(u16 nativeSegment, u16 offset) { return image_[(std::size_t{nativeSegment} * 16 + offset) % image_.size()]; }
+  Word farW(u16 nativeSegment, u16 offset) { return Word(&farB(nativeSegment, offset)); }
+  /// One of Party Land's segment values, as this table has it.
+  u16 S(u16 segment) const;
+
   /// Party Land's address of some data, as this table has it: to keep as a pointer.
   u16 A(u16 a) const { return data(a); }
   /// Party Land's address of a routine, as this table has it: to keep as a pointer.
@@ -95,6 +102,7 @@ class Program {
 
   int table_;
   std::vector<u8> ds_, cs_;
+  std::vector<u8> image_;  ///< the whole program as loaded, for its other segments
   u16 dataSegment_ = 0;
 
  private:
