@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <vector>
 #include <stdexcept>
 #include <string>
 
@@ -50,6 +51,9 @@ class Cpu {
   std::map<u32, std::function<void()>> watch;
   /// Set by a watch to leave that instruction for later: step() returns without running it.
   bool pause = false;
+  /// If set: every offset in segment `coverageSegment` an instruction began at is marked.
+  std::vector<bool>* coverage = nullptr;
+  u16 coverageSegment = 0;
   std::uint64_t executed = 0;
 
   u8 lo(Reg x) const { return static_cast<u8>(r[x]); }

@@ -338,6 +338,7 @@ void Cpu::step() {
       if (pause) return;
     }
   }
+  if (coverage && s[CS] == coverageSegment) (*coverage)[ip] = true;
   history_[historyAt_] = (u32{s[CS]} << 16) | ip;
   historyAt_ = (historyAt_ + 1) % kHistory;
   segOverride_ = -1;

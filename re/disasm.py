@@ -28,15 +28,26 @@ target = re.compile(r'^\S+\s+\S+\s+(?:call|jmp|j\w+|loop\w*|jcxz)(?: near| short
 
 def disassemble(binf):
     """ndisasm reads straight through, and loses its place wherever data sits between
-    routines. Every address the code jumps to or calls is certainly an instruction, so those
-    are given back to it as places to start afresh, until no new ones turn up."""
+    routines. It is given places that are certainly instructions to start afresh from: every
+    address the referee has run an instruction at (encore-oracle --coverage), and every
+    address the code jumps to or calls, unless that falls inside an instruction the referee
+    ran (a "jump" read out of data). Repeated until no new ones turn up."""
     size = binf.stat().st_size
-    sync, text = set(), ''
-    for _ in range(6):
+    cov = binf.parent / (binf.name.split('_')[0] + '.cov')
+    ran = {int(x, 16) for x in cov.read_text().split()} if cov.exists() and binf.name.endswith('seg0010.bin') else set()
+    sync, text = set(ran), ''
+    for _ in range(8):
         args = ['ndisasm', '-b16'] + [a for t in sorted(sync) for a in ('-s', hex(t))] + [str(binf)]
         text = subprocess.run(args, capture_output=True, text=True).stdout
-        found = {int(m.group(1), 16) for line in text.splitlines() if (m := target.match(line))}
-        found = {t for t in found if t < size}
+        inside, found, at = set(), set(), None
+        for line in text.splitlines():
+            try: at = int(line[:8], 16)
+            except ValueError:
+                continue
+            if at in ran: inside |= set(range(at + 1, at + len(line[10:28].strip()) // 2))
+            if (m := target.match(line)): found.add(int(m.group(1), 16))
+        found = {t for t in found if t < size and t not in inside}
+        sync -= inside
         if found <= sync: break
         sync |= found
     return text
