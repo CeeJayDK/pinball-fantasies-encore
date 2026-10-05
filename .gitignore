@@ -21,6 +21,7 @@ re/*
 !re/unexepack.py
 !re/align.py
 !re/gensymbols.py
+!re/show.py
 !re/symbols/
 # The server's tools and its local database
 server/node_modules/
