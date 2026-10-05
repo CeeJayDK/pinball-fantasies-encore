@@ -214,8 +214,8 @@ Contact Physics::probe(const Ball& ball) const {
     if (!wall.get(cx + p.dx, cy + p.dy)) continue;
     sumAngle += p.angle;
     ++count;
-    if (p.angle < 0x400) ++downHalf;
-    quadrants |= 1 << (p.angle >> 9);
+    if (p.angle <= 0x400) ++downHalf;  // the point due left counts with the quarter below it
+    quadrants |= p.angle == 0x400 ? 2 : 1 << (p.angle >> 9);
     last = index;
   }
   if (count == 0 || last < 0) return {};

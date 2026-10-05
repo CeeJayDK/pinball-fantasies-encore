@@ -856,7 +856,7 @@ void SpeedDevils::bindSteps() {
     w(0x33ad) = bx;
     call(nativeW(bx));
   });
-  bindNative(0x2603, [=, this] {  // the bonus times its multiplier
+  bindNative(0x2602, [=, this] {  // the bonus times its multiplier
     for (u16 i = 0; i < 12; ++i) b(static_cast<u16>(0x095e + i)) = b(static_cast<u16>(0x3361 + i));
     for (u8 n = static_cast<u8>(b(0x095d) - 1); n > 0; --n) addScore(0x3361, 0x095e);
     b(0x1dd1) = static_cast<u8>(b(0x095d) + 0x37);

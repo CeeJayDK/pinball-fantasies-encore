@@ -1,5 +1,7 @@
 // The ball: its sub-steps (probe, bounce, flippers and nudge, move), and what follows them
 // each frame. All of it works on the program's own variables and collision masks.
+#include <cstdio>
+
 #include "engine/table/Engine.h"
 
 namespace encore {
@@ -77,8 +79,9 @@ bool Engine::probeBall() {
     if (!maskBit(walls, cx + p.dx, cy + p.dy)) continue;
     sum = static_cast<u16>(sum + p.angle);
     ++count;
-    if (p.angle < 0x400) ++lowerHalf;
-    quadrants |= 1 << (p.angle >> 9);
+    // (the point due left, at 0x400, is counted with the quarter below it: cs:8a2f)
+    if (p.angle <= 0x400) ++lowerHalf;
+    quadrants |= p.angle == 0x400 ? 2 : 1 << (p.angle >> 9);
     last = index;
   }
   // Touches either side of "pointing right" would average to pointing left.
@@ -162,6 +165,10 @@ bool Engine::probeBall() {
 
 /// cs:8e95
 void Engine::bounce() {
+  if (debugWatch == -2)
+    std::fprintf(stderr, "[ours] bounce at (%d,%d) speed (%d,%d) angle %03x probes %d material %d contact (%d,%d) nudge %d\n", W(at::ballX).s(),
+                 W(at::ballY).s(), W(at::ballVx).s(), W(at::ballVy).s(), static_cast<unsigned>(W(at::contactAngle)), B(at::contactProbes),
+                 B(at::material), W(at::contactX).s(), W(at::contactY).s(), W(at::nudgeLift).s());
   const i16 lowest = W(0x68a2).s(), highest = W(0x68a4).s();
   const i16 vx = clampTo(static_cast<i16>(W(at::ballVx) + W(at::flipperVx)), lowest, highest);
   const i16 vy = clampTo(static_cast<i16>(W(at::ballVy) + W(at::flipperVy) + W(at::tableVelocity)), lowest, highest);

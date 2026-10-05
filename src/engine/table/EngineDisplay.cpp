@@ -498,32 +498,35 @@ void Engine::bindDisplay() {
   // --- an animation from the table's bank of them (cs:6fb5). Before its frames come where to
   // go back to, how many times round, and where the frames end; each frame is how long it
   // stays and, for each plane, a list of dots to light or put out.
+  // (its three counters and its note of where it is are in the bank itself, at places each
+  // table's own code names)
   bind(0x44dd, [=, this] {
     if (W(0x33e9) != 0) B(0x3397) = 0xff;
     const u16 bank = S(0x2056), anim = arg(2);
-    farW(bank, 0x42c) = 0;
-    farW(bank, 0x42a) = 1;
-    farW(bank, 0x428) = farW(bank, static_cast<u16>(anim - 4));
+    farW(bank, kw(0x44f5, 2)) = 0;
+    farW(bank, kw(0x44fb, 2)) = 1;
+    farW(bank, kw(0x4504, 2)) = farW(bank, static_cast<u16>(anim - 4));
     W(0x33e7) = F(0x6fb5);
     W(0x33e9) = anim;
     nextStep(4);
   });
   bind(0x6fb5, [this] {
     const u16 bank = S(0x2056);
-    farW(bank, 0x42e) = si;
-    if (--farW(bank, 0x42a) != 0) return;
-    const u16 entry = farW(bank, 0x42c);
+    const u16 entryAt = kw(0x44f5, 2), framesLeft = kw(0x44fb, 2), roundsLeft = kw(0x4504, 2);
+    farW(bank, kw(0x6fc3, 2)) = si;
+    if (--farW(bank, framesLeft) != 0) return;
+    const u16 entry = farW(bank, entryAt);
     if (entry == farW(bank, static_cast<u16>(si - 2))) {
-      if (--farW(bank, 0x428) == 0) {
+      if (--farW(bank, roundsLeft) == 0) {
         si = 0;
-        farW(bank, 0x42c) = 0;
-        farW(bank, 0x42a) = 0;
+        farW(bank, entryAt) = 0;
+        farW(bank, framesLeft) = 0;
         return;
       }
-      farW(bank, 0x42c) = farW(bank, static_cast<u16>(si - 6));
+      farW(bank, entryAt) = farW(bank, static_cast<u16>(si - 6));
     }
-    farW(bank, 0x42c) += 4;
-    farW(bank, 0x42a) = farW(bank, static_cast<u16>(entry + si + 2));
+    farW(bank, entryAt) += 4;
+    farW(bank, framesLeft) = farW(bank, static_cast<u16>(entry + si + 2));
     u16 frame = farW(bank, static_cast<u16>(entry + si));
     for (int plane = 0; plane < 2; ++plane) {
       const u16 count = farW(bank, frame);
@@ -536,62 +539,6 @@ void Engine::bindDisplay() {
         else if ((b >> 1) != 0x7f) dot(plane, place) = kb(0x7001, 2);
       }
     }
-  });
-
-  // --- a count down from a number of seconds, shown as two digits (cs:47db)
-  bind(0x4757, [=, this] {
-    B(0x33e4) = 0;
-    W(0x33e9) = 1;
-    W(0x33e7) = F(0x47db);
-    forgetNumber();
-    W(0x36f0) = arg(6);
-    W(0x36ee) = 1;
-    B(0x33f7) = 0;
-    nextStep(8);
-  });
-  bind(0x47bc, [=, this] {
-    W(0x33e9) = 1;
-    W(0x33e7) = F(0x47db);
-    forgetNumber();
-    if (B(0x33e4) == 0xff) {
-      B(0x33e4) = 0;
-      W(0x36f0) = arg(6);
-      B(0x36f3) = static_cast<u8>(0x37 + arg(2));
-      B(0x36f4) = static_cast<u8>(0x38 + arg(4));
-    }
-    W(0x36ee) = 1;
-    nextStep(8);
-  });
-  bind(0x47db, [this] {
-    if (B(0x33f7) != 0xff && --W(0x36ee) == 0) {
-      W(0x36ee) = W(0x36ec);
-      if (B(0x36f4) == 0x37 && B(0x36f3) == 0x2a) {  // nought: done
-        W(0x33e9) = 0;
-        si = 0;
-        return;
-      }
-      if (--B(0x36f4) == 0x36) {
-        B(0x36f4) += 0x0a;
-        --B(0x36f3);
-      }
-      if (B(0x36f3) == 0x37) B(0x36f3) = 0x2a;  // no nought in front
-      const u16 keep = si;
-      call(F(0x2ddc));  // the table's own, each second
-      si = keep;
-      setFont(1);
-      W(0x447b) = 0;
-      W(0x447d) = 0;
-      W(0x36fc) = A(0x36f3);
-      W(0x36fe) = 0x240;
-      W(0x36fa) = F(0x6ca5);
-      si = 1;
-      return;
-    }
-    W(0x447d) = 0;
-    W(0x4485) = W(0x36f0);
-    W(0x4487) = 0x158;
-    W(0x36fa) = F(0x45af);
-    si = 1;
   });
 
   // --- text that slides in from below, or out upwards

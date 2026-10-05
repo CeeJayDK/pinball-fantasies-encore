@@ -13,6 +13,7 @@
 //                                 it, and says each place that ever differs once
 #include <cstdio>
 #include <cstdlib>
+#include <array>
 #include <cstring>
 #include <memory>
 #include <set>
@@ -81,6 +82,18 @@ int main(int argc, char** argv) {
     if (const char* w = std::getenv("ENCORE_WATCH")) e.debugWatch = static_cast<int>(std::strtol(w, nullptr, 16));
     if (const char* w = std::getenv("ENCORE_WATCH")) m.watchWrite = (oracle::u32{m.seg(e.dataSegment())} << 4) + static_cast<oracle::u32>(std::strtol(w, nullptr, 16));
     const oracle::u16 ds = m.seg(e.dataSegment()), cs = m.seg(0x10);
+    if (const char* from = std::getenv("ENCORE_BOUNCE")) {
+      const int fromFrame = std::atoi(from);
+      m.cpu.watch[(oracle::u32{cs} << 16) | e.F(0x8e95)] = [&, fromFrame] {
+        if (frame < fromFrame) return;
+        e.debugWatch = -2;
+        auto w = [&](encore::u16 a) { return static_cast<oracle::i16>(m.peek16(ds, e.A(a))); };
+        std::fprintf(stderr, "[original] bounce at (%d,%d) speed (%d,%d) angle %03x probes %d material %d contact (%d,%d) nudge %d (frame %d)\n",
+                     w(encore::at::ballX), w(encore::at::ballY), w(encore::at::ballVx), w(encore::at::ballVy),
+                     static_cast<unsigned>(m.peek16(ds, e.A(encore::at::contactAngle))), m.peek8(ds, e.A(encore::at::contactProbes)),
+                     m.peek8(ds, e.A(encore::at::material)), w(encore::at::contactX), w(encore::at::contactY), w(encore::at::nudgeLift), frame);
+      };
+    }
     if (ownStart) {
       // The engine starts by itself, and what that leaves is compared with what the original's
       // start-up left, before it is taken over like every other difference.
@@ -134,6 +147,7 @@ int main(int argc, char** argv) {
     bool left = false, right = false;
     int reported = 0;
     long videoDiffers = 0;
+    bool shown = false;
     for (frame = 0; frame < frames; ++frame) {
       for (const auto& [at, code] : keys)
         if (at == frame) {
@@ -164,6 +178,7 @@ int main(int argc, char** argv) {
       m.frame();
       e.frame();
       bool differs = false;
+      const std::array<std::vector<encore::u8>, 2> shownOurs = {e.videoMemory()[0], e.videoMemory()[2]};
       // What only the original's drawing uses is not kept: where it last drew the ball, and
       // the drawing routines' own variables among the code.
       auto drawing = [&](const char* what, unsigned a) {
@@ -193,6 +208,10 @@ int main(int argc, char** argv) {
           std::printf("  (the copy of the ramps' marks in video memory at %04x: %d bytes differ, the first at row %d column %d)\n", base, bad,
                       first / 40, first % 40 * 8);
         }
+        if (std::getenv("ENCORE_TASK"))
+          std::printf("  (task %04x state %04x next step %04x; clip %d,%d; slide row %d of %d)\n", m.peek16(ds, e.A(0x33e7)), m.peek16(ds, e.A(0x33e9)),
+                      m.peek16(ds, e.A(0x33e5)), m.peek16(ds, e.A(0x447b)), m.peek16(ds, e.A(0x447d)),
+                      static_cast<oracle::i16>(m.peek16(ds, e.A(0x370a))), static_cast<oracle::i16>(m.peek16(ds, e.A(0x370c))));
         if (std::getenv("ENCORE_BALL"))
           std::printf("  (trigger %04x, ours %04x) (ball %d,%d layer %02x nudge %d)\n", m.peek16(ds, e.A(0x3316)), static_cast<unsigned>(e.W(0x3316)), m.peek16(ds, e.A(encore::at::ballX)), m.peek16(ds, e.A(encore::at::ballY)),
                       m.peek8(ds, e.A(encore::at::layer)), m.peek16(ds, e.A(encore::at::nudgeLift)));
@@ -226,6 +245,14 @@ int main(int argc, char** argv) {
             if (all) ours = theirs;
           }
         }
+      // beside the picture: the four spare bytes of each row, where the top of one mask's copy is
+      for (std::size_t p = 0; p < 4; ++p)
+        for (unsigned a = 0x0ad4; a < 0xc7d4; ++a)
+          if ((a - 0x0ad4) % 0x54 >= 0x50 && e.videoMemory()[p][a] != m.vga.planes[p][a]) {
+            ++videoDiffers;
+            if (std::getenv("ENCORE_VIDEO")) report("video memory beside the picture,", a, e.videoMemory()[p][a], m.vga.planes[p][a]);
+            if (std::getenv("ENCORE_TAKE_VIDEO")) e.videoMemory()[p][a] = m.vga.planes[p][a];
+          }
       // past the picture: the mask copies and the pictures kept over them
       for (std::size_t p = 0; p < 4; ++p)
         for (unsigned a = 0xc7d4; a < 0x10000; ++a)
@@ -243,6 +270,34 @@ int main(int argc, char** argv) {
           report("colour byte", a, e.colours()[a], m.vga.dac[a]);
           if (all) e.colours()[a] = m.vga.dac[a];
         }
+      if (const char* at = std::getenv("ENCORE_SEGMENTS"); at && frame == std::atoi(at)) {
+        // the whole program, once: where its other segments (the masks, say) differ
+        int n = 0;
+        for (std::size_t a = 0x100; a + 0x10000 < e.image().size(); ++a) {
+          const oracle::u8 theirs = m.peek8(static_cast<oracle::u16>(encore::Program::kLoadSegment + (a >> 4)), static_cast<oracle::u16>(a & 15));
+          const std::size_t dataAt = std::size_t{e.dataSegment()} * 16;
+          if ((a >= dataAt && a < dataAt + 0x10000) || a < 0x100 + 0xac00u) continue;
+          if (e.image()[a] != theirs && ++n <= 12)
+            std::printf("frame %d: the program's byte %05zx (segment %04zx) ours %02x, the original's %02x\n", frame, a, a >> 4, e.image()[a], theirs);
+        }
+        std::printf("frame %d: %d bytes of the program's other segments differ\n", frame, n);
+      }
+      if (differs && std::getenv("ENCORE_SHOW") && !shown) {
+        // the two displays, ours above
+        shown = true;
+        for (int which = 0; which < 2; ++which) {
+          for (int row = 0; row < 16; ++row) {
+            std::string line;
+            for (int x = 0; x < 160; ++x) {
+              const unsigned at = 0xa8u + static_cast<unsigned>(row) * 0xa8u + static_cast<unsigned>(x / 2);
+              const oracle::u8 v = which ? m.vga.planes[(x & 1) * 2][at] : shownOurs[static_cast<std::size_t>(x & 1)][at];
+              line += v == e.kb(0x4afa, 1) ? '#' : '.';
+            }
+            std::puts(line.c_str());
+          }
+          std::puts("");
+        }
+      }
       if (differs && !all) {
         std::printf("they part at frame %d\n", frame);
         return 1;
