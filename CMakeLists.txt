@@ -217,7 +217,7 @@ add_executable(encore-play tools/play.cpp)
 target_link_libraries(encore-play PRIVATE encore_core)
 
 # The engine being written (docs/own-engine.md), beside the one it will replace.
-file(GLOB ENCORE_ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/audio/*.cpp src/engine/data/*.cpp src/engine/sim/*.cpp src/engine/game/*.cpp src/engine/table/*.cpp)
+file(GLOB ENCORE_ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/audio/*.cpp src/engine/data/*.cpp src/engine/sim/*.cpp src/engine/game/*.cpp src/engine/table/*.cpp src/engine/view/*.cpp)
 # The front end (intro, menu) comes last, and is not built until then.
 list(FILTER ENCORE_ENGINE_SOURCES EXCLUDE REGEX "game/(Menu|Intro|Session)\\.cpp$")
 add_library(encore_engine STATIC ${ENCORE_ENGINE_SOURCES})

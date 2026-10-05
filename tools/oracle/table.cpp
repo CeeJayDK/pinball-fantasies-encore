@@ -7,6 +7,8 @@
 //   encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...]
 //                       [--flip <seed>]  plays at random from frame 400 on
 //                       [--wild]   with --flip: nudges, letters and more players too
+//                       [--picture] the screen as ours draws it against the original's, dot for dot
+//                                  (ENCORE_PICTURE=<frame> writes both there as ours.png, theirs.png)
 //                       [--rough]  with --flip: now and then the ball is thrown somewhere else on
 //                                  the table, and the table shaken until it tilts; the best
 //                                  scores start at nought, so that every game asks for initials
@@ -31,6 +33,8 @@
 #include "engine/table/Gameshow.h"
 #include "engine/table/SpeedDevils.h"
 #include "engine/table/StonesNBones.h"
+#include "engine/view/TableScreen.h"
+#include "core/Png.h"
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -43,7 +47,7 @@ int main(int argc, char** argv) {
   std::vector<std::pair<int, int>> keys;
   bool all = false;
   int flip = -1;
-  bool ownStart = false, wild = false, rough = false;
+  bool ownStart = false, wild = false, rough = false, picture = false;
   oracle::Machine::Config config;
   encore::Engine::Options options;
   for (int i = 4; i < argc; ++i) {
@@ -51,6 +55,7 @@ int main(int argc, char** argv) {
     else if (!std::strcmp(argv[i], "--start")) ownStart = true;
     else if (!std::strcmp(argv[i], "--wild")) wild = true;
     else if (!std::strcmp(argv[i], "--rough")) rough = true;
+    else if (!std::strcmp(argv[i], "--picture")) picture = true;
     else if (!std::strcmp(argv[i], "--options") && i + 1 < argc) {  // six digits, as PINBALL.CFG's bytes
       const char* o = argv[++i];
       for (int k = 0; k < 6 && o[k]; ++k) config.bytes[k] = static_cast<oracle::u8>(o[k] - '0');
@@ -154,6 +159,10 @@ int main(int argc, char** argv) {
     bool left = false, right = false;
     int shakeUntil = 0;
     unsigned throwEvery = 350;
+    long pictureFrames = 0, picturePixels = 0;
+    std::unique_ptr<encore::TableScreen> screen;
+    if (picture) screen = std::make_unique<encore::TableScreen>(*pfr::file::findCaseInsensitive(dir, "TABLE" + std::to_string(table + 1) + ".PRG"), table);
+    if (screen) screen->attach(e);
     int wrongPlayer = 0;
     int reported = 0;
     long videoDiffers = 0;
@@ -380,6 +389,34 @@ int main(int argc, char** argv) {
           report("colour byte", a, e.colours()[a], m.vga.dac[a]);
           if (all) e.colours()[a] = m.vga.dac[a];
         }
+      if (picture) {
+        const int height = encore::TableScreen::height(options.highResolution);
+        std::vector<encore::u8> ours(static_cast<std::size_t>(320 * height));
+        screen->draw(e, ours.data(), height);
+        const auto theirs = m.vga.picture(height);
+        long wrong = 0;
+        std::size_t first = 0;
+        for (std::size_t i = 0; i < ours.size(); ++i)
+          if (ours[i] != theirs[i] && std::memcmp(&m.vga.dac[ours[i] * 3u], &m.vga.dac[theirs[i] * 3u], 3) != 0 && wrong++ == 0) first = i;
+        if (wrong) {
+          ++pictureFrames;
+          picturePixels += wrong;
+          if (pictureFrames <= 8)
+            std::printf("frame %d: the screen differs in %ld dots, the first at %zu,%zu (ours %02x, the original's %02x); top row %d, the original's memory from %04x, split at %d\n",
+                        frame, wrong, first % 320, first / 320, ours[first], theirs[first], static_cast<encore::i16>(e.screenRow()) - 33,
+                        m.vga.startAddress(), m.vga.lineCompare());
+        }
+        if (const char* at = std::getenv("ENCORE_PICTURE"); at && frame == std::atoi(at)) {
+          auto save = [&](const char* name, const encore::u8* px) {
+            std::vector<encore::u8> rgb(static_cast<std::size_t>(320 * height * 3));
+            for (std::size_t i = 0; i < static_cast<std::size_t>(320 * height); ++i)
+              for (std::size_t c = 0; c < 3; ++c) rgb[i * 3 + c] = static_cast<encore::u8>(m.vga.dac[px[i] * 3u + c] * 255 / 63);
+            pfr::writeRgbPng(name, rgb.data(), 320, height);
+          };
+          save("ours.png", ours.data());
+          save("theirs.png", theirs.data());
+        }
+      }
       if (const char* at = std::getenv("ENCORE_GRAVITY"); at && frame == std::atoi(at)) {
         // what the pull on the ball is read from, under where the ball is now, in both
         unsigned x = m.peek16(ds, e.A(encore::at::ballX)), y = m.peek16(ds, e.A(encore::at::ballY));
@@ -438,6 +475,7 @@ int main(int argc, char** argv) {
     }
     std::printf(reported ? "%d places differed over %d frames\n" : "the same for %2$d frames\n", reported, frames);
     if (videoDiffers) std::printf("(the original's drawing past the picture: %ld bytes, frame by frame)\n", videoDiffers);
+    if (picture) std::printf(pictureFrames ? "the screen differed in %ld frames, %ld dots in all\n" : "the screen the same in every frame\n", pictureFrames, picturePixels);
     if (std::getenv("ENCORE_COVER")) {  // what of ours the game never came to
       std::printf("never called:");
       for (const encore::u16 at : e.neverCalled()) std::printf(" %04x", at);

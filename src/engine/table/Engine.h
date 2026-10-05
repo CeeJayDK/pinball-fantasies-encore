@@ -59,6 +59,18 @@ class Engine : public Program {
   u8 musicAsks(u8 place) { return musicCallback(place); }
   /// The program asked to end.
   bool exited() const { return exited_; }
+  /// Where the moving things were when the original last drew them (which is not always
+  /// where they are now: some are drawn before a frame's steps and some after).
+  struct Shown {
+    i16 ballX = 0, ballY = 0;
+    bool ramps = false;              ///< the ball is on the ramps: other things hide it there
+    std::array<u16, 3> flipper{};    ///< which of its pictures each flipper shows
+  };
+  const Shown& shown() const { return shown_; }
+  /// A flipper is drawn standing another way than it was last drawn: its record, and which
+  /// of its pictures it showed and shows now. The original gets from one to the other by
+  /// lists of changes, and what is left on the screen depends on the way taken.
+  std::function<void(u16 record, u16 was, u16 now)> onFlipperDrawn;
   /// The row of the picture at the top of the screen.
   u16 screenRow() const { return screenRow_; }
 
@@ -81,6 +93,8 @@ class Engine : public Program {
   void frameCallback();
   void midFrameCallback();
   void mainLoop();
+  void drawBall();          // cs:4140
+  void drawFlipper(int which);  // cs:550e
   void attractFrame();      // cs:6011
   void attractMidFrame();   // cs:60c5
   void scroll();            // cs:4018
@@ -202,6 +216,7 @@ class Engine : public Program {
   bool exited_ = false;
   enum class Pause { No, AnyKey, YesOrNo } pause_ = Pause::No;
   u16 screenRow_ = 0;
+  Shown shown_;
 };
 
 }  // namespace encore

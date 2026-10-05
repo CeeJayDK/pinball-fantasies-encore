@@ -115,20 +115,32 @@ void Engine::frameCallback() {
     B(0x2f0a) = 0xff;
   } else if (W(0x2f02) >= (high() ? kw(0x42ae, 1) : kw(0x42a1, 1))) {
     B(0x2f0b) = 0xff;
+  } else {
+    drawFlipper(2);
   }
   if (ballY >= static_cast<u16>(W(0x2f02) + (high() ? 0x9e : 0x67))) {
-    if (B(0x2f06) != 0xff) B(0x2f09) = 0xff;
-    else B(0x2f06) = 0;
+    if (B(0x2f06) != 0xff) {
+      B(0x2f09) = 0xff;
+      drawBall();
+    } else {
+      B(0x2f06) = 0;
+      drawFlipper(0);
+      drawFlipper(1);
+    }
     physicsSteps();
     B(0x2f07) = 0;
   } else if (B(0x2f06) != 0xff) {
     B(0x2f06) = 0xff;
     B(0x2f07) = 0xff;
     B(0x2f09) = 0xff;
+    drawBall();
     physicsSteps();
   } else {
+    drawFlipper(0);
+    drawFlipper(1);
     physicsSteps();
     B(0x2f07) = 0xff;
+    if (static_cast<u16>(W(0x2f02) + (high() ? 0xa3 : 0x6c)) < kw(0x4359, 1)) drawFlipper(2);
   }
   afterSteps();
   B(0x23aa) = 0;
@@ -153,6 +165,30 @@ void Engine::frameCallback() {
   B(0x23ab) = 0;
 }
 
+/// cs:4140: the ball is drawn where it now is, and with it whichever flippers are due. The
+/// engine draws nothing: it keeps where the original would have drawn each, for whoever
+/// makes the picture.
+void Engine::drawBall() {
+  if (B(0x2f09) == 0xff) {
+    drawFlipper(0);
+    drawFlipper(1);
+  }
+  if (B(0x2f0a) == 0xff) drawFlipper(2);
+  shown_.ballX = W(at::ballX).s();
+  shown_.ballY = static_cast<i16>(W(at::ballY) + (B(at::ballHidden) == 0xff ? 0 : W(at::nudgeLift)));
+  shown_.ramps = B(at::layer) != 0;
+}
+
+/// cs:550e: a flipper is drawn as it now stands.
+void Engine::drawFlipper(int which) {
+  const u16 record = static_cast<u16>(A(0x6950) + which * 0x3c);
+  if (which == 2 && nativeB(record) == 0) return;
+  const u16 now = nativeW(static_cast<u16>(record + 0x1e)), was = nativeW(static_cast<u16>(record + 0x2c));
+  nativeW(static_cast<u16>(record + 0x2c)) = now;
+  shown_.flipper[static_cast<std::size_t>(which)] = now;
+  if (now != was && onFlipperDrawn) onFlipperDrawn(record, was, now);
+}
+
 // ---------------------------------------------------------------------------------------
 // cs:55db, the callback part way down the frame
 // ---------------------------------------------------------------------------------------
@@ -169,7 +205,11 @@ void Engine::midFrameCallback() {
   if (B(0x23aa) != 0) return;
   B(at::inMidFrame) = 0xff;
   physicsSteps();
-  if (B(0x2f07) == 0xff) B(0x2f09) = 0;
+  if (B(0x2f07) == 0xff) {
+    B(0x2f09) = 0;
+    drawBall();
+  }
+  if (B(0x2f0b) == 0xff) drawFlipper(2);
   if (const u8 al = B(0x3714); al != 0) {  // a game was asked for: with this many players
     B(0x3714) = 0;
     B(0x3716) = static_cast<u8>(al - 0x3a);
