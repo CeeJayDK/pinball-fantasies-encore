@@ -1,0 +1,122 @@
+// encore-oracle-table: the engine's memory against the original's, frame by frame.
+//
+// The referee starts a table and runs its start-up; the engine is given the memory as that
+// leaves it. Both are then given the same keys, and after every frame the engine's data
+// segment, the variables among its code and its colours are compared with the original's.
+//
+//   encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...]
+//                       [--all]   goes on after a difference, taking the original's value for
+//                                 it, and says each place that ever differs once
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "Machine.h"
+#include "core/File.h"
+#include "engine/table/Engine.h"
+
+int main(int argc, char** argv) {
+  if (argc < 4) {
+    std::puts("usage: encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...] [--all]");
+    return 2;
+  }
+  const std::filesystem::path dir = argv[1];
+  const int table = std::atoi(argv[2]) - 1;
+  const int frames = std::atoi(argv[3]);
+  std::vector<std::pair<int, int>> keys;
+  bool all = false;
+  for (int i = 4; i < argc; ++i) {
+    if (!std::strcmp(argv[i], "--all")) all = true;
+    else if (!std::strcmp(argv[i], "--keys") && i + 1 < argc) {
+      for (const char* p = argv[++i]; *p;) {
+        char* end = nullptr;
+        const long a = std::strtol(p, &end, 10);
+        if (*end != ':') break;
+        const long b = std::strtol(end + 1, &end, 16);
+        keys.push_back({static_cast<int>(a), static_cast<int>(b)});
+        p = *end == ',' ? end + 1 : end;
+      }
+    }
+  }
+  const auto prg = pfr::file::readAll(dir / ("TABLE" + std::to_string(table + 1) + ".PRG"));
+  if (!prg) {
+    std::puts("cannot read the table's program");
+    return 2;
+  }
+  int frame = -1;
+  try {
+    encore::Engine e(*prg, table);
+    oracle::Machine m(dir, table, {});
+    m.setLoop(0x10, e.F(encore::at::mainLoop));
+    m.loopsPerFrame = e.loopsPerFrame;
+    m.boot();
+    const oracle::u16 ds = m.seg(e.dataSegment()), cs = m.seg(0x10);
+    for (unsigned a = 0; a < 0x10000; ++a) {
+      e.memory()[a] = m.peek8(ds, static_cast<oracle::u16>(a));
+      e.codeMemory()[a] = m.peek8(cs, static_cast<oracle::u16>(a));
+    }
+    e.colours() = m.vga.dac;
+
+    // The data segment ends where the next begins; the code's variables are among its code.
+    const unsigned dataEnd = 0x6c00, codeEnd = 0xac00;
+    std::set<unsigned> seen;
+    int reported = 0;
+    for (frame = 0; frame < frames; ++frame) {
+      for (const auto& [at, code] : keys)
+        if (at == frame) {
+          m.key(static_cast<oracle::u8>(code));
+          e.key(static_cast<encore::u8>(code));
+        }
+      m.frame();
+      e.frame();
+      bool differs = false;
+      auto report = [&](const char* what, unsigned a, unsigned ours, unsigned theirs) {
+        differs = true;
+        if (!seen.insert((what[0] << 20) | a).second) return;
+        ++reported;
+        if (what[0] == 'd') {
+          const encore::u16 pl = e.partyLandData(static_cast<encore::u16>(a));
+          std::printf("frame %d: data %04x (Party Land's %04x) ours %02x, the original's %02x\n", frame, a, pl, ours, theirs);
+        } else {
+          std::printf("frame %d: %s %04x ours %02x, the original's %02x\n", frame, what, a, ours, theirs);
+        }
+      };
+      for (unsigned a = 0; a < dataEnd; ++a) {
+        const oracle::u8 theirs = m.peek8(ds, static_cast<oracle::u16>(a));
+        if (e.memory()[a] != theirs) {
+          report("data", a, e.memory()[a], theirs);
+          if (all) e.memory()[a] = theirs;
+        }
+      }
+      for (unsigned a = 0; a < codeEnd; ++a) {
+        const oracle::u8 theirs = m.peek8(cs, static_cast<oracle::u16>(a));
+        if (e.codeMemory()[a] != theirs) {
+          report("code variable", a, e.codeMemory()[a], theirs);
+          if (all) e.codeMemory()[a] = theirs;
+        }
+      }
+      for (unsigned a = 0; a < 768; ++a)
+        if (e.colours()[a] != m.vga.dac[a]) {
+          report("colour byte", a, e.colours()[a], m.vga.dac[a]);
+          if (all) e.colours()[a] = m.vga.dac[a];
+        }
+      if (differs && !all) {
+        std::printf("they part at frame %d\n", frame);
+        return 1;
+      }
+      if (reported > 200) {
+        std::puts("(and more)");
+        return 1;
+      }
+    }
+    std::printf(reported ? "%d places differed over %d frames\n" : "the same for %2$d frames\n", reported, frames);
+    return reported ? 1 : 0;
+  } catch (const std::exception& ex) {
+    std::printf("stopped at frame %d: %s\n", frame, ex.what());
+    return 2;
+  }
+}

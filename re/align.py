@@ -63,6 +63,10 @@ def main(a, b):
                 if run: o.write(f'code {run[0]:04x} {run[1]:04x} {run[0] + run[2]:04x}\n')
                 run = [aa, aa, d]
         if run: o.write(f'code {run[0]:04x} {run[1]:04x} {run[0] + run[2]:04x}\n')
+        o.write('# target: where a routine A calls or jumps to is in B, as B\'s matching instruction has it\n')
+        for x in sorted(votes['code']):
+            c = votes['code'][x].most_common()
+            o.write(f'target {x:04x} {c[0][0]:04x} {c[0][1]}\n')
         for kd in ('data', 'csdata', 'imm'):
             o.write(f'# {kd}: number in A, number in B, how often (other candidates)\n')
             for x in sorted(votes[kd]):

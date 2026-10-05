@@ -19,7 +19,7 @@ dest.mkdir(parents=True, exist_ok=True)
 
 tables = {}
 for t in (2, 3, 4):
-    m = {'code': [], 'data': {}, 'imm': {}, 'csdata': {}}
+    m = {'code': [], 'data': {}, 'imm': {}, 'csdata': {}, 'target': {}}
     for line in (here / 'fantasy' / f'map_1_{t}.txt').read_text().splitlines():
         f = line.split()
         if not f or f[0].startswith('#'): continue
@@ -41,7 +41,7 @@ for line in (here / 'symbols' / 'table1.txt').read_text().splitlines():
 (dest / 'Names.inc').write_text('\n'.join(names) + '\n')
 
 out = ['// Written by re/gensymbols.py from the line-up of the four table programs. Do not edit.', '']
-for kind, macro in (('data', 'ENCORE_MAP_DATA'), ('csdata', 'ENCORE_MAP_CODE_DATA'), ('imm', 'ENCORE_MAP_VALUE')):
+for kind, macro in (('data', 'ENCORE_MAP_DATA'), ('csdata', 'ENCORE_MAP_CODE_DATA'), ('imm', 'ENCORE_MAP_VALUE'), ('target', 'ENCORE_MAP_TARGET')):
     keys = sorted(set().union(*(tables[t][kind].keys() for t in (2, 3, 4))))
     for k in keys:
         # 0xffff: not found in that table
