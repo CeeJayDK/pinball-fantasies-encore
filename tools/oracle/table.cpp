@@ -7,6 +7,9 @@
 //   encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...]
 //                       [--flip <seed>]  plays at random from frame 400 on
 //                       [--wild]   with --flip: nudges, letters and more players too
+//                       [--rough]  with --flip: now and then the ball is thrown somewhere else on
+//                                  the table, and the table shaken until it tilts; the best
+//                                  scores start at nought, so that every game asks for initials
 //                       [--options 001010]  balls, angle, scrolling, music off, resolution, mono
 //                       [--start]  the engine starts by itself, and that is compared first
 //                       [--all]   goes on after a difference, taking the original's value for
@@ -25,6 +28,7 @@
 #include "core/File.h"
 #include "engine/table/Engine.h"
 #include "engine/table/PartyLand.h"
+#include "engine/table/Gameshow.h"
 #include "engine/table/SpeedDevils.h"
 
 int main(int argc, char** argv) {
@@ -34,17 +38,18 @@ int main(int argc, char** argv) {
   }
   const std::filesystem::path dir = argv[1];
   const int table = std::atoi(argv[2]) - 1;
-  const int frames = std::atoi(argv[3]);
+  int frames = std::atoi(argv[3]);
   std::vector<std::pair<int, int>> keys;
   bool all = false;
   int flip = -1;
-  bool ownStart = false, wild = false;
+  bool ownStart = false, wild = false, rough = false;
   oracle::Machine::Config config;
   encore::Engine::Options options;
   for (int i = 4; i < argc; ++i) {
     if (!std::strcmp(argv[i], "--all")) all = true;
     else if (!std::strcmp(argv[i], "--start")) ownStart = true;
     else if (!std::strcmp(argv[i], "--wild")) wild = true;
+    else if (!std::strcmp(argv[i], "--rough")) rough = true;
     else if (!std::strcmp(argv[i], "--options") && i + 1 < argc) {  // six digits, as PINBALL.CFG's bytes
       const char* o = argv[++i];
       for (int k = 0; k < 6 && o[k]; ++k) config.bytes[k] = static_cast<oracle::u8>(o[k] - '0');
@@ -73,6 +78,7 @@ int main(int argc, char** argv) {
     std::unique_ptr<encore::Engine> made;
     if (table == 0) made = std::make_unique<encore::PartyLand>(*prg);
     else if (table == 1) made = std::make_unique<encore::SpeedDevils>(*prg);
+    else if (table == 2) made = std::make_unique<encore::Gameshow>(*prg);
     else made = std::make_unique<encore::Engine>(*prg, table);
     encore::Engine& e = *made;
     oracle::Machine m(dir, table, config);
@@ -145,6 +151,8 @@ int main(int argc, char** argv) {
     std::set<unsigned> seen;
     unsigned rng = static_cast<unsigned>(flip) * 2654435761u + 1;
     bool left = false, right = false;
+    int shakeUntil = 0;
+    unsigned throwEvery = 350;
     int reported = 0;
     long videoDiffers = 0;
     bool shown = false;
@@ -167,6 +175,60 @@ int main(int argc, char** argv) {
         if (frame % 900 == 5) both(0x9c);
         if (frame % 300 == 100) { both(0xe0); both(0x50); }
         if (frame % 300 == 100 + static_cast<int>(random() % 60) + 20) { both(0xe0); both(0xd0); }
+        if (rough) {
+          // the same change made to both memories: the two are still to stay alike
+          auto poke = [&](encore::u16 partyLandAddress, unsigned value, int bytes) {
+            const encore::u16 at = e.A(partyLandAddress);
+            for (int i = 0; i < bytes; ++i) {
+              const auto v = static_cast<oracle::u8>(value >> (8 * i));
+              m.poke8(ds, static_cast<oracle::u16>(at + i), v);
+              e.memory()[static_cast<encore::u16>(at + i)] = v;
+            }
+          };
+          if (frame == 401)
+            for (encore::u16 entry = 0; entry < 4; ++entry) {
+              const encore::u16 at = static_cast<encore::u16>(e.kw(0x6377, 1) + entry * 0x10);
+              for (encore::u16 i = 0; i < 12; ++i) {
+                m.poke8(ds, static_cast<oracle::u16>(at + i), 0);
+                e.memory()[static_cast<encore::u16>(at + i)] = 0;
+              }
+            }
+          // (a ball about to leave by the top or the sides is thrown again at once: the original
+          // would draw it over the display's memory, which no game does)
+          const int ballX = static_cast<oracle::i16>(m.peek16(ds, e.A(encore::at::ballX))), ballY = static_cast<oracle::i16>(m.peek16(ds, e.A(encore::at::ballY)));
+          const bool leaving = ballY < 40 || ballX < 0 || ballX > 304;
+          // (now and then quickly one after another, for what takes two shots in a few seconds)
+          if (frame % 3000 == 0) throwEvery = std::array<unsigned, 4>{40, 120, 350, 350}[random() % 4];
+          if ((leaving || random() % throwEvery == 0) && m.peek8(ds, e.A(encore::at::ballHidden)) == 0 && m.peek8(ds, e.A(encore::at::betweenBalls)) == 0) {
+            unsigned x = 8 + random() % 300, y = 60 + random() % 510, layer = random() % 6 == 0 ? 0xff : 0;
+            int speed = 1000;
+            if (const unsigned where = random() % 4; where != 0) {
+              // more often than not, into one of the table's own places: where rolling over
+              // counts (on the playfield, on the ramps), or where touching something does
+              const encore::u16 list = e.A(where == 1 ? 0x0d9b : where == 2 ? 0x0e29 : 0x0d71);
+              unsigned entries = 0;
+              while (e.nativeW(static_cast<encore::u16>(list + entries * 10)) != 0) ++entries;
+              if (entries != 0) {
+                const encore::u16 entry = static_cast<encore::u16>(list + (random() % entries) * 10);
+                auto word = [&](int i) { return static_cast<unsigned>(e.nativeW(static_cast<encore::u16>(entry + i))); };
+                x = word(0) + random() % (word(4) - word(0) + 1) - 8;
+                y = word(2) + random() % (word(6) - word(2) + 1) - 8;
+                layer = where == 2 ? 0xff : 0;
+                speed = where == 3 ? 1500 : 300;
+              }
+            }
+            poke(encore::at::ballX, x, 2);
+            poke(encore::at::ballY, y, 2);
+            poke(encore::at::ballXFixed, x * 0x400, 4);
+            poke(encore::at::ballYFixed, y * 0x400, 4);
+            poke(encore::at::ballVx, static_cast<unsigned>(static_cast<int>(random() % static_cast<unsigned>(2 * speed + 1)) - speed), 2);
+            poke(encore::at::ballVy, static_cast<unsigned>(static_cast<int>(random() % static_cast<unsigned>(2 * speed + 1)) - speed), 2);
+            poke(encore::at::layer, layer, 1);
+          }
+          if (random() % 9000 == 0) shakeUntil = frame + 60;
+          if (frame < shakeUntil && frame % 4 == 0) both(0x39);
+          if (frame < shakeUntil && frame % 4 == 2) both(0xb9);
+        }
         if (wild) {  // and the rest of the keyboard: nudges, letters, more players
           if (random() % 500 == 0) both(0x39);
           if (random() % 500 == 1) both(0xb9);
@@ -175,7 +237,25 @@ int main(int argc, char** argv) {
           if (random() % 4000 == 0) { const int f = 0x3b + static_cast<int>(random() % 4); both(f); both(f | 0x80); }
         }
       }
-      m.frame();
+      // The original can go astray by itself, and then there is nothing to compare with: its
+      // players counted past the eighth (a game begun again with fewer players while a later
+      // one's turn was kept), after which it writes over its own tables; or a routine of its
+      // own that never ends.
+      const char* astray = nullptr;
+      std::string why;
+      try {
+        m.frame();
+      } catch (const std::exception& ex) {
+        why = ex.what();
+        astray = why.c_str();
+      }
+      // (a ninth is where the match stops looking when eight play)
+      if (!astray && m.peek8(ds, e.A(encore::at::player)) > 9) astray = "it counts its players past the eighth";
+      if (astray) {
+        std::printf("the original goes astray at frame %d (%s)\n", frame, astray);
+        frames = frame;
+        break;
+      }
       e.frame();
       bool differs = false;
       const std::array<std::vector<encore::u8>, 2> shownOurs = {e.videoMemory()[0], e.videoMemory()[2]};
@@ -184,6 +264,9 @@ int main(int argc, char** argv) {
       auto drawing = [&](const char* what, unsigned a) {
         if (!std::strcmp(what, "data")) {
           if ((a >= e.A(0x2ef8) && a < e.A(0x2ef8) + 4u) || a == e.A(0x2f08)) return true;
+          // what was under the ball where it was drawn is kept at the start of a segment that,
+          // in the Gameshow, begins inside the data segment's 64 KB
+          if (a - (static_cast<unsigned>(static_cast<encore::u16>(e.S(0x2f94) - encore::Program::kLoadSegment)) - e.dataSegment()) * 16u < 0x100u) return true;
           // each flipper's record keeps which picture of it was last drawn, and where
           for (unsigned f = e.A(0x6950); f < e.A(0x6950) + 3 * 0x3cu; f += 0x3c)
             if ((a >= f + 0x2c && a < f + 0x2e) || (a >= f + 0x34 && a < f + 0x36)) return true;
@@ -241,6 +324,12 @@ int main(int argc, char** argv) {
           const oracle::u8 theirs = m.vga.planes[static_cast<std::size_t>(p * 2)][a];
           encore::u8& ours = e.videoMemory()[static_cast<std::size_t>(p * 2)][a];
           if (ours != theirs) {
+            // a ball that goes off the top of the table is drawn by the original over the
+            // display's memory, in colours no dot of the display has: that is its drawing
+            if (theirs != 0 && theirs != e.kb(0x4afa, 1) && theirs != e.kb(0x4b01, 1)) {
+              ++videoDiffers;
+              continue;
+            }
             report(p ? "display, third plane," : "display, first plane,", a, ours, theirs);
             if (all) ours = theirs;
           }
@@ -309,6 +398,11 @@ int main(int argc, char** argv) {
     }
     std::printf(reported ? "%d places differed over %d frames\n" : "the same for %2$d frames\n", reported, frames);
     if (videoDiffers) std::printf("(the original's drawing past the picture: %ld bytes, frame by frame)\n", videoDiffers);
+    if (std::getenv("ENCORE_COVER")) {  // what of ours the game never came to
+      std::printf("never called:");
+      for (const encore::u16 at : e.neverCalled()) std::printf(" %04x", at);
+      std::printf("\n");
+    }
     return reported ? 1 : 0;
   } catch (const std::exception& ex) {
     std::printf("stopped at frame %d: %s\n", frame, ex.what());

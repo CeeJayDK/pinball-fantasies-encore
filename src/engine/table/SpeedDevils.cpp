@@ -205,7 +205,7 @@ void SpeedDevils::restorePlayer() {
   // and the lights are put as that says
   if (b(0x3626) != 0) {
     blink(0x09, later(b(0x007a), 0x0f), 0x0f);
-    lightOn(0x09);
+    setLight(0x09);
   }
   for (u16 i = 0; i < w(0x1087); ++i) setLight(static_cast<u8>(0x1a + i));
   row(0x3633, 4, 0x16);

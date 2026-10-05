@@ -40,7 +40,7 @@ class SpeedDevils : public Flow {
   void matchPace() override { nativeCW(0x07e0) = nativeCW(0x07e2) = high() ? 0x0d : 0x0b; }
   u16 matchLength() override { return kw(0x0866, 1); }
   void gameOverLights() override {}
-  bool matchAvoidsRepeat() override { return false; }
+  u16 matchRepeated(u16 digit) override { return digit; }
   void matchWon() override { b(0x0070) = 0xff; }
   bool restoresAtTurn() override { return false; }
   void ballShown() override { b(0x2062) = b(0x209e); }

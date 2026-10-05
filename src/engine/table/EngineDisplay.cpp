@@ -567,6 +567,57 @@ void Engine::bindDisplay() {
       si = 1;
     }
   };
+  // --- a count-down: seconds on the left, counted off, with a score beside them
+  auto countDown = [=, this] {  // cs:4780: from so many seconds
+    B(0x33e4) = 0;
+    W(0x33e9) = 1;
+    W(0x33e7) = F(0x47db);
+    forgetNumber();
+    W(0x36f0) = arg(6);
+    W(0x36ee) = 1;
+    B(0x36f3) = static_cast<u8>(0x37 + arg(2));
+    B(0x36f4) = static_cast<u8>(0x38 + arg(4));
+    nextStep(8);
+  };
+  bind(0x4780, countDown);
+  bind(0x47bc, [=, this] {  // or on from where it was, unless it is to begin again
+    if (B(0x33e4) == 0xff) return countDown();
+    W(0x33e9) = 1;
+    W(0x33e7) = F(0x47db);
+    forgetNumber();
+    W(0x36ee) = 1;
+    nextStep(8);
+  });
+  bind(0x47db, [this] {
+    si = 1;
+    if (B(0x33f7) != 0xff && --W(0x36ee) == 0) {
+      W(0x36ee) = W(0x36ec);
+      if (B(0x36f4) == 0x37 && B(0x36f3) == 0x2a) {  // nought: it is over
+        W(0x33e9) = 0;
+        si = 0;
+        return;
+      }
+      if (--B(0x36f4) == 0x36) {
+        B(0x36f4) += 0x0a;
+        --B(0x36f3);
+      }
+      if (B(0x36f3) == 0x37) B(0x36f3) = 0x2a;  // no nought in front
+      const u16 keptSi = si;
+      call(F(0x2ddc));  // the table's own, each second
+      si = keptSi;
+      setFont(1);
+      W(0x447b) = 0;
+      W(0x447d) = 0;
+      W(0x36fc) = A(0x36f3);
+      W(0x36fe) = 0x240;
+      W(0x36fa) = F(0x6ca5);
+      return;
+    }
+    W(0x447d) = 0;
+    W(0x4485) = W(0x36f0);
+    W(0x4487) = 0x158;
+    W(0x36fa) = F(0x45af);
+  });
   bind(0x4892, [=, this] {
     W(0x33e7) = F(0x48cc);
     W(0x3708) = arg(2);

@@ -174,11 +174,12 @@ void Engine::placeBall(u16 x, u16 y) {
   W(at::ballVx) = 0;
 }
 
-void Engine::patchMask(u16 segment, u16 at, u16 shape, u16 width, u16 rows) {
-  const u16 native = S(segment);
-  for (u16 r = 0; r < rows; ++r, at = static_cast<u16>(at + 0x28))
+void Engine::patchMask(u16 segment, u16 at, u16 shape, u16 width, u16 rows) { copyShape(S(segment), at, shape, width, rows, width); }
+
+void Engine::copyShape(u16 native, u16 at, u16 shape, u16 width, u16 rows, u16 step) {
+  for (u16 r = 0; r < rows; ++r, at = static_cast<u16>(at + 0x28), shape = static_cast<u16>(shape + step))
     for (u16 x = 0; x < width; ++x) {
-      const u8 v = nativeB(shape++);
+      const u8 v = nativeB(static_cast<u16>(shape + x));
       farB(native, static_cast<u16>(at + x)) = v;
       maskChanged(native, static_cast<u16>(at + x), v);
     }

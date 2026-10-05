@@ -137,12 +137,21 @@ void Program::call(u16 native) {
     std::snprintf(b, sizeof b, "table %d: the routine at %04x is not written yet", table_ + 1, native);
     throw DataError(b);
   }
+  called_.insert(native);
   if (debugWatch < 0) return it->second();
   const u8 before = ds_[static_cast<std::size_t>(debugWatch)];
   it->second();
   if (ds_[static_cast<std::size_t>(debugWatch)] != before)
     std::fprintf(stderr, "[ours] %04x changed from %02x to %02x in the routine at %04x\n", static_cast<unsigned>(debugWatch), before,
                  ds_[static_cast<std::size_t>(debugWatch)], native);
+}
+
+std::vector<u16> Program::neverCalled() const {
+  std::vector<u16> never;
+  for (const auto& [at, fn] : routines_)
+    if (!called_.contains(at)) never.push_back(at);
+  std::sort(never.begin(), never.end());
+  return never;
 }
 
 }  // namespace encore

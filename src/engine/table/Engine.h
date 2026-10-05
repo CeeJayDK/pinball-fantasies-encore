@@ -181,6 +181,8 @@ class Engine : public Program {
   void dropTimer() { nativeW(W(0x3381)) = F(0x69fc); }
   /// Copies a shape into a collision mask (cs:5f5a): `width` bytes a row for `rows` rows.
   void patchMask(u16 partyLandSegment, u16 at, u16 nativeShape, u16 width, u16 rows);
+  /// The same by the table's own segment; `step` is how far apart the shape's rows are.
+  void copyShape(u16 nativeSegment, u16 at, u16 nativeShape, u16 width, u16 rows, u16 step);
   /// Called when a collision mask changes, for whoever keeps a copy.
   virtual void maskChanged(u16 nativeSegment, u16 offset, u8 value) { (void)nativeSegment, (void)offset, (void)value; }
 

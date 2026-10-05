@@ -12,6 +12,7 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "core/Error.h"
@@ -70,8 +71,13 @@ class Program {
 
   /// The program's other segments (pictures of the display's animations, the score's digits),
   /// by this table's own segment value: the byte at an offset in one.
+  /// The data segment's 64 KB are kept apart from the rest, and a table may have another
+  /// segment begin inside them (the Gameshow's map of where the ball is hidden does): what is
+  /// there is the same memory.
   u8& farB(u16 nativeSegment, u16 offset) {
-    return image_[(std::size_t{static_cast<u16>(nativeSegment - kLoadSegment)} * 16 + offset) % image_.size()];
+    const std::size_t at = (std::size_t{static_cast<u16>(nativeSegment - kLoadSegment)} * 16 + offset) % image_.size();
+    if (const std::size_t d = at - std::size_t{dataSegment_} * 16; d < 0x10000) return ds_[d];
+    return image_[at];
   }
   Word farW(u16 nativeSegment, u16 offset) { return Word(&farB(nativeSegment, offset)); }
   /// The segment the program counts as loaded at. Segment values it keeps in its memory are
@@ -101,6 +107,9 @@ class Program {
 
   /// Runs the routine at an address of this table's (a pointer read from its memory).
   void call(u16 native);
+  /// The routines written (by this table's addresses) that nothing has called yet: for the
+  /// tests, to know what a comparison with the original did not reach.
+  std::vector<u16> neverCalled() const;
   /// Says which function is the routine at Party Land's address `a`, in every table.
   void bind(u16 a, std::function<void()> fn);
   void bindNative(u16 native, std::function<void()> fn) { routines_[native] = std::move(fn); }
@@ -136,6 +145,7 @@ class Program {
 
  private:
   std::unordered_map<u16, std::function<void()>> routines_;
+  std::unordered_set<u16> called_;
 };
 
 }  // namespace encore

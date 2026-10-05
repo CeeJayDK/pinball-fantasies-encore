@@ -32,8 +32,9 @@ class Flow : public Engine {
     setLight(kb(0x0baa, 1));
     setLight(kb(0x0baf, 1));
   }
-  /// The match never shows the same digit twice running (Party Land: cs:0902); not all do so.
-  virtual bool matchAvoidsRepeat() { return true; }
+  /// The match's digit came out the same as the last one: what is shown instead (Party Land,
+  /// cs:0902: the next one up).
+  virtual u16 matchRepeated(u16 digit) { return digit == 9 ? 0 : static_cast<u16>(digit + 1); }
   /// A player matched (Party Land: cs:0a58): one more ball, and its tune is not played again.
   virtual void matchWon() {
     B(0x00cd) = 0xff;
@@ -42,6 +43,17 @@ class Flow : public Engine {
   /// Party Land brings the next player's things back as soon as the turn passes (cs:0b13),
   /// as well as when the ball is served; not all do.
   virtual bool restoresAtTurn() { return true; }
+  /// What is put right once the player's things are back, as a ball is served (Party Land,
+  /// cs:0be7: the light of a ball owed).
+  virtual void afterRestore() {
+    if (B(0x00ce) != 0) setLight(kb(0x0bec, 1));
+  }
+  /// The tune a ball opens with (Party Land, cs:0c3d: not after a match was won).
+  virtual void serveMusic() {
+    if (B(0x00d1) == 0xff) return;
+    music(A(0x0c6f));
+    B(0x00d1) = 0;
+  }
   virtual void ballShown() {}    ///< the ball's number was written for the display
   virtual void playerShown() {}  ///< and the player's
   virtual bool redrawNameWhileWaiting() { return true; }

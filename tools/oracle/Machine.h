@@ -40,6 +40,7 @@ class Machine : public Bus {
   bool exited() const { return exited_; }
 
   u8 peek8(u16 seg, u16 off) const { return mem_[((u32{seg} << 4) + off) & 0xfffff]; }
+  void poke8(u16 seg, u16 off, u8 v) { mem_[((u32{seg} << 4) + off) & 0xfffff] = v; }
   u16 peek16(u16 seg, u16 off) const { return static_cast<u16>(peek8(seg, off) | (peek8(seg, static_cast<u16>(off + 1)) << 8)); }
   /// A segment value of the program's as its listing has it (relative to where it is loaded).
   u16 seg(u16 relative) const { return static_cast<u16>(base_ + relative); }

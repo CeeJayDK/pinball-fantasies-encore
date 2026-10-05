@@ -29,14 +29,11 @@ void Flow::serve() {
   stopBlinks();
   clearBall();
   restorePlayer();
-  if (B(0x00ce) != 0) setLight(kb(0x0bec, 1));  // a ball more is owed: its light
+  afterRestore();
   B(at::ballHidden) = 0xff;
   placeBall(kw(0x0bf7, 4), kw(0x0bfd, 4));
   W(0x3385) = 0xffff;
-  if (B(0x33e3) != 0xff && B(0x00d1) != 0xff) {
-    music(A(0x0c6f));
-    B(0x00d1) = 0;
-  }
+  if (B(0x33e3) != 0xff) serveMusic();
   B(0x230a) = 0;
   B(0x33de) = 0;
   if (B(0x33e3) != 0xff) startBall();
@@ -214,10 +211,12 @@ void Flow::bindFlow() {
   });
   bind(0x0609, [=, this] {  // three letters are typed for it
     u8 key = B(at::lastKey);
+    bool typed = false;
     if (key != 0xff) {
       B(at::lastKey) = 0xff;
       key = B(0x3654, key);
       if (key != 0) {
+        typed = true;
         nativeB(CW(0x0605)) = key;
         CW(0x0605) += 1;
         B(0x22a1, static_cast<u16>(3 - CW(0x0607))) = key;
@@ -232,7 +231,7 @@ void Flow::bindFlow() {
         }
       }
     }
-    if (redrawNameWhileWaiting()) {
+    if (typed || redrawNameWhileWaiting()) {
       plain(0);
       drawText(A(0x2291), 0x150);
     }
@@ -322,7 +321,7 @@ void Flow::bindFlow() {
     plain(3);
     drawText(A(0x1c3c), static_cast<u16>(0x540 + (W(0x1c3e) << 3)));  // the last digit rubbed out
     u16 digit = W(at::loopCounter) % 10;
-    if (matchAvoidsRepeat() && W(0x1c3e) == digit && ++digit >= 10) digit = 0;
+    if (W(0x1c3e) == digit) digit = matchRepeated(digit);
     W(0x1c3e) = digit;
     B(0x1c3a) = static_cast<u8>(digit + 0x37);
     plain(3);

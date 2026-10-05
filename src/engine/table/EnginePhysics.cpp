@@ -70,13 +70,18 @@ u8 Engine::copiedMask(int which, u16 offset) {
 
 /// cs:8829
 bool Engine::probeBall() {
-  const u16 walls = B(at::layer) == 0 ? 0x3b74 : 0x46b4;
-  const int cx = W(at::ballX).s() + 7, cy = W(at::ballY).s() + W(at::nudgeLift).s() + 7;
+  const u16 walls = S(B(at::layer) == 0 ? 0x3b74 : 0x46b4);
+  // The original works out the byte the ball's left edge is in once, as a number without a
+  // sign, and reaches each point from there: with the ball at the table's left edge that is
+  // 8 KB further on in the mask's segment, not the row's own start.
+  const u32 left = static_cast<u16>(W(at::ballX) - 1);
+  const int cy = W(at::ballY).s() + W(at::nudgeLift).s() + 7;
   u16 sum = 0;
   int count = 0, lowerHalf = 0, quadrants = 0, last = -1;
   for (u8 index : kProbeOrder) {
     const ProbePoint& p = kProbes[index];
-    if (!maskBit(walls, cx + p.dx, cy + p.dy)) continue;
+    const u32 x = left + static_cast<u32>(p.dx + 8);
+    if (!(farB(walls, static_cast<u16>((cy + p.dy) * 0x28 + (x >> 3))) & (0x80 >> (x & 7)))) continue;
     sum = static_cast<u16>(sum + p.angle);
     ++count;
     // (the point due left, at 0x400, is counted with the quarter below it: cs:8a2f)
@@ -350,7 +355,7 @@ void Engine::bumperEvent() {
 /// cs:59d9: the pull on the ball where it is. The planes that are not about solidity carry,
 /// for each stretch of eight dots, which of the table's slopes it lies on.
 void Engine::pickGravity() {
-  u16 at = static_cast<u16>(((W(at::ballX) + 8) >> 3) + (W(at::ballY) + 8) * 0x28 - 1);
+  u16 at = static_cast<u16>((static_cast<u16>(W(at::ballX) + 8) >> 3) + (W(at::ballY) + 8) * 0x28 - 1);
   const bool ground = B(at::layer) != 0xff;
   for (int i = 0; i < 3; ++i, ++at) {
     u8 solid = 0, slope = 0;
