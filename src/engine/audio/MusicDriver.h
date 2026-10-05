@@ -33,6 +33,9 @@ class MusicDriver : public SoundDriver {
   u8 start() override;
   u8 status() override { return 7; }
 
+  /// This version's pause: a stop keeps every note where it is, and the next start goes on
+  /// from there. (The driver's own stop silences the channels for good.)
+  bool holdOnStop = false;
   /// Function 0x18: both sides the same.
   void setMono(bool mono) { mono_ = mono; }
   /// Function 0x09: where the music is: its place in the song and the row there.
@@ -94,7 +97,8 @@ class MusicDriver : public SoundDriver {
   u8 pendingRow_ = 0;                     ///< 0, or one more than the row a jump goes to
   u8 speed_ = 6, ticksLeft_ = 1, rowSample_ = 0;
   u32 ticks_ = 0;
-  u16 master_ = 0x400;
+  u16 master_ = 0xff;
+  bool held_ = false;                     ///< stopped by this version's pause
   bool playing_ = false, loaded_ = false, mono_ = false;
   std::array<Channel, 4> ch_{};
   double due_ = 0;                        ///< ticks owed

@@ -598,11 +598,9 @@ void TableScreen::draw(Engine& e, u8* frame, const View& v, HdFrame* hd) const {
       HdPixel& m = hd->map[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)];
       m = px < 0 ? HdPixel{} : HdPixel{static_cast<u16>(px * 8), static_cast<u16>(py * 8), plunger, 0};
     };
+    // (with the pictures drawn again, what the plunger leaves is the playfield's picture)
     for (int y = 0; y < down; ++y)
-      for (int x = 0; x < width; ++x) {
-        put(x0 + x, row0 + y, 0);
-        mark(x0 + x, row0 + y, -1, -1);
-      }
+      for (int x = 0; x < width; ++x) put(x0 + x, row0 + y, 0);
     for (int y = 0; y < rows - down; ++y)
       for (int x = 0; x < width; ++x) {
         const std::size_t i = static_cast<std::size_t>((skip + y) * width + x);
@@ -647,7 +645,9 @@ void TableScreen::draw(Engine& e, u8* frame, const View& v, HdFrame* hd) const {
     // has just been goes immediately before it. The trail follows the ball's own steps rather
     // than the frames, which is what makes it flow rather than step.
     if (ball_.valid() && !waiting) {
-      const float bx = static_cast<float>(e.W(at::ballX).s()), by = static_cast<float>(e.W(at::ballY).s());
+      // (a ball in play is drawn lifted with a shaken table, as the original draws it: cs:4140)
+      const float lift = e.B(at::ballHidden) == 0xff ? 0.0f : static_cast<float>(e.W(at::nudgeLift).s());
+      const float bx = static_cast<float>(e.W(at::ballX).s()), by = static_cast<float>(e.W(at::ballY).s()) + lift;
       // What the artwork covers of the ball is said wherever the ball is drawn, the trail
       // included, and a little wider than the ball itself: a dot's cover is read smoothly,
       // from the four around it, and without that the outermost ring of the ball would read
@@ -686,7 +686,7 @@ void TableScreen::draw(Engine& e, u8* frame, const View& v, HdFrame* hd) const {
       const std::size_t length = e.stepsKept();
       for (std::size_t i = 0; v.ballTrail && i < length; ++i) {
         const Engine::Step& was = steps[Engine::kSteps - length + i];
-        const float x = static_cast<float>(was.x) / 1024.0f, y = static_cast<float>(was.y) / 1024.0f;
+        const float x = static_cast<float>(was.x) / 1024.0f, y = static_cast<float>(was.y) / 1024.0f + lift;
         // Strongest just behind the ball, fading away towards the oldest step.
         const float recent = static_cast<float>(i + 1) / static_cast<float>(length);
         const float away = std::hypot(x - bx, y - by);

@@ -177,6 +177,8 @@ class Front {
   std::vector<u32> from_;
   int slide_ = 0;        ///< which of the five slides is on the screen, or 0
   float level_ = 1.0f;   ///< how far the screen is faded in
+  float textLevel_ = 1.0f;  ///< and the pages' letters, with which their heading comes and goes
+  bool fadeWhite_ = false;  ///< the fade is out of white, not black
 
   Task task_;
   std::coroutine_handle<> waiting_;

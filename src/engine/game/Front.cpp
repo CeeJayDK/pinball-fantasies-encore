@@ -80,7 +80,6 @@ Front::Front(ByteView prg, ByteView module, const Config& config, int returningF
   for (auto& plane : planes_) plane.assign(0x10000, 0);
   from_.assign(0x10000 * 8, 0);
   if (!music_.load(module)) throw DataError("the menu's music is not a module");
-  music_.setMono(options_.mono);
   music_.start();
 
   // cs:407e: the options, as PINBALL.CFG has them
@@ -105,7 +104,19 @@ Front::Front(ByteView prg, ByteView module, const Config& config, int returningF
         begun |= h.score.digits[i] != 0;
         ds(static_cast<u16>(row + 6 + i)) = begun ? static_cast<u8>(h.score.digits[i] + 0x30) : ' ';
       }
+      if (!begun) ds(static_cast<u16>(row + 6 + 11)) = '0';  // (this version: a score of nought is written)
     }
+  // (this version: each table's name in the middle of its line, where the original has them all
+  // begin at one place)
+  for (const u16 line : {u16{0x4efc + 0x18}, u16{0x4efc + 0x18 * 7}, u16{0x501c + 0x18}, u16{0x501c + 0x18 * 7}}) {
+    std::string name;
+    for (u16 i = 0; i < 0x18; ++i) name += static_cast<char>(ds(static_cast<u16>(line + i)));
+    const auto first = name.find_first_not_of(' '), last = name.find_last_not_of(' ');
+    if (first == std::string::npos) continue;
+    name = name.substr(first, last - first + 1);
+    const std::size_t before = (0x18 - name.size()) / 2;
+    for (u16 i = 0; i < 0x18; ++i) ds(static_cast<u16>(line + i)) = i >= before && i - before < name.size() ? static_cast<u8>(name[i - before]) : ' ';
+  }
   for (int row = 0; row < 6; ++row) {  // cs:404a: the options' words into their page
     u16 word = 0;
     optionText(row, word);
@@ -346,6 +357,7 @@ void Front::threeColours(int times, int of) {
   for (const auto& c : kColours)
     for (std::size_t part = 0; part < 3; ++part)
       dac_[c[0] * 3u + part] = static_cast<u8>(((c[part + 1] * (times & 0xff)) / of) & 0x3f);
+  textLevel_ = static_cast<float>(times < 0 ? 0 : times) / static_cast<float>(of);
 }
 
 void Front::rubOutText(bool both) {
@@ -454,9 +466,11 @@ Front::Task Front::fade(int frames, u16 fromSegment, u16 from, u16 toSegment, u1
     }
     co_await nextFrame();
     setDac(0, fadeBuffer_.data(), bytes);
-    // (0x527d and 0x557d are the black the slides fade from and to)
+    // (0x527d is the black the slides fade from and to, and 0x557d the white the second and
+    // third come out of)
     const bool toBlack = fromSegment == 0x80 && (from == 0x527d || from == 0x557d);
     const bool fromBlack = toSegment == 0x80 && (to == 0x527d || to == 0x557d);
+    fadeWhite_ = (toSegment == 0x80 && to == 0x557d) || (fromSegment == 0x80 && from == 0x557d);
     level_ = toBlack && fromBlack ? 0.0f : toBlack ? static_cast<float>(left) / static_cast<float>(frames)
                                          : static_cast<float>(frames - left) / static_cast<float>(frames);
   }
@@ -990,6 +1004,8 @@ void Front::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
   if (hd) {
     hd->reset(kWidth, kHeight);
     hd->fade.fill(level_);
+    hd->fade[static_cast<std::size_t>(HdPicture::HiScores)] = level_ * textLevel_;
+    hd->fadeColor = fadeWhite_ ? Rgb{0xff, 0xff, 0xff} : Rgb{};
   }
   auto mark = [&](int x, int y, HdPicture is, u32 across8, u32 down8, u16 halves, u16 width, u16 height) {
     const auto id = static_cast<std::size_t>(is);

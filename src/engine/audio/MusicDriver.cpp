@@ -1,5 +1,7 @@
 #include "engine/audio/MusicDriver.h"
 
+#include <utility>
+
 #include <algorithm>
 #include <cstring>
 
@@ -116,6 +118,7 @@ int MusicDriver::periodAt(u16 index) const { return index < std::size(kPeriods) 
 u8 MusicDriver::start() {
   std::lock_guard lock(mutex_);
   playing_ = loaded_;
+  if (std::exchange(held_, false)) return 0;
   ticksLeft_ = 1;
   return 0;
 }
@@ -124,6 +127,10 @@ u8 MusicDriver::start() {
 void MusicDriver::stop() {
   std::lock_guard lock(mutex_);
   playing_ = false;
+  if (holdOnStop) {  // this version's pause: everything as it is, to go on from
+    held_ = true;
+    return;
+  }
   for (Channel& c : ch_) {
     c.volume = 0;
     c.end = c.loopStart = c.loops = c.position = 0;
@@ -132,7 +139,9 @@ void MusicDriver::stop() {
 
 void MusicDriver::volume(u16 level) {
   std::lock_guard lock(mutex_);
-  master_ = level;
+  // cs:1584: the level goes to the sound card's own mixer as a byte, 0x100 becoming its 0xff:
+  // so 0x100 is all of it, which is what the game sends when it is not fading
+  master_ = static_cast<u8>(level - (level >> 8));
 }
 
 /// Function 0x10 (cs:0201): the place to go to once the row now due has been played. The
@@ -342,11 +351,11 @@ void MusicDriver::mixTick() {
   tickSamples_ -= static_cast<double>(frames);
   const std::size_t at = made_.size();
   made_.resize(at + frames * 2, 0.0f);
-  const float master = static_cast<float>(master_) / 1024.0f;
+  const float master = static_cast<float>(master_) / 255.0f;
   for (std::size_t n = 0; n < 4; ++n) {
     Channel& c = ch_[n];
     if (!c.data) continue;
-    const float gain = static_cast<float>(c.volume >> 8) / 64.0f / 128.0f * 0.5f * master;
+    const float gain = static_cast<float>(c.volume >> 8) / 64.0f / 128.0f * 0.25f * master;
     const bool left = n < 2;
     for (std::size_t i = 0; i < frames; ++i) {
       if (c.position >= c.end) {
@@ -354,11 +363,7 @@ void MusicDriver::mixTick() {
         c.position = static_cast<u16>(c.position - c.end + c.loopStart);
         if (c.position >= c.end) c.position = c.loopStart;
       }
-      // between two bytes of the sample, a straight line (the driver itself takes the nearer)
-      const float a = c.data[c.position];
-      const u16 next = static_cast<u16>(c.position + 1);
-      const float b = next < c.end ? c.data[next] : c.loops > 2 ? c.data[c.loopStart] : a;
-      const float s = (a + (b - a) * (static_cast<float>(c.fraction) / 65536.0f)) * gain;
+      const float s = static_cast<float>(c.data[c.position]) * gain;  // (the byte it is at, as the driver takes it)
       float* out = &made_[at + i * 2];
       if (mono_) {
         out[0] += s * 0.5f;
@@ -376,7 +381,13 @@ void MusicDriver::mixTick() {
 
 void MusicDriver::advance(double seconds) {
   std::lock_guard lock(mutex_);
-  if (!loaded_ || !playing_) {
+  if (held_) {
+    // paused: nothing sounds, and nothing moves on
+    tickSamples_ += seconds * rate_;
+    const auto frames = static_cast<std::size_t>(tickSamples_);
+    tickSamples_ -= static_cast<double>(frames);
+    made_.resize(made_.size() + frames * 2, 0.0f);
+  } else if (!loaded_ || !playing_) {
     // no music: time still passes for the sound card
     tickSamples_ += seconds * rate_;
     const auto frames = static_cast<std::size_t>(tickSamples_);

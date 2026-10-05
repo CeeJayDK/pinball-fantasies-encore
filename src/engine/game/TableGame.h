@@ -103,7 +103,6 @@ class TableGame {
   void note();
 
   Options options_;
-  bool engineHigh_ = true;  ///< the screen mode the table was started for, which its speeds are for
   MusicDriver music_;
   std::unique_ptr<Engine> engine_;
   std::unique_ptr<TableScreen> screen_;
@@ -121,6 +120,8 @@ class TableGame {
   int leaving_ = 0x100;       ///< the table being left: how bright it still is, of 256 (cs:3a11)
   int lamps_ = 0;             ///< 0 as the game has them, 1 all lit, 2 all out
   int manual_ = 0;            ///< rows the screen was moved by hand while paused
+  int pauseFrames_ = 0;       ///< how long the pause's display has shown what it shows
+  bool wasPaused_ = false;
   bool up_ = false, down_ = false;
   i32 camera_ = 0;            ///< where the screen looks, in sixteenths of a row, when not where the table's own would
 };

@@ -17,7 +17,7 @@ class SoundDriver {
   virtual void effect(u8 sample, u8 note, u8 volume, u8 channel) { (void)sample, (void)note, (void)volume, (void)channel; }
   /// Function 0x10: go to a place in the song at the next tick.
   virtual u8 jump(u16 position) { (void)position; return 0; }
-  /// Function 0x06: the volume, 0x400 for all of it.
+  /// Function 0x06: the volume, 0x100 for all of it.
   virtual void volume(u16 level) { (void)level; }
   /// Function 0x0f: stop the music.
   virtual void stop() {}

@@ -33,7 +33,8 @@ Scancode scancode(Key k) {
                                       0x31, 0x18, 0x19, 0x10, 0x13, 0x1f, 0x14, 0x16, 0x2f, 0x11, 0x2d, 0x15, 0x2c};
   if (k >= Key::A && k <= Key::Z) return {kLetters[static_cast<int>(k) - static_cast<int>(Key::A)]};
   if (k >= Key::F1 && k <= Key::F8) return {static_cast<u8>(0x3b + static_cast<int>(k) - static_cast<int>(Key::F1))};
-  if (k >= Key::Digit1 && k <= Key::Digit8) return {static_cast<u8>(0x02 + static_cast<int>(k) - static_cast<int>(Key::Digit1))};
+  // (this version takes 1 to 8 for F1 to F8: a game for that many players)
+  if (k >= Key::Digit1 && k <= Key::Digit8) return {static_cast<u8>(0x3b + static_cast<int>(k) - static_cast<int>(Key::Digit1))};
   switch (k) {
     case Key::ShiftLeft: return {0x2a};
     case Key::ShiftRight: return {0x36};
@@ -77,11 +78,11 @@ bool same(const HighScores& a, const HighScores& b) {
 }  // namespace
 
 TableGame::TableGame(ByteView prg, ByteView module, int table, const Setup& setup)
-    : options_(setup.options), engineHigh_(setup.options.resolution != Resolution::Normal), music_(48000) {
+    : options_(setup.options), music_(48000) {
   engine_ = make(prg, table);
   if (setup.picture) screen_ = std::make_unique<TableScreen>(Bytes(prg.begin(), prg.end()), table);
   if (!music_.load(module)) throw DataError("the table's music is not a module");
-  music_.setMono(options_.mono);
+  music_.holdOnStop = true;
   music_.onJump = [this](u8 place) { return engine_->musicAsks(place); };
   engine_->sound = &music_;
   engine_->pollCallsMusic = false;
@@ -93,7 +94,11 @@ TableGame::TableGame(ByteView prg, ByteView module, int table, const Setup& setu
   o.lowAngle = options_.angle == Angle::Low;
   o.scrolling = static_cast<u8>(options_.scrollSpeed);
   o.musicOff = options_.noMusic;
-  o.highResolution = engineHigh_;
+  // The original has two sets of speeds: one for its screen of 350 rows, which the card shows
+  // 70 times a second, and one for its screen of 240, shown 60 times. This version shows every
+  // screen 60 times a second, so the table is always started for that one, whatever size of
+  // picture is asked for: the size is then only a matter of what is drawn.
+  o.highResolution = false;
   o.mono = options_.mono;
   const auto best = packed(setup.highScores);
   engine_->start(o, best);
@@ -153,7 +158,7 @@ bool TableGame::highScoresChanged() { return std::exchange(scoresChanged_, false
 Recording::Carry TableGame::carryOver() const {
   Recording::Carry c;
   c.noTilt = engine_->B(0x372a) == 0xff;
-  c.otherSteps = ((engine_->B(at::keys) & 4) != 0) != engineHigh_;
+  c.otherSteps = (engine_->B(at::keys) & 4) != 0;
   c.balls = engine_->B(0x33dd);
   c.scrollPos = engine_->W(0x3383);
   c.scrollAt = engine_->W(0x2f04);
@@ -162,7 +167,7 @@ Recording::Carry TableGame::carryOver() const {
 
 bool TableGame::startsGame(Key key) const {
   if (!waiting() || left() || asking_) return false;
-  if (key != Key::Enter && !(key >= Key::F1 && key <= Key::F8)) return false;
+  if (key != Key::Enter && !(key >= Key::F1 && key <= Key::F8) && !(key >= Key::Digit1 && key <= Key::Digit8)) return false;
   // the table takes keys, more players may join, and it is not asking whether to be left
   return engine_->CB(0x3475) != 0 && engine_->B(0x33e3) != 0 && engine_->CB(0x3195) != 0xff;
 }
@@ -171,13 +176,13 @@ bool TableGame::askingName() const { return engine_->W(0x33e7) == engine_->F(0x0
 
 void TableGame::key(Key key, bool down) {
   if (left()) return;
-  recording_.events.push_back({frames_, down, key});
+  if (recording_.games.empty()) recording_.events.push_back({frames_, down, key});  // (a recording is of one game)
   if (key == Key::ArrowUp) up_ = down;
   if (key == Key::ArrowDown) down_ = down;
   if (asking_) {  // this version's question, which the table knows nothing of
     if (!down) return;
     if (key == Key::Y) sendOnline_ = true;
-    if (key == Key::Y || key == Key::N || key == Key::Escape) {
+    if (key == Key::Y || key == Key::N) {
       asking_ = false;
       engine_->write("");
     }
@@ -207,18 +212,20 @@ void TableGame::pausedKey(Key key) {
       engine_->toggleMusic();
       engine_->write(engine_->musicIsOff() ? "MUSIC OFF" : "MUSIC ON");
       break;
-    case Key::R: {
-      const int before = viewTop();
+    case Key::R:
       options_.resolution = static_cast<Resolution>((static_cast<int>(options_.resolution) + 1) % 3);
-      camera_ = before * 16;
-      engine_->write(options_.resolution == Resolution::Normal ? "RESOLUTION NORMAL" : options_.resolution == Resolution::High ? "RESOLUTION HIGH" : "RESOLUTION FULL");
+      // the new size of screen looks where the ball is
+      manual_ = 0;
+      camera_ = std::clamp(engine_->W(at::ballY).s() - (options_.resolution == Resolution::High ? 0x82 : 0x4b), 0,
+                           TableData::kHeight - viewRows()) * 16;
+      engine_->write("RESOLUTION CHANGED");
       break;
-    }
     case Key::F7:
       lamps_ = (lamps_ + 1) % 3;
-      break;
-    default: break;
+      return;
+    default: return;
   }
+  pauseFrames_ = 0;
 }
 
 int TableGame::screenHeight() const {
@@ -229,10 +236,11 @@ int TableGame::screenHeight() const {
 int TableGame::viewRows() const { return screenHeight() - TableScreen::kDisplayRows; }
 
 int TableGame::viewTop() const {
-  if (options_.resolution == Resolution::Full) return 0;
-  const bool own = (options_.resolution == Resolution::High) == engineHigh_;
+  // (the whole table on the screen still jumps when the table is shaken)
+  if (options_.resolution == Resolution::Full) return engine_->W(at::nudgeLift).s();
+  const bool own = options_.resolution == Resolution::Normal;  // the size the table was started for
   const int top = own ? static_cast<i16>(engine_->screenRow()) - TableScreen::kDisplayRows
-                      : (camera_ >> 4) + engine_->W(at::nudgeLift).s();
+                      : std::clamp(camera_ >> 4, 0, TableData::kHeight - viewRows()) + engine_->W(at::nudgeLift).s();
   if (manual_ == 0) return top;
   return std::clamp(top + manual_, 0, TableData::kHeight - viewRows());
 }
@@ -240,10 +248,9 @@ int TableGame::viewTop() const {
 /// Where the screen looks when it is not of the size the table was started for: as the
 /// original's own (cs:4018), with the other size's numbers.
 void TableGame::follow() {
-  if (options_.resolution == Resolution::Full || (options_.resolution == Resolution::High) == engineHigh_) return;
-  const bool high = options_.resolution == Resolution::High;
-  const int lead = high ? 0x82 : 0x4b, last = high ? 0x103 : 0x171, band = high ? 0xaa : 0x73;
-  const int tableLead = engineHigh_ ? 0x82 : 0x4b, tableLast = engineHigh_ ? 0x103 : 0x171;
+  if (options_.resolution != Resolution::High) return;
+  const int lead = 0x82, last = 0x103, band = 0xaa;
+  const int tableLead = 0x4b, tableLast = 0x171;
   Engine& e = *engine_;
   if (e.W(0x3383) != 0xffff) {  // the table says where: the same way down the picture
     camera_ = (e.W(0x3383).s() * last / tableLast) * 16;
@@ -283,27 +290,46 @@ void TableGame::frame() {
     log::error("table " + std::to_string(table() + 1) + ", frame " + std::to_string(frames_) + ": " + failure_);
   }
   if (engine_->isPaused()) {
-    if (up_) manual_ -= 4;
-    if (down_) manual_ += 4;
-    const int top = viewTop() - manual_;
-    manual_ = std::clamp(manual_, -top, std::max(-top, TableData::kHeight - viewRows() - top));
+    if (!engine_->asksToQuit()) {
+      if (up_) manual_ -= 4;
+      if (down_) manual_ += 4;
+      const int top = viewTop() - manual_;
+      manual_ = std::clamp(manual_, -top, std::max(-top, TableData::kHeight - viewRows() - top));
+      // what the display says while paused, in turn
+      if (!wasPaused_) pauseFrames_ = 0;
+      ++pauseFrames_;
+      if (pauseFrames_ == 120) engine_->write("P TO UNPAUSE");
+      else if (pauseFrames_ == 240) engine_->write("ASMR FOR OPTIONS");
+      else if (pauseFrames_ == 360) {
+        engine_->write("GAME PAUSED");
+        pauseFrames_ = 0;
+      }
+    }
+    wasPaused_ = true;
   } else {
-    manual_ = 0;
-    lamps_ = 0;
+    if (wasPaused_ && manual_ != 0) {
+      // the screen goes back to the ball from where it was moved to by hand
+      if (options_.resolution == Resolution::High) camera_ = (std::clamp(camera_ >> 4, 0, TableData::kHeight - viewRows()) + manual_) * 16;
+      else if (options_.resolution == Resolution::Normal) engine_->W(0x2f04) += static_cast<u16>(manual_ * 16);
+      manual_ = 0;
+    }
+    wasPaused_ = false;
     follow();
   }
 
-  // In a game of one player, the initials for a best score are in (the display waits a second
-  // on them, cs:06c0): this version then asks whether the game is to be sent online.
+  // In a game of one player, the initials for a best score are in and have been shown (the
+  // display's second with them, cs:06c0, is over): this version then asks whether the game is
+  // to be sent online, and the table waits for the answer.
   const u16 wait = engine_->W(0x33e7);
-  if (wait != lastWait_ && wait == engine_->F(0x06c0) && players() == 1 && !recording_.cheated() && failure_.empty()) {
+  if (wait != lastWait_ && lastWait_ == engine_->F(0x06c0) && players() == 1 && failure_.empty()) {
     asking_ = true;
     engine_->write("SEND ONLINE \\Y OR N]");
   }
   lastWait_ = wait;
 
   const bool now = !waiting() && failure_.empty() && !engine_->exited();
-  if (playing_ && !now) {
+  // (a table left in the middle of a game leaves no game to keep)
+  if (playing_ && !now && !engine_->exited() && recording_.games.empty()) {
     Recording::Game g;
     g.endFrame = frames_;
     // (the last ball's number is one past the balls there are, once it has been played)
@@ -336,6 +362,10 @@ void TableGame::frame() {
 
 void TableGame::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
   if (!screen_) return;
+  if (hd && options_.mono) {  // the pictures drawn again are in colour: not for a screen in greys
+    hd->reset(TableScreen::kWidth, screenHeight());
+    hd = nullptr;
+  }
   TableScreen::View view;
   view.height = screenHeight();
   view.top = viewTop();
