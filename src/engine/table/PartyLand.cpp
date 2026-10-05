@@ -18,6 +18,21 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
   bindRules();
   bindSteps();
   bindGameSteps();
+  bind(0x0004, [this] {  // at start-up: the top of the left ramp's mask is kept, for putting back
+    u16 to = 0x1356;
+    for (u16 row = 0; row < 0x12; ++row)
+      for (u16 b = 0; b < 2; ++b) B(to++) = farB(S(0x46b4), static_cast<u16>(0x0266 + row * 0x28 + b));
+    lightsOut();
+  });
+  bind(0x01cd, [this] {  // the music while nobody plays
+    if (B(0x3712) != 0xff && B(0x3711) != 0xff) {
+      music(0x0c75);
+      B(0x230c) = B(0x0c77);
+      B(0x230a) = 9;
+      B(0x230d) = 1;
+    }
+    B(0x3712) = 0;
+  });
   bind(0x0bca, [this] { serve(); });
   bind(0x2ab1, [this] { everyFrame(); });
   bind(0x0215, [this] { drained(); });

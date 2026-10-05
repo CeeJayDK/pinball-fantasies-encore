@@ -31,6 +31,19 @@ class Engine : public Program {
  public:
   Engine(ByteView prg, int table);
 
+  /// The options, as PINBALL.CFG has them.
+  struct Options {
+    bool fiveBalls = false;
+    bool lowAngle = false;
+    u8 scrolling = 1;      ///< 0 hard, 1 medium, 2 soft
+    bool musicOff = false;
+    bool highResolution = true;
+    bool mono = false;
+  };
+  /// The program's start-up (cs:2f9b), up to where its own loop begins: once, before the
+  /// first frame. `bestScores` is the table's TABLEn.HI, 64 bytes, if there is one.
+  void start(const Options& options, ByteView bestScores = {});
+
   /// A key goes down or up, as the keyboard says it: a scancode, bit 7 set for up
   /// (cs:3e44, the table's keyboard interrupt).
   void key(u8 scancode);

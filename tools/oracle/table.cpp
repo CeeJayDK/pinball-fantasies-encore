@@ -6,6 +6,7 @@
 //
 //   encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...]
 //                       [--flip <seed>]  plays at random from frame 400 on
+//                       [--start]  the engine starts by itself, and that is compared first
 //                       [--all]   goes on after a difference, taking the original's value for
 //                                 it, and says each place that ever differs once
 #include <cstdio>
@@ -33,8 +34,10 @@ int main(int argc, char** argv) {
   std::vector<std::pair<int, int>> keys;
   bool all = false;
   int flip = -1;
+  bool ownStart = false;
   for (int i = 4; i < argc; ++i) {
     if (!std::strcmp(argv[i], "--all")) all = true;
+    else if (!std::strcmp(argv[i], "--start")) ownStart = true;
     else if (!std::strcmp(argv[i], "--flip") && i + 1 < argc) flip = std::atoi(argv[++i]);
     else if (!std::strcmp(argv[i], "--keys") && i + 1 < argc) {
       for (const char* p = argv[++i]; *p;) {
@@ -63,6 +66,43 @@ int main(int argc, char** argv) {
     if (const char* w = std::getenv("ENCORE_WATCH")) e.debugWatch = static_cast<int>(std::strtol(w, nullptr, 16));
     if (const char* w = std::getenv("ENCORE_WATCH")) m.watchWrite = (oracle::u32{m.seg(e.dataSegment())} << 4) + static_cast<oracle::u32>(std::strtol(w, nullptr, 16));
     const oracle::u16 ds = m.seg(e.dataSegment()), cs = m.seg(0x10);
+    if (ownStart) {
+      // The engine starts by itself, and what that leaves is compared with what the original's
+      // start-up left, before it is taken over like every other difference.
+      e.start({});
+      int differ = 0;
+      unsigned lastAt = 0xfffffff;
+      const char* lastWhat = "";
+      auto say = [&](const char* what, unsigned a, unsigned ours, unsigned theirs) {
+        // what the start-up leaves that is nothing to the engine: the sound driver's file
+        // name, and the variables of the routines that draw
+        if (!std::strcmp(what, "data") && a >= e.A(0x22c5) && a < e.A(0x22c5) + 13u) return;
+        if (what[0] == 'c' && a >= e.F(0x9240) && a < e.F(0x9240) + 0x1a00u) return;
+        ++differ;
+        // only the first of a run is said
+        if (!(lastWhat == what && a == lastAt + 1) && differ <= 400)
+          std::printf("after start-up: %s %04x ours %02x, the original's %02x\n", what, a, ours, theirs);
+        lastAt = a;
+        lastWhat = what;
+      };
+      for (unsigned a = 0; a < 0x6c00; ++a)
+        if (e.memory()[a] != m.peek8(ds, static_cast<oracle::u16>(a))) say("data", a, e.memory()[a], m.peek8(ds, static_cast<oracle::u16>(a)));
+      for (unsigned a = 0; a < 0xac00; ++a)
+        if (e.codeMemory()[a] != m.peek8(cs, static_cast<oracle::u16>(a))) say("code variable", a, e.codeMemory()[a], m.peek8(cs, static_cast<oracle::u16>(a)));
+      for (std::size_t a = 0x100; a + 0x10000 < e.image().size(); ++a) {
+        const oracle::u8 theirs = m.peek8(static_cast<oracle::u16>(encore::Program::kLoadSegment + (a >> 4)), static_cast<oracle::u16>(a & 15));
+        const std::size_t dataAt = std::size_t{e.dataSegment()} * 16, codeAt = 0x100;
+        if ((a >= dataAt && a < dataAt + 0x10000) || (a >= codeAt && a < codeAt + 0xac00)) continue;  // those two are kept apart
+        if (e.image()[a] != theirs) say("the program's other segments, byte", static_cast<unsigned>(a), e.image()[a], theirs);
+      }
+      for (std::size_t p = 0; p < 4; ++p)
+        for (unsigned a = 0; a < 0x10000; ++a)
+          if ((a < 0x0ad4 || a >= 0xc7d4 || (a - 0x0ad4) % 0x54 >= 0x50) && e.videoMemory()[p][a] != m.vga.planes[p][a])
+            say("video memory", a, e.videoMemory()[p][a], m.vga.planes[p][a]);
+      for (unsigned a = 0; a < 768; ++a)
+        if (e.colours()[a] != m.vga.dac[a]) say("colour byte", a, e.colours()[a], m.vga.dac[a]);
+      std::printf(differ ? "after start-up: %d bytes differ\n" : "after start-up: the same\n", differ);
+    }
     for (unsigned a = 0; a < 0x10000; ++a) {
       e.memory()[a] = m.peek8(ds, static_cast<oracle::u16>(a));
       e.codeMemory()[a] = m.peek8(cs, static_cast<oracle::u16>(a));
