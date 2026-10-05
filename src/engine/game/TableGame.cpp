@@ -310,6 +310,8 @@ void TableGame::frame() {
         bool before = false;
         for (const HighScore& old : bestAtStart_) before |= old.score == best[entry].score && old.name == best[entry].name;
         if (!before) g.initials = best[entry].name;
+        // (the table keeps a space typed as its own mark for one)
+        for (u8& c : g.initials) c = c == '*' ? ' ' : c;
       }
     recording_.games.push_back(std::move(g));
     bestAtStart_ = best;

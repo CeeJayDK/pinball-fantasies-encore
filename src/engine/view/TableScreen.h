@@ -75,6 +75,15 @@ class TableScreen {
   Bytes picture_;  ///< the playfield as it now is on the screen: its picture, and the flippers as they stand
   std::array<Bytes, 2> cover_;      ///< how much of the ball each dot hides, on the playfield and on the ramps
   std::vector<Bytes> flipperRest_;  ///< each flipper's shape at rest, a byte to a dot of its rectangle
+  /// Where each flipper's artwork hinges, in dots from its rectangle's corner, and how far it
+  /// turns from one of its pictures to the next, in radians: measured from its pictures.
+  struct Hinge {
+    float x = 0, y = 0, step = 0;
+  };
+  std::vector<Hinge> hinge_;
+
+ public:
+  const std::vector<Hinge>& hinges() const { return hinge_; }
 };
 
 }  // namespace encore

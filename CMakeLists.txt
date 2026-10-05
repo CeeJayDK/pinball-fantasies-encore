@@ -214,7 +214,7 @@ add_executable(encore-assets tools/assets_check.cpp)
 target_link_libraries(encore-assets PRIVATE encore_core)
 
 add_executable(encore-play tools/play.cpp)
-target_link_libraries(encore-play PRIVATE encore_core)
+target_link_libraries(encore-play PRIVATE encore_engine)
 
 # The engine being written (docs/own-engine.md), beside the one it will replace.
 file(GLOB ENCORE_ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/audio/*.cpp src/engine/data/*.cpp src/engine/sim/*.cpp src/engine/game/*.cpp src/engine/table/*.cpp src/engine/view/*.cpp)
@@ -243,8 +243,6 @@ target_link_libraries(encore-oracle-physics PRIVATE encore_engine)
 add_executable(encore-music tools/music.cpp)
 target_link_libraries(encore-music PRIVATE encore_engine)
 
-add_executable(encore-game tools/game.cpp)
-target_link_libraries(encore-game PRIVATE encore_engine)
 
 add_executable(encore-oracle-table tools/oracle/table.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
 target_include_directories(encore-oracle-table PRIVATE tools/oracle)

@@ -22,6 +22,7 @@ void TableScreen::attach(Engine& engine) {
   // Each flipper's shape at rest, from the first of the pictures of it that the ball is
   // stopped by: before the table's start-up adds the wall round it to them (cs:3d81).
   flipperRest_.clear();
+  hinge_.clear();
   const u16 pictures[3] = {engine.S(0x4c54), engine.S(0x4fc2), engine.S(0x4eb6)};
   int which = 0;
   for (u16 f = engine.A(0x6950); which < 3 && engine.nativeB(f) != 0; f = static_cast<u16>(f + 0x3c), ++which) {
@@ -31,6 +32,63 @@ void TableScreen::attach(Engine& engine) {
       for (int x = 0; x < bytes * 8; ++x)
         shape[static_cast<std::size_t>(y * bytes * 8 + x)] =
             (engine.farB(pictures[which], static_cast<u16>(y * bytes + (x >> 3))) & (0x80 >> (x & 7))) ? 1 : 0;
+    // Where it hinges: the long way through its shape at rest and the long way through its
+    // shape when up are two lines, and they cross at the one point that does not move. (Not
+    // always where the table has the ball bounce off it: the upper bats of Party Land and
+    // Speed Devils are the lower bats' pictures, hinged several dots from there.)
+    struct Line { double x = 0, y = 0, angle = 0; };
+    auto through = [&](int picture) {
+      Line l;
+      double n = 0, sxx = 0, syy = 0, sxy = 0;
+      const u16 from = static_cast<u16>(picture * bytes * rows);
+      auto solid = [&](int x, int y) { return (engine.farB(pictures[which], static_cast<u16>(from + y * bytes + (x >> 3))) & (0x80 >> (x & 7))) != 0; };
+      for (int y = 0; y < rows; ++y)
+        for (int x = 0; x < bytes * 8; ++x)
+          if (solid(x, y)) l.x += x + 0.5, l.y += y + 0.5, n += 1;
+      if (n == 0) return l;
+      l.x /= n, l.y /= n;
+      for (int y = 0; y < rows; ++y)
+        for (int x = 0; x < bytes * 8; ++x)
+          if (solid(x, y)) {
+            const double dx = x + 0.5 - l.x, dy = y + 0.5 - l.y;
+            sxx += dx * dx, syy += dy * dy, sxy += dx * dy;
+          }
+      l.angle = 0.5 * std::atan2(2 * sxy, sxx - syy);
+      return l;
+    };
+    const int last = engine.nativeW(static_cast<u16>(f + 0x20));
+    Hinge h;
+    // (the point nearest to the lines through every one of its pictures)
+    double nxx = 0, nxy = 0, nyy = 0, bx = 0, by = 0;
+    for (int picture = 0; picture <= last; ++picture) {
+      const Line l = through(picture);
+      const double nx = -std::sin(l.angle), ny = std::cos(l.angle), along = nx * l.x + ny * l.y;
+      nxx += nx * nx, nxy += nx * ny, nyy += ny * ny, bx += nx * along, by += ny * along;
+    }
+    const double det = nxx * nyy - nxy * nxy;
+    if (last > 0 && std::abs(det) > 1e-6) {
+      h.x = static_cast<float>((bx * nyy - by * nxy) / det);
+      h.y = static_cast<float>((by * nxx - bx * nxy) / det);
+      // how far it turns: from the hinge to its tip at rest, to its tip when up
+      auto tip = [&](int picture) {
+        const u16 from = static_cast<u16>(picture * bytes * rows);
+        double best = -1, sx = 0, sy = 0, n = 0;
+        for (int pass = 0; pass < 2; ++pass)
+          for (int y = 0; y < rows; ++y)
+            for (int x = 0; x < bytes * 8; ++x) {
+              if (!(engine.farB(pictures[which], static_cast<u16>(from + y * bytes + (x >> 3))) & (0x80 >> (x & 7)))) continue;
+              const double dx = x + 0.5 - h.x, dy = y + 0.5 - h.y, far = dx * dx + dy * dy;
+              if (pass == 0) best = std::max(best, far);
+              else if (far >= best * 0.9) sx += dx, sy += dy, n += 1;  // the dots of its end, not one of them
+            }
+        return std::atan2(sy / std::max(n, 1.0), sx / std::max(n, 1.0));
+      };
+      double turn = tip(last) - tip(0);
+      while (turn > 3.14159265) turn -= 6.2831853;
+      while (turn < -3.14159265) turn += 6.2831853;
+      h.step = static_cast<float>(turn / last);
+    }
+    hinge_.push_back(h);
     flipperRest_.push_back(std::move(shape));
   }
 }
@@ -214,31 +272,30 @@ void TableScreen::draw(Engine& e, u8* frame, const View& v, HdFrame* hd) const {
       }
   }
   if (hd) {
-    // The flippers, each one picture turned about its hinge by as much as it has risen. The
-    // original has a picture for every 55 of a flipper's travel, about 3.2 degrees apart.
-    constexpr float kStep = 3.185f * 3.14159265f / 180.0f;
+    // The flippers, each one picture turned about its hinge by as much as it has risen: the
+    // original has a picture for every 55 of a flipper's travel.
     u16 which = 0;
-    for (u16 f = e.A(0x6950); which < 3 && e.nativeB(f) != 0; f = static_cast<u16>(f + 0x3c), ++which) {
+    for (u16 f = e.A(0x6950); which < hinge_.size() && e.nativeB(f) != 0; f = static_cast<u16>(f + 0x3c), ++which) {
       auto w = [&](u16 o) { return static_cast<float>(static_cast<i16>(e.nativeW(static_cast<u16>(f + o)))); };
       const float width = w(0x06) * 16, rows = w(0x08);
+      const Hinge& h = hinge_[which];
       HdSprite s;
       s.picture = which;
-      s.pivotFrameX = w(0x12) + 0.5f;
-      s.pivotFrameY = w(0x14) + 0.5f - static_cast<float>(top);
-      s.pivotSpriteX = (w(0x12) + 0.5f - w(0x02)) / width;
-      s.pivotSpriteY = (w(0x14) + 0.5f - w(0x04)) / rows;
+      s.pivotFrameX = w(0x02) + h.x;
+      s.pivotFrameY = w(0x04) + h.y - static_cast<float>(top);
+      s.pivotSpriteX = h.x / width;
+      s.pivotSpriteY = h.y / rows;
       s.scaleX = 1.0f / width;
       s.scaleY = 1.0f / rows;
-      const float risen = w(0x1c) / 55.0f;
-      s.angle = (e.nativeB(f) == 2 ? -risen : risen) * kStep;
+      s.angle = w(0x1c) / 55.0f * h.step;
       s.clipTop = 0;
       s.clipBottom = static_cast<float>(view);
       hd->sprites.push_back(s);
     }
     // The ball, where it is to the 1024th of a dot, and behind it where it was at its last steps.
-    if (ball_.valid() && e.B(at::ballHidden) != 0xff) {
+    if (ball_.valid()) {
       const auto& steps = e.steps();
-      const float lift = static_cast<float>(e.W(at::nudgeLift).s());
+      const float lift = e.B(at::ballHidden) == 0xff ? 0.0f : static_cast<float>(e.W(at::nudgeLift).s());
       auto ball = [&](const Engine::Step& at, float opacity) {
         HdSprite s;
         s.picture = HdSprite::kBall;
