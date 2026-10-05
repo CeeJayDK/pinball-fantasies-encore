@@ -133,7 +133,6 @@ void Front::key(Key key, bool down) {
 }
 
 Front::Action Front::frame() {
-  music_.advance(1.0 / 60);
   if (done_) return {};
   frameCallback();
   if (waiting_) {

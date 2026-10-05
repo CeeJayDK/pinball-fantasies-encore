@@ -81,6 +81,7 @@ class Gameshow : public Flow {
   /// and with all three of its row lit the way to collect them opens.
   void prizeLit(u16 flag, u16 record, u8 light, bool outOfStepLight, u16 other1, u16 other2);
   void threeDigits(u16 value, u16 at);
+  bool bothShown_ = false;  ///< the pair of door targets is flashing for both having been hit
 };
 
 }  // namespace encore

@@ -53,6 +53,10 @@ class TableScreen {
   /// Follows a table from before its start: the flippers are drawn into the playfield's
   /// picture as the engine says they move. The engine must outlive this.
   void attach(Engine& engine);
+  /// The picture's first row as the artwork has it; the original rubs it out as the table starts.
+  bool keepTopRow = false;
+  /// The artwork where the plunger has moved down from, rather than the dark the original leaves.
+  bool artBehindPlunger = false;
 
   /// Once the table has started: works out what the high-resolution pictures need.
   void started(Engine& engine);

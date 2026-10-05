@@ -2,7 +2,10 @@
 // The engine the four tables share, written again routine by routine from Party Land's
 // program (docs/own-engine.md). A comment "cs:1234" is where the routine is in TABLE1.PRG.
 #include <array>
+#include <optional>
+#include <random>
 #include <string_view>
+#include <utility>
 
 #include "engine/table/Program.h"
 
@@ -52,6 +55,22 @@ class Engine : public Program {
   /// program's own loop (cs:35fd) `loopsPerFrame` times.
   void frame();
   int loopsPerFrame = 8;
+  /// The original's loop reads the keys in whatever time the frame's two callbacks leave it,
+  /// so a key acts in the frame after the one it was pressed before. With this, the loop's
+  /// turns come first, and a key acts in the frame it was pressed before.
+  bool keysFirst = false;
+  /// The original moves the ball twice at the start of the frame and twice part way down it,
+  /// with the table's rules in between. With this, all the frame's moves come first and the
+  /// rules after them: what the rules see is where the ball is when the frame is drawn.
+  bool stepsTogether = false;
+  /// How much of a hit goes into the ball's spin depends on what was hit and how softly. The
+  /// original scales those two numbers in 16 bits, where steel's no longer fit for all but
+  /// the hardest hits, and what is left of them is what it divides by. With this they are
+  /// scaled in full, so a soft touch on steel trades as little as the numbers mean it to.
+  bool wholeGains = false;
+  /// This version's amendments to the tables' rules, each said where it is made. Without
+  /// this the rules are the original's to the byte.
+  bool amended = false;
   /// As the silent driver: the music's callback is called every time the driver is polled.
   bool pollCallsMusic = true;
   /// The sound driver's question at each jump in the music (cs:3a6a): the place the music
@@ -62,6 +81,18 @@ class Engine : public Program {
   /// more may still join, and then goes astray (docs/own-engine.md). With this, such a key
   /// is taken for no key.
   bool refuseFewerPlayers = false;
+  /// The original takes its chance from the count of its own loop's turns (ds:33ed), which
+  /// goes as fast as the machine does. With this, chance is a generator's instead, begun
+  /// from `seed`: one number each time the game asks for one, and nothing in between, so the
+  /// same game comes of the same seed on any machine.
+  void seedChance(u64 seed) { generator_.emplace(seed); }
+  /// How many numbers have been drawn from it.
+  u32 chancesDrawn() const { return drawn_; }
+  /// The original keeps a first ball back half a second longer than the others, while more
+  /// players may still be added. With this, every ball is served alike.
+  bool servesAlike = false;
+  /// A ball was lost and the next has not been put on the plunger yet.
+  bool ballParked() const { return lostParked_; }
   /// The program asked to end.
   bool exited() const { return exited_; }
   /// Where the moving things were when the original last drew them (which is not always
@@ -72,6 +103,18 @@ class Engine : public Program {
     std::array<u16, 3> flipper{};    ///< which of its pictures each flipper shows
   };
   const Shown& shown() const { return shown_; }
+  /// The ball and the flippers taken as shown where they now are, as the frame ends: for a
+  /// picture that is drawn once a frame is over. (The flippers' note of the picture last drawn
+  /// is moved on too, which nothing but the drawing reads.)
+  /// (A ball put away out of play only when the original draws it there, and none while no
+  /// game is played.)
+  void showAsNow() {
+    for (int which = 0; which < 3; ++which) drawFlipper(which);
+    if (!std::exchange(ballDrawn_, false) && (B(at::ballHidden) == 0xff || B(0x3713) == 0xff)) return;
+    shown_.ballX = W(at::ballX).s();
+    shown_.ballY = static_cast<i16>(W(at::ballY) + (B(at::ballHidden) == 0xff ? 0 : W(at::nudgeLift)));
+    shown_.ramps = B(at::layer) != 0;
+  }
   /// A flipper is drawn standing another way than it was last drawn: its record, and which
   /// of its pictures it showed and shows now. The original gets from one to the other by
   /// lists of changes, and what is left on the screen depends on the way taken.
@@ -103,7 +146,7 @@ class Engine : public Program {
   struct Step {
     i32 x = 0, y = 0;
   };
-  static constexpr std::size_t kSteps = 14;
+  static constexpr std::size_t kSteps = 15;
   const std::array<Step, kSteps>& steps() const { return steps_; }
   /// How many of them are of the ball now in play (the last ones).
   std::size_t stepsKept() const { return stepsKept_; }
@@ -126,6 +169,7 @@ class Engine : public Program {
   // --- the frame (EngineFrame.cpp)
   void frameCallback();
   void midFrameCallback();
+  void frameSteps();
   void mainLoop();
   void drawBall();          // cs:4140
   void drawFlipper(int which);  // cs:550e
@@ -167,6 +211,13 @@ class Engine : public Program {
 
   // --- timers: up to 50 routines run once a frame (cs:5b0b, cs:5b2a, cs:576a)
   void addTimer(u16 native);
+  /// The same, for one that is the rest of the timer that starts it: it has its first turn in
+  /// this frame (see runTimers).
+  void addTimerNow(u16 native) {
+    startsNow_ = true;
+    addTimer(native);
+    startsNow_ = false;
+  }
   void runTimers();
   void endTimer();
   /// cs:5777: counts the word at `counter` up to `limit`; true, and back to 0, when there.
@@ -216,6 +267,7 @@ class Engine : public Program {
   void beginBall();            // cs:37ea
   void toAttract();            // cs:5fff
   void lightsOut();            // cs:5867
+  void lightsDark();  ///< at a tilt
   /// cs:5c3f: asks for a piece of the music (place, repeats, priority); false if something
   /// more important is playing.
   bool music(u16 nativeRecord);
@@ -243,6 +295,14 @@ class Engine : public Program {
   void effect(u16 record);  ///< plays the four-byte effect record at Party Land's address
 
   bool high() { return B(at::highResolution) == 0xff; }
+  /// A number below `n` by chance: the generator's next, or `counted`, which is what the
+  /// original makes of its count of loops at this place.
+  u16 chance(u16 n, u16 counted) {
+    if (!generator_) return counted;
+    ++drawn_;
+    return static_cast<u16>((*generator_)() % n);
+  }
+  bool drawsChance() const { return generator_.has_value(); }
 
   std::array<u8, 768> dac_{};
   std::array<std::vector<u8>, 4> video_;
@@ -255,6 +315,17 @@ class Engine : public Program {
   std::array<i16, 2> speedLimits_{};  ///< as the start-up left them, while the steeper angle has them greater
   std::array<Step, kSteps> steps_{};
   std::size_t stepsKept_ = 0;
+  std::optional<std::mt19937_64> generator_;
+  u32 drawn_ = 0;
+  std::array<std::vector<u8>, 2> slopes_;  ///< the slope at each stretch of eight dots, playfield and ramps
+  std::array<bool, 64> waiting_{};     ///< the timers started in this frame's turn, to be run from the next
+  std::array<bool, 64> startedNow_{};  ///< and the ones to be run in this turn yet
+  bool startsNow_ = false;             ///< a timer started now is one of the latter
+  bool timersRunning_ = false;
+  bool lostParked_ = false;  ///< a ball was lost and the next has not been put on the plunger yet
+  bool nudgeDue_ = false;
+  bool ballDrawn_ = false;  ///< the original drew the ball in this frame  ///< the table was shaken: counted when the frame's rules are run
+  bool spinDue_ = false;  ///< the ball was put somewhere: its spin is drawn when it next moves
 };
 
 }  // namespace encore

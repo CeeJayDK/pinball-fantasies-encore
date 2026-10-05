@@ -21,6 +21,7 @@ class PartyLand : public Flow {
 
 
   // (named by where they are in the program until what they are is clearer)
+  void scrollUp();
   void hole() { placeBall(0x0f, 0x2f); }   ///< the ball put away, out of sight
   void eject();           // cs:1126
   bool allFive();         // cs:1249

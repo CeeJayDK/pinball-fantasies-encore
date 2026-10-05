@@ -66,7 +66,7 @@ export interface Env {
 }
 
 /** Recording formats a verifier can play (Recording::kFormat in the game). */
-const FORMATS = [4];
+const FORMATS = [3];
 const MAX_RECORDING = 512 * 1024;
 const MAX_PENDING_PER_PLAYER = 50;
 const MAX_RUNS_PER_DAY = 300;

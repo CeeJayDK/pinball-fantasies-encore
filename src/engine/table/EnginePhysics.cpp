@@ -40,11 +40,18 @@ void Engine::physicsSteps() {
   const bool twice = !((B(at::keys) & B(at::inMidFrame)) & 4);
   for (int i = 0; i < (twice ? 2 : 1); ++i) {
     if (B(at::ballHidden) == 0xff) {
+      spinDue_ = false;  // (put away, not sent off: it leaves later with the spin it has)
       stepsKept_ = 0;
       nudgeAndFlippers();
       stampFlippers();
       continue;
     }
+    if (spinDue_ && drawsChance()) {
+      // the spin of a ball put somewhere, drawn as it sets off from there
+      const u16 spin = chance(0x400, 0);
+      W(at::spin) = (spin & 1) ? static_cast<u16>(-spin) : spin;
+    }
+    spinDue_ = false;
     if (probeBall()) bounce();
     nudgeAndFlippers();
     integrate();
@@ -61,6 +68,9 @@ bool Engine::maskBit(u16 partyLandSegment, int x, int y) {
 }
 
 u8 Engine::copiedMask(int which, u16 offset) {
+  // The original keeps pictures over parts of these copies, and so takes what the ball
+  // touches there for something else than it is. Amended: the masks themselves are read.
+  if (amended) return farB(S(which == 0 ? 0x7734 : which == 1 ? 0x7cd4 : 0x7194), offset);
   const auto& plane = video_[offset & 3];
   if (which == 0) return plane[static_cast<u16>(W(0x239f) + (offset >> 2))];
   if (which == 1) return plane[static_cast<u16>(W(0x23a1) + (offset >> 2))];
@@ -116,7 +126,10 @@ bool Engine::probeBall() {
   B(0x2eda) = material;
 
   // Where: the point of the 44 nearest the mean angle.
-  const u16 nearest = static_cast<u16>(((u32{0x580} * W(at::contactAngle) + 0x8000) >> 16) * 4);
+  // (an angle just short of the full turn rounds to a forty-fifth point, which the original
+  // reads from whatever follows the list; amended: that is the first point again)
+  u16 nearest = static_cast<u16>(((u32{0x580} * W(at::contactAngle) + 0x8000) >> 16) * 4);
+  if (amended) nearest = static_cast<u16>(nearest % (44 * 4));
   const u16 x = static_cast<u16>(W(0x67e0, nearest) + W(at::ballX)), y = static_cast<u16>(W(0x67e2, nearest) + W(at::ballY));
   W(at::contactX) = x;
   W(at::contactY) = y;
@@ -221,6 +234,19 @@ void Engine::bounce() {
   // by the softness of the hit in 16-bit registers, so steel's wrap round for all but the
   // hardest hits, and are then signed divisors; a gain of zero leaves the dividend's low word.
   i16 gain = W(0x6898).s(), spinGain = W(0x689a).s();
+  i32 alongWhole = 0;
+  if (wholeGains) {
+    i32 wide = gain, wideSpin = spinGain;
+    if (normal >= -1023) {
+      const i32 soft = (-normal >> 6) + 1;
+      wide *= soft;
+      wideSpin *= soft;
+    }
+    const i32 slip = (W(at::spin).s() + W(at::tableVelocity).s() - along) * 256;
+    alongWhole = along + (wide != 0 ? slip / wide : slip);
+    W(at::spin) -= static_cast<u16>(static_cast<i16>(wideSpin != 0 ? slip / wideSpin : slip));
+    alongWhole = alongWhole * 0x800 / 0x801;
+  } else {
   if (normal >= -1023) {
     const u16 soft = static_cast<u16>((static_cast<i16>(-normal) >> 6) + 1);
     gain = static_cast<i16>(static_cast<u16>(soft * static_cast<u16>(gain)));
@@ -230,12 +256,14 @@ void Engine::bounce() {
   along = static_cast<i16>(along + (gain != 0 ? static_cast<i16>(slip / gain) : static_cast<i16>(slip)));
   W(at::spin) -= static_cast<u16>(spinGain != 0 ? static_cast<i16>(slip / spinGain) : static_cast<i16>(slip));
   along = static_cast<i16>((i32{0x800} * along) / 0x801);
+  alongWhole = along;
+  }
 
   // Turned back.
   cosine = W(0x4a00, static_cast<u16>(angle * 2)).s();
   sine = W(0x4600, static_cast<u16>(angle * 2)).s();
-  i16 nvx = static_cast<i16>(static_cast<u32>((cosine * normal - sine * along) << 1) >> 16);
-  i16 nvy = static_cast<i16>(static_cast<u32>((sine * normal + cosine * along) << 1) >> 16);
+  i16 nvx = static_cast<i16>(static_cast<u32>((cosine * normal - sine * alongWhole) << 1) >> 16);
+  i16 nvy = static_cast<i16>(static_cast<u32>((sine * normal + cosine * alongWhole) << 1) >> 16);
   nvx = static_cast<i16>(nvx - W(at::flipperVx));
   nvy = static_cast<i16>(nvy - W(at::flipperVy) - W(at::tableVelocity));
   W(at::ballVx) = static_cast<u16>(clampTo(nvx, lowest, highest));
@@ -324,7 +352,10 @@ void Engine::stampFlippers() {
   const u16 x = W(at::ballX), y = W(at::ballY);
   for (u16 f = A(0x6950); nativeB(f) != 0; f = static_cast<u16>(f + 0x3c)) {
     auto w = [&](u16 o) { return nativeW(static_cast<u16>(f + o)); };
-    if (x < w(0x0a) || x > w(0x0c) || y < w(0x0e) || y > w(0x10)) continue;
+    // (the original only does so while the ball is within a box round the flipper, though the
+    // ball's edge reaches the flipper from a little outside it, where it then meets the
+    // flipper as it last stood; amended: the mask always has the flipper where it is)
+    if (!amended && (x < w(0x0a) || x > w(0x0c) || y < w(0x0e) || y > w(0x10))) continue;
     const u16 picture = w(0x1e);
     if (static_cast<u8>(picture) == nativeB(static_cast<u16>(f + 1))) continue;
     nativeB(static_cast<u16>(f + 1)) = static_cast<u8>(picture);
@@ -346,7 +377,10 @@ void Engine::afterSteps() {
   bumperEvent();
   pickGravity();
   changeLayer();
-  if (B(at::ballLost) == 0xff && B(0x33ce) != 0xff) call(F(0x0215));
+  if (B(at::ballLost) == 0xff && B(0x33ce) != 0xff) {
+    call(F(0x0215));
+    lostParked_ = true;
+  }
 }
 
 /// cs:5ace: a bumper or kicker threw the ball: its sound and its score.
@@ -366,6 +400,22 @@ void Engine::bumperEvent() {
 void Engine::pickGravity() {
   u16 at = static_cast<u16>((static_cast<u16>(W(at::ballX) + 8) >> 3) + (W(at::ballY) + 8) * 0x28 - 1);
   const bool ground = B(at::layer) != 0xff;
+  if (amended) {
+    // The original reads the slopes from copies of the masks it keeps in the video card's
+    // memory, over parts of which it also keeps pictures, and looks for a stretch with nothing
+    // solid in it as the masks are at that moment, a flipper's picture and all. Amended: the
+    // slopes are a property of the table, the same wherever the flippers stand.
+    // (a lost ball is put away wherever each table has room for it, and the next one would set
+    // off with the pull of that place; amended: with the pull of the bottom of the table,
+    // where it was lost)
+    const int x = (lostParked_ ? 280 : W(at::ballX).s()) + 8, y = (lostParked_ ? 525 : W(at::ballY).s()) + 8;
+    if (x < 0 || x >= 320 || y < 0 || y >= 0x240) return;
+    const u8 slope = slopes_[ground ? 0 : 1][static_cast<std::size_t>(y * 0x28 + (x >> 3))];
+    if (slope >= cs_[static_cast<u16>(F(0x5a15) + 2)]) return;
+    W(at::gravityX) = nativeW(static_cast<u16>(koffset(high() ? 0x5a39 : 0x5a2a) + slope * 4));
+    W(at::gravityY) = nativeW(static_cast<u16>(koffset(high() ? 0x5a40 : 0x5a31) + slope * 4));
+    return;
+  }
   for (int i = 0; i < 3; ++i, ++at) {
     u8 solid = 0, slope = 0;
     if (ground) {
@@ -400,6 +450,11 @@ void Engine::runRules() {
   rollTriggers();
   hitTriggers();
   call(F(0x0fcc));
+  if (std::exchange(nudgeDue_, false)) {
+    const u8 key = B(at::lastKey);
+    nudgeKey();
+    B(at::lastKey) = key;
+  }
   displayFlash();
   call(W(0x338c));
   W(0x338c) = F(0x69fc);
@@ -457,13 +512,13 @@ void Engine::bindPlunger() {
   bind(0x5e6a, [=, this] {
     if (const u8 pull = B(0x23a5); pull != 0) {
       if (B(0x338a) != 0) {  // a ball waits on it
-        i16 speed = static_cast<i16>((high() ? -166 : -138) * pull - (W(at::loopCounter) & 0xff));
+        i16 speed = static_cast<i16>((high() ? -166 : -138) * pull - chance(0x100, W(at::loopCounter) & 0xff));
         if (angle_ == 2) speed = static_cast<i16>(speed * 5 / 4);  // this version's steeper table
         if (B(at::loopCounter, 2) != 0xff) {
           W(at::ballVy) = static_cast<u16>(speed);
           W(at::ballVx) = 0;
         }
-        W(at::spin) = W(at::loopCounter) & 0x0f;
+        W(at::spin) = chance(0x10, W(at::loopCounter) & 0x0f);
       }
       const u8 volume = static_cast<u8>((pull << 6) / 0x20);
       sound->effect(B(0x0c3d), B(0x0c3e), volume, static_cast<u8>(B(0x0c40) + 1));

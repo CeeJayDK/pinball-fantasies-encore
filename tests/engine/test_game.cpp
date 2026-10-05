@@ -34,7 +34,7 @@ Recording play(int table, int frames, unsigned seed, const HighScores& best = Co
   TableGame::Setup setup;
   setup.options.balls = 3;
   setup.highScores = best;
-  setup.chance = static_cast<u16>(seed * 40503u);
+  setup.seed = static_cast<u64>(seed);
   setup.picture = false;
   const std::string n = std::to_string(table + 1);
   TableGame game(read("TABLE" + n + ".PRG"), read("TABLE" + n + ".MOD"), table, setup);
@@ -89,6 +89,29 @@ TEST(recorded_games_play_again_exactly) {
     CHECK(again.games == played.games);
     CHECK(again.events == played.events);
   }
+}
+
+// Games played and kept by earlier versions (tests/recordings): each still plays again to the
+// game it was, score, last frame and every event.
+TEST(kept_recordings_play_again_exactly) {
+  if (!haveData()) return;
+  const auto dir = std::filesystem::path(ENCORE_SOURCE_DIR) / "tests" / "recordings";
+  int played = 0;
+  for (const auto& entry : std::filesystem::directory_iterator(dir)) {
+    if (entry.path().extension() != ".RPL") continue;
+    const auto data = file::readAll(entry.path());
+    const auto kept = data ? Recording::load(*data) : std::nullopt;
+    CHECK(kept.has_value());
+    if (!kept) continue;
+    const std::string n = std::to_string(kept->table + 1);
+    const Recording again = replay(read("TABLE" + n + ".PRG"), read("TABLE" + n + ".MOD"), *kept);
+    std::printf("  %s\n", entry.path().filename().string().c_str());
+    CHECK(again.games == kept->games);
+    CHECK(again.events == kept->events);
+    CHECK(again.frames == kept->frames);
+    ++played;
+  }
+  CHECK(played == 8);
 }
 
 // A best score asks for initials and then whether to send the game online; both answers are

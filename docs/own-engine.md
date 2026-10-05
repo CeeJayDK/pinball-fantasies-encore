@@ -56,19 +56,19 @@ game refuses that key.
 (`src/engine/audio/MusicDriver`) and with its picture (`src/engine/view/TableScreen`), takes
 keys, and adds what this version has that the original has not: the options changed while
 paused, the steeper angle, the whole table on one screen, what the high-resolution pictures
-need, and the question whether a best score goes online. A game is recorded as its start and
-its keys (`Recording`) and plays again to the same end:
+need, and the question whether a best score goes online. A game is recorded as its start, its
+keys and what it saw of its music (`Recording`) and plays again to the same end:
 
 ```bash
 build/encore-play <the game's folder> <table 1-4> 60000 <seed>     # games by keys at random, twice, and from their recording
 build/encore-play <the game's folder> --verify <file.RPL>          # as the server checks one
 ```
 
-Two things are not as the original has them, on purpose. Its source of chance is a count of
-the turns of its own loop, which depends on the machine: here it goes on evenly, eight turns a
-frame, from a number each game is given. And the screen mode a table is started in decides its
-speeds, as in the original, but the picture can be changed to another size while it plays: the
-speeds then stay as they were until the next game.
+## What this version changes on purpose
+
+The engine by itself is the original's, to the byte: that is what the referee checks. The game
+then turns on a handful of switches for this version's own decisions. They are listed, each
+with what the original does instead, in [differences-from-the-original.md](differences-from-the-original.md).
 
 ## The slides and the menu
 

@@ -57,7 +57,7 @@ Gameshow::Gameshow(ByteView prg) : Flow(prg, 2) {
     b(0x1dcb) = 0x37;
     startScript(0x1a0a);
     stopBlinks();
-    lightsOut();
+    lightsDark();
   });
   bindNative(0x0cf6, [this] { music(0x08b0); });
   bindNative(0x0cfd, [this] {  // a flipper pressed
@@ -368,7 +368,8 @@ void Gameshow::bindRules() {
   auto both = [this] {
     blink(0x02, 0, 2);
     blink(0x03, 0, 2);
-    addTimer(0x1051);
+    if (!(amended && bothShown_)) addTimer(0x1051);
+    bothShown_ = true;
     award(0x0758);
     stopBlink(0x12);
     blink(0x12, outOfStep(), 0x0a);
@@ -378,7 +379,9 @@ void Gameshow::bindRules() {
   bindNative(0x0f57, [=, this] {
     at1f8f();
     sfx(0x089d);
-    if (b(0x2e62) == 0xff) return both();
+    // (amended: for the second that the pair flashes after both were hit, another hit on
+    // either counts as both again)
+    if (b(0x2e62) == 0xff || (amended && bothShown_)) return both();
     blink(0x02, 0, 6);
     b(0x2e61) = 0xff;
     addTimer(0x1019);
@@ -387,7 +390,7 @@ void Gameshow::bindRules() {
   bindNative(0x0f95, [=, this] {
     at1f8f();
     sfx(0x089d);
-    if (b(0x2e61) == 0xff) return both();
+    if (b(0x2e61) == 0xff || (amended && bothShown_)) return both();
     blink(0x03, 0, 6);
     b(0x2e62) = 0xff;
     addTimer(0x1035);
@@ -404,6 +407,7 @@ void Gameshow::bindRules() {
     endTimer();
   });
   after(0x1051, 0x2e98, 0x3c, [this] {
+    bothShown_ = false;
     stopBlink(0x02);
     clearLight(0x02);
     stopBlink(0x03);
@@ -456,6 +460,12 @@ void Gameshow::bindRules() {
     startScript(0x12ff);
     clearLight(static_cast<u8>(0x13 + b(0x0124)));
     u8 start = static_cast<u8>(w(0x2c7f));
+    if (drawsChance() && b(0x2e70) != 1) {
+      // by chance proper: where the wheel is to stop, counted back by the moves it will make
+      u16 moves = 0;
+      for (u16 at = w(0x0078); nativeW(at) != 0xffff; at = static_cast<u16>(at + 2)) ++moves;
+      start = static_cast<u8>(chance(8, 0) - moves);
+    }
     if (b(0x2e70) == 1) {  // a prize is to be collected: the wheel is made to stop on it
       struct Prize { u16 flag; u8 start; };
       for (const Prize p : {Prize{0x01b7, 0}, {0x01b9, 1}, {0x01ba, 2}, {0x01bc, 6}, {0x01bb, 5}, {0x01bd, 4}})
@@ -711,6 +721,11 @@ void Gameshow::bindSteps() {
     w(0x2c7b) = 1;
     b(0x2fd6) = 1;
     nextStep(4);
+    if (amended) {  // in this frame, not the next, as on the other tables
+      si = 1;
+      call(0x06e5);
+      w(0x2c7b) = si;
+    }
   });
   bindNative(0x1fe1, [this] {
     b(0x1a7b) = b(0x1aa8) = static_cast<u8>(b(0x2fd6) + 0x37);

@@ -32,11 +32,12 @@ void Flow::serve() {
   afterRestore();
   B(at::ballHidden) = 0xff;
   placeBall(kw(0x0bf7, 4), kw(0x0bfd, 4));
+  lostParked_ = false;
   W(0x3385) = 0xffff;
   if (B(0x33e3) != 0xff) serveMusic();
   B(0x230a) = 0;
   B(0x33de) = 0;
-  if (B(0x33e3) != 0xff) startBall();
+  if (B(0x33e3) != 0xff || servesAlike) startBall();
   else addTimer(F(0x6200));
 }
 
@@ -78,7 +79,9 @@ void Flow::bindFlow() {
     endTimer();
   });
   bind(0x0cca, [this] {
-    if (!countTo(A(0x35d2), kw(0x0cca, 1))) return;
+    // (the sound of the ball coming up: three of the tables wait 50 frames for it and one 45;
+    // amended: all 45)
+    if (!countTo(A(0x35d2), amended ? 0x2d : kw(0x0cca, 1))) return;
     effect(0x0c35);
     endTimer();
   });
@@ -298,11 +301,18 @@ void Flow::bindFlow() {
     W(0x33e9) = 1;
     B(0x371a) = 1;
     nextStep(4);
+    if (amended) {  // the match begins in this frame, not the next
+      si = 1;
+      call(F(0x07fa));
+      W(0x33e9) = si;
+    }
   });
   bind(0x07fa, [=, this] {
     B(0x230d) = 1;
     music(A(0x0c90));
-    B(0x230a) = kb(0x0806, 4);
+    // (after the match, silence; the Gameshow's names a place past the end of its music, so
+    // that its music starts again from the top. Amended: the table's own silence)
+    B(0x230a) = amended ? kb(0x3ab3, 1) : kb(0x0806, 4);
     W(0x33e7) = F(0x089f);
     for (u16 player = 0; player < B(0x3716); ++player) {
       const u16 digit = static_cast<u16>(0x2000 | static_cast<u8>(nativeB(static_cast<u16>(A(0x021a) + 0x0a + player * playerSize())) + 0x37));
@@ -311,6 +321,9 @@ void Flow::bindFlow() {
     }
     plain(3);
     drawText(A(0x1c16), 0xa8);
+    // (amended: the digit the match sets out from is drawn by chance too, and the next is
+    // never the same again: the one after it is shown instead, on every table)
+    if (amended) W(0x1c3e) = chance(10, W(0x1c3e));
     si = matchLength();
     W(0x33e9) = si;
     matchPace();
@@ -320,8 +333,8 @@ void Flow::bindFlow() {
     matchPace();
     plain(3);
     drawText(A(0x1c3c), static_cast<u16>(0x540 + (W(0x1c3e) << 3)));  // the last digit rubbed out
-    u16 digit = W(at::loopCounter) % 10;
-    if (W(0x1c3e) == digit) digit = matchRepeated(digit);
+    u16 digit = chance(10, W(at::loopCounter) % 10);
+    if (W(0x1c3e) == digit) digit = amended ? (digit == 9 ? 0 : static_cast<u16>(digit + 1)) : matchRepeated(digit);
     W(0x1c3e) = digit;
     B(0x1c3a) = static_cast<u8>(digit + 0x37);
     plain(3);
@@ -423,7 +436,8 @@ void Flow::bindFlow() {
     endTimer();
   });
   bind(0x0bb7, [this] {
-    if (countTo(A(0x35ce), kw(0x0bb7, 1))) serve();
+    // (two of the tables wait a second here and two half a second; amended: all half a second)
+    if (countTo(A(0x35ce), amended ? 0x1e : kw(0x0bb7, 1))) serve();
   });
 }
 

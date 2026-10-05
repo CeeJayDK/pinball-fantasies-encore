@@ -126,7 +126,7 @@ Outcome play(ByteView prg, ByteView module, int table, int frames, unsigned seed
   TableGame::Setup setup;
   setup.options.balls = 3;
   setup.options.resolution = Resolution::High;
-  setup.chance = static_cast<u16>(seed * 40503u);
+  setup.seed = static_cast<u64>(seed);
   TableGame game(prg, module, table, setup);  // (best scores of nought: every game asks for initials)
   unsigned rng = seed * 2654435761u + 1;
   auto random = [&] { rng = rng * 1664525u + 1013904223u; return rng >> 16; };

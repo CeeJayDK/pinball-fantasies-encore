@@ -70,7 +70,7 @@ Bytes Recording::save() const {
   w.out.insert(w.out.end(), kMagic, kMagic + 4);
   w.u16_(kFormat);
   w.u8_(static_cast<u8>(table));
-  w.u16_(chance);
+  w.u64_(seed);
   w.u8_(options.balls);
   w.u8_(static_cast<u8>(options.angle));
   w.u8_(static_cast<u8>(options.scrollSpeed));
@@ -92,8 +92,9 @@ Bytes Recording::save() const {
   for (const Event& e : events) {
     w.var(e.frame - last);
     last = e.frame;
-    w.u8_(e.down ? 0 : 1);
-    w.u8_(static_cast<u8>(e.key));
+    w.u8_(static_cast<u8>(e.kind));
+    if (e.kind == Event::Kind::Music) w.u32_(e.value);
+    else w.u8_(static_cast<u8>(e.value));
   }
   w.u32_(static_cast<u32>(games.size()));
   for (const Game& g : games) {
@@ -113,7 +114,7 @@ std::optional<Recording> Recording::load(ByteView data) {
   if (r.le(2) != kFormat) return std::nullopt;
   Recording p;
   p.table = r.u8_();
-  p.chance = static_cast<u16>(r.le(2));
+  p.seed = r.le(8);
   p.options.balls = r.u8_();
   p.options.angle = static_cast<Angle>(r.u8_());
   p.options.scrollSpeed = static_cast<ScrollSpeed>(r.u8_());
@@ -140,11 +141,10 @@ std::optional<Recording> Recording::load(ByteView data) {
     frame += r.var();
     e.frame = frame;
     const u8 kind = r.u8_();
-    if (kind > 1) return std::nullopt;
-    e.down = kind == 0;
-    const u8 key = r.u8_();
-    if (key > static_cast<u8>(Key::Z)) return std::nullopt;
-    e.key = static_cast<Key>(key);
+    if (kind > static_cast<u8>(Event::Kind::Music)) return std::nullopt;
+    e.kind = static_cast<Event::Kind>(kind);
+    e.value = e.kind == Event::Kind::Music ? static_cast<u32>(r.le(4)) : r.u8_();
+    if (e.isKey() && e.value > static_cast<u32>(Key::Z)) return std::nullopt;
     p.events.push_back(e);
   }
   const u32 games = static_cast<u32>(r.le(4));
@@ -182,14 +182,15 @@ Recording replay(ByteView prg, ByteView module, const Recording& recording) {
   TableGame::Setup setup;
   setup.options = recording.options;
   setup.highScores = recording.highScores;
-  setup.chance = recording.chance;
+  setup.seed = recording.seed;
   setup.carry = recording.carry;
   setup.picture = false;
   TableGame t(prg, module, recording.table, setup);
+  t.playBack(&recording);
   std::size_t next = 0;
   for (u32 f = 0; f < recording.frames && !t.left(); ++f) {
     for (; next < recording.events.size() && recording.events[next].frame == f; ++next)
-      t.key(recording.events[next].key, recording.events[next].down);
+      if (recording.events[next].isKey()) t.key(recording.events[next].key(), recording.events[next].down());
     t.frame();
   }
   return t.recording();

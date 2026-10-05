@@ -73,6 +73,7 @@ class SpeedDevils : public Flow {
   void at24f8();
   void everyFrame();   // cs:241a
   void threeDigits(u16 value, u16 at, bool blankHundreds);
+  u16 pitWait_ = 0x14;  ///< how long the pit keeps the ball this time
 };
 
 }  // namespace encore

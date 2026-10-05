@@ -1,6 +1,8 @@
 // The dot-matrix display. What it shows is a script: a list of steps, each the address of a
 // routine and its arguments. A step sets a task going (a routine called every frame until it
 // answers zero) and often a drawing to be done once; when the task is done the next step runs.
+#include <cstdio>
+
 #include "engine/table/Engine.h"
 
 namespace encore {
@@ -346,7 +348,9 @@ void Engine::bindDisplay() {
   bind(0x4736, [=, this] {  // a piece of music, come what may
     wait(1);
     B(0x3389) = 0;
-    B(0x230d) = 1;
+    // (the original has the music go back afterwards to the place it was told to before;
+    // amended: when no other piece is playing, back to where the music is now, as any other)
+    if (!amended || static_cast<i8>(B(0x230d)) > 0) B(0x230d) = 1;
     music(arg(2));
     nextStep(4);
   });
@@ -439,7 +443,9 @@ void Engine::bindDisplay() {
     nextStep(4);
   });
   bind(0x4d62, [=, this] {  // wait, but not long for one player
-    wait(B(0x3716) == 1 ? 2 : arg(2));
+    // (amended: on Stones 'n Bones a lone player is given the time as well, to read what the
+    // display says between balls)
+    wait(B(0x3716) == 1 && !(amended && table() == 3) ? 2 : arg(2));
     nextStep(4);
   });
   bind(0x4d82, [=, this] {

@@ -4,10 +4,12 @@
 //
 // Every game is played on a table of its own, made afresh when the game is started, so it
 // depends on nothing played before it. It is the same every time given the same start (the
-// table, where its source of chance began, the options, the table's high scores and what it
-// took over from the table it was started on) and the same keys
-// at the same frames. The music is played by the game's own time (engine/audio/MusicDriver.h),
-// so what it does to the game is the same every time too.
+// table, what its chance was begun from, the options, the table's high scores and what it
+// took over from the table it was started on), the same keys at the same frames, and the
+// music in the same state at the same frames. The music is the one thing played on the side,
+// by the sound card's clock, as it was on the machines the game was made for: so what the
+// game saw of it at the start of each frame is recorded too, whenever it had moved on by
+// itself (engine/game/TableMusic.h).
 #include <array>
 #include <optional>
 #include <string>
@@ -26,12 +28,16 @@ struct Recording {
 
   /// Raised whenever a recording would no longer play back the same: a change in the file's
   /// layout, or in how the tables play.
-  static constexpr u16 kFormat = 4;
+  static constexpr u16 kFormat = 3;
 
   struct Event {
-    u32 frame = 0;  ///< the key is pressed or let go before this frame
-    bool down = true;
-    Key key = Key::None;
+    enum class Kind : u8 { KeyDown, KeyUp, Music };
+    u32 frame = 0;  ///< before this frame for keys, at its start for the music
+    Kind kind = Kind::KeyDown;
+    u32 value = 0;  ///< a Key, or the music's state as TableMusic packs it
+    bool isKey() const { return kind != Kind::Music; }
+    Key key() const { return static_cast<Key>(value); }
+    bool down() const { return kind == Kind::KeyDown; }
     bool operator==(const Event&) const = default;
   };
   /// What a game takes over from the table it was started on, beyond the options: cheats
@@ -40,8 +46,8 @@ struct Recording {
     bool noTilt = false;
     bool otherSteps = false;  ///< the cheat that has the ball move at the other screen mode's pace
     u8 balls = 0;  ///< as the options or the balls cheat have it; 0: as the options have it
-    u16 scrollPos = 0xffff;  ///< where the waiting table's screen had drifted to; 0xffff: where a table opens
-    u16 scrollAt = 0;        ///< and where it was looking, in sixteenths of a row
+    u16 scrollPos = 0xffff;  ///< the first row the waiting table's screen showed; 0xffff: where a table opens
+    u16 scrollAt = 0;        ///< the same in sixteenths of a row, as it was being followed
     bool operator==(const Carry&) const = default;
   };
   /// The game as it ended: the frame of its game over and each player's score.
@@ -54,7 +60,7 @@ struct Recording {
   };
 
   int table = 0;
-  u16 chance = 0;  ///< where the table's source of chance begins
+  u64 seed = 0;  ///< what the table's chance is begun from
   Options options;  ///< as the table opened; changed in the pause menu by keys, which are here
   HighScores highScores;  ///< the table's, which decide whether a game ends asking for a name
   Carry carry;

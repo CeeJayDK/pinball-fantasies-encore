@@ -46,7 +46,7 @@ void fillEnclosed(u8* mask, int w, int h) {
 void TableScreen::attach(Engine& engine) {
   picture_ = data_.playfield;
   // (the picture's first row is rubbed out as the table starts: cs:31b5)
-  std::fill_n(picture_.begin(), kWidth, u8{0});
+  if (!keepTopRow) std::fill_n(picture_.begin(), kWidth, u8{0});
   engine.onFlipperDrawn = [this, &engine](u16 record, u16 was, u16 now) { turnFlipper(engine, picture_, record, was, now); };
 
   // Each flipper's shape at every step of its travel, from the pictures of it that the ball is
@@ -600,7 +600,8 @@ void TableScreen::draw(Engine& e, u8* frame, const View& v, HdFrame* hd) const {
     };
     // (with the pictures drawn again, what the plunger leaves is the playfield's picture)
     for (int y = 0; y < down; ++y)
-      for (int x = 0; x < width; ++x) put(x0 + x, row0 + y, 0);
+      for (int x = 0; x < width; ++x)
+        put(x0 + x, row0 + y, artBehindPlunger ? picture_[static_cast<std::size_t>(row0 + y) * kWidth + static_cast<std::size_t>(x0 + x)] : u8{0});
     for (int y = 0; y < rows - down; ++y)
       for (int x = 0; x < width; ++x) {
         const std::size_t i = static_cast<std::size_t>((skip + y) * width + x);
@@ -682,10 +683,12 @@ void TableScreen::draw(Engine& e, u8* frame, const View& v, HdFrame* hd) const {
         s.opacity = opacity;
         hd->sprites.push_back(s);
       };
+      // (where the ball was before each of its last fourteen steps: the newest kept is where it
+      // is now, which the ball itself covers)
       const auto& steps = e.steps();
-      const std::size_t length = e.stepsKept();
+      const std::size_t kept = e.stepsKept(), length = kept > 0 ? kept - 1 : 0;
       for (std::size_t i = 0; v.ballTrail && i < length; ++i) {
-        const Engine::Step& was = steps[Engine::kSteps - length + i];
+        const Engine::Step& was = steps[Engine::kSteps - kept + i];
         const float x = static_cast<float>(was.x) / 1024.0f, y = static_cast<float>(was.y) / 1024.0f + lift;
         // Strongest just behind the ball, fading away towards the oldest step.
         const float recent = static_cast<float>(i + 1) / static_cast<float>(length);

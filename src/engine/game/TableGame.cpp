@@ -80,13 +80,24 @@ bool same(const HighScores& a, const HighScores& b) {
 TableGame::TableGame(ByteView prg, ByteView module, int table, const Setup& setup)
     : options_(setup.options), music_(48000) {
   engine_ = make(prg, table);
-  if (setup.picture) screen_ = std::make_unique<TableScreen>(Bytes(prg.begin(), prg.end()), table);
+  if (setup.picture) {
+    screen_ = std::make_unique<TableScreen>(Bytes(prg.begin(), prg.end()), table);
+    screen_->keepTopRow = true;
+    screen_->artBehindPlunger = true;
+  }
   if (!music_.load(module)) throw DataError("the table's music is not a module");
   music_.holdOnStop = true;
-  music_.onJump = [this](u8 place) { return engine_->musicAsks(place); };
-  engine_->sound = &music_;
+  link_ = std::make_unique<TableMusic>(*engine_, music_);
+  music_.conductor = link_.get();
+  engine_->sound = link_.get();
   engine_->pollCallsMusic = false;
   engine_->refuseFewerPlayers = true;
+  engine_->servesAlike = true;
+  engine_->keysFirst = true;
+  engine_->stepsTogether = true;
+  engine_->wholeGains = true;
+  engine_->amended = true;
+  engine_->seedChance(setup.seed);
   if (screen_) screen_->attach(*engine_);
 
   Engine::Options o;
@@ -103,7 +114,6 @@ TableGame::TableGame(ByteView prg, ByteView module, int table, const Setup& setu
   const auto best = packed(setup.highScores);
   engine_->start(o, best);
   if (options_.angle == Angle::Higher) engine_->setAngle(2);
-  engine_->W(at::loopCounter) = setup.chance;
   // what the table this one's game was started on had that the game would not be the same without
   const Recording::Carry& carry = setup.carry;
   if (carry.balls != 0) engine_->B(0x33dd) = carry.balls;
@@ -114,19 +124,22 @@ TableGame::TableGame(ByteView prg, ByteView module, int table, const Setup& setu
     engine_->W(0x2f04) = carry.scrollAt;
   }
   if (screen_) screen_->started(*engine_);
-  camera_ = (static_cast<i16>(engine_->screenRow()) - TableScreen::kDisplayRows) * 16;
+  // (where the screen was on the table the game was started from, the fraction of a row too)
+  camera_.pos = static_cast<u16>(carry.scrollPos != 0xffff ? carry.scrollPos : std::max(cameraTop(), 0));
+  camera_.raw = static_cast<i16>(carry.scrollPos != 0xffff ? carry.scrollAt : camera_.pos << 4);
 
   recording_.table = table;
-  recording_.chance = setup.chance;
+  recording_.seed = setup.seed;
   recording_.options = options_;
   recording_.highScores = setup.highScores;
   recording_.carry = carry;
   recording_.carry.balls = engine_->B(0x33dd);
   bestAtStart_ = savedScores_ = highScores();
   saved_ = options();
+  link_->give();
 }
 
-TableGame::~TableGame() { music_.onJump = {}; }
+TableGame::~TableGame() { music_.conductor = nullptr; }
 
 Bcd TableGame::score(int player) const {
   Bcd s;
@@ -160,8 +173,8 @@ Recording::Carry TableGame::carryOver() const {
   c.noTilt = engine_->B(0x372a) == 0xff;
   c.otherSteps = (engine_->B(at::keys) & 4) != 0;
   c.balls = engine_->B(0x33dd);
-  c.scrollPos = engine_->W(0x3383);
-  c.scrollAt = engine_->W(0x2f04);
+  c.scrollPos = camera_.pos;
+  c.scrollAt = static_cast<u16>(camera_.raw);
   return c;
 }
 
@@ -176,7 +189,8 @@ bool TableGame::askingName() const { return engine_->W(0x33e7) == engine_->F(0x0
 
 void TableGame::key(Key key, bool down) {
   if (left()) return;
-  if (recording_.games.empty()) recording_.events.push_back({frames_, down, key});  // (a recording is of one game)
+  if (recording_.games.empty())  // (a recording is of one game)
+    recording_.events.push_back({frames_, down ? Recording::Event::Kind::KeyDown : Recording::Event::Kind::KeyUp, static_cast<u32>(key)});
   if (key == Key::ArrowUp) up_ = down;
   if (key == Key::ArrowDown) down_ = down;
   if (asking_) {  // this version's question, which the table knows nothing of
@@ -184,6 +198,7 @@ void TableGame::key(Key key, bool down) {
     if (key == Key::Y) sendOnline_ = true;
     if (key == Key::Y || key == Key::N) {
       asking_ = false;
+      answered_ = true;
       engine_->write("");
     }
     return;
@@ -195,6 +210,22 @@ void TableGame::key(Key key, bool down) {
   if (s.code == 0) return;
   if (s.extended) engine_->key(0xe0);
   engine_->key(static_cast<u8>(s.code | (down ? 0 : 0x80)));
+  link_->give();
+}
+
+/// The music as the table sees it this frame: the sound card's, or a recording's when one is
+/// played back; noted in this table's own recording whenever it has moved on by itself.
+void TableGame::syncMusic() {
+  const u32 before = link_->view();
+  if (playback_) {
+    const auto& events = playback_->events;
+    for (; playbackAt_ < events.size() && events[playbackAt_].frame <= frames_; ++playbackAt_)
+      if (events[playbackAt_].frame == frames_ && !events[playbackAt_].isKey()) link_->setView(events[playbackAt_].value);
+  } else {
+    link_->take();
+  }
+  if (link_->view() != before && recording_.games.empty())
+    recording_.events.push_back({frames_, Recording::Event::Kind::Music, link_->view()});
 }
 
 void TableGame::pausedKey(Key key) {
@@ -214,10 +245,9 @@ void TableGame::pausedKey(Key key) {
       break;
     case Key::R:
       options_.resolution = static_cast<Resolution>((static_cast<int>(options_.resolution) + 1) % 3);
-      // the new size of screen looks where the ball is
-      manual_ = 0;
-      camera_ = std::clamp(engine_->W(at::ballY).s() - (options_.resolution == Resolution::High ? 0x82 : 0x4b), 0,
-                           TableData::kHeight - viewRows()) * 16;
+      // the new size of screen looks where it is told to, or where the ball is
+      camera_.pos = static_cast<u16>(std::clamp(camera_.said ? *camera_.said : engine_->W(at::ballY).s() - cameraLead(), 0, cameraTop()));
+      camera_.raw = static_cast<i16>(camera_.pos << 4);
       engine_->write("RESOLUTION CHANGED");
       break;
     case Key::F7:
@@ -226,6 +256,7 @@ void TableGame::pausedKey(Key key) {
     default: return;
   }
   pauseFrames_ = 0;
+  link_->give();
 }
 
 int TableGame::screenHeight() const {
@@ -237,43 +268,87 @@ int TableGame::viewRows() const { return screenHeight() - TableScreen::kDisplayR
 
 int TableGame::viewTop() const {
   // (the whole table on the screen still jumps when the table is shaken)
-  if (options_.resolution == Resolution::Full) return engine_->W(at::nudgeLift).s();
-  const bool own = options_.resolution == Resolution::Normal;  // the size the table was started for
-  const int top = own ? static_cast<i16>(engine_->screenRow()) - TableScreen::kDisplayRows
-                      : std::clamp(camera_ >> 4, 0, TableData::kHeight - viewRows()) + engine_->W(at::nudgeLift).s();
-  if (manual_ == 0) return top;
-  return std::clamp(top + manual_, 0, TableData::kHeight - viewRows());
+  const int lift = engine_->W(at::nudgeLift).s();
+  if (options_.resolution == Resolution::Full) return lift;
+  return std::min<int>(camera_.pos, cameraTop()) + lift;
 }
 
-/// Where the screen looks when it is not of the size the table was started for: as the
-/// original's own (cs:4018), with the other size's numbers.
-void TableGame::follow() {
-  if (options_.resolution != Resolution::High) return;
-  const int lead = 0x82, last = 0x103, band = 0xaa;
-  const int tableLead = 0x4b, tableLast = 0x171;
+int TableGame::cameraLead() const { return options_.resolution == Resolution::Normal ? 75 : options_.resolution == Resolution::High ? 130 : 0; }
+
+TableGame::Sight TableGame::look() const {
   Engine& e = *engine_;
-  if (e.W(0x3383) != 0xffff) {  // the table says where: the same way down the picture
-    camera_ = (e.W(0x3383).s() * last / tableLast) * 16;
+  return {waiting(), e.ballParked() ? 525 : e.W(at::ballY).s(), e.W(0x3385), e.W(0x2f02)};
+}
+
+/// Where the screen looks this frame: after the ball, drifting while nobody plays, or moved
+/// by hand while paused. `s` is the table as the frame began.
+void TableGame::aim(const Sight& s) {
+  const u16 said = engine_->W(0x3383);
+  if (engine_->isPaused()) {
+    if (!engine_->asksToQuit() && cameraTop() > 0 && up_ != down_) {
+      const int p = std::clamp(static_cast<int>(camera_.pos) + (down_ ? 4 : 0) - (up_ ? 4 : 0), 0, cameraTop());
+      camera_.pos = static_cast<u16>(p);
+      camera_.raw = static_cast<i16>(p << 4);
+    }
     return;
   }
-  int row = std::clamp(e.W(at::ballY).s() - lead, 0, last);
-  if (e.W(0x3385) != 0xffff) row = std::clamp(e.W(0x3385).s() + tableLead - lead, 0, last);
-  camera_ += ((row - (camera_ >> 4)) * e.W(0x23ac).s()) >> 2;
-  int off = row - (camera_ >> 4);
-  if (off >= 0) {
-    off -= band;
-    if (off >= 0) camera_ += off << 4;
-  } else {
-    off += lead;
-    if (off <= 0) camera_ += off << 4;
+  if (s.waiting) {
+    if (cameraTop() <= 0) camera_.pos = 0;
+    else {
+      if (camera_.pos == 0) camera_.up = false;
+      else if (camera_.pos >= cameraTop()) camera_.up = true;
+      camera_.pos = static_cast<u16>(camera_.up ? camera_.pos - 1 : camera_.pos + 1);
+      camera_.raw = static_cast<i16>(camera_.pos << 4);
+    }
+    camera_.said.reset();
+    saidBefore_ = said;
+    return;
   }
+  follow(s);
+  // Party Land takes the screen up from where it is after its holes (ds:3383, counted from
+  // where the table's own screen was): this one goes up by as much from where it is, at once.
+  const u16 before = std::exchange(saidBefore_, said);
+  if (said == 0xffff) {
+    camera_.said.reset();
+    return;
+  }
+  if (before == 0xffff || !camera_.said) camera_.said = camera_.pos + static_cast<i16>(said) - static_cast<i16>(s.shown);
+  else camera_.said = *camera_.said + static_cast<i16>(said) - static_cast<i16>(before);
+  camera_.pos = static_cast<u16>(std::clamp(*camera_.said, 0, std::max(cameraTop(), 0)));
+  camera_.raw = static_cast<i16>(camera_.pos << 4);
+}
+
+/// The screen follows the ball, or the row the table says to follow instead (ds:3385): so
+/// far each frame towards it as the scrolling option has it, and never so far behind that the
+/// ball is off the screen.
+void TableGame::follow(const Sight& s) {
+  const int top = cameraTop();
+  if (top <= 0) {
+    camera_.pos = 0;
+    return;
+  }
+  const int lead = cameraLead();
+  int target = std::clamp(s.ballY - lead, 0, top);
+  if (camera_.said) target = std::clamp(*camera_.said, 0, top);
+  else if (s.follow != 0xffff) {
+    // the Gameshow's wheel, or the bottom of the table when a ball is lost
+    const int row = static_cast<i16>(s.follow);
+    target = row == 0x10e ? (options_.resolution == Resolution::High ? 220 : 270) : row >= 0x171 ? top : std::clamp(row, 0, top);
+  }
+  const i16 speed = options_.scrollSpeed == ScrollSpeed::Hard ? 20 : options_.scrollSpeed == ScrollSpeed::Medium ? 11 : 9;
+  i16 delta = static_cast<i16>(target - (camera_.raw >> 4));
+  camera_.raw = static_cast<i16>(camera_.raw + ((delta * speed) >> 2));
+  delta = static_cast<i16>(target - (camera_.raw >> 4));
+  if (delta <= -lead) camera_.raw = static_cast<i16>(camera_.raw + ((delta + lead) << 4));
+  else if (delta >= lead + 40) camera_.raw = static_cast<i16>(camera_.raw + ((delta - lead - 40) << 4));
+  camera_.pos = static_cast<u16>(std::max(camera_.raw >> 4, 0));
 }
 
 void TableGame::frame() {
   if (left()) return;
+  syncMusic();
   ++frames_;
-  recording_.frames = frames_;
-  music_.advance(1.0 / 60);
+  if (recording_.games.empty()) recording_.frames = frames_;
   if (engine_->exited()) {
     // cs:3a11: the table is left: its picture and its music fade away, in 128 frames
     leaving_ -= 2;
@@ -281,6 +356,15 @@ void TableGame::frame() {
     return;
   }
   if (asking_) return;  // the table waits for the answer
+  if (std::exchange(answered_, false)) return;  // and takes it in this frame; it goes on from the next
+  // where the screen looks is worked out from the table as the frame begins (the ball where
+  // it was), once the frame's keys have been taken: a pause pressed now holds it already
+  const Sight sight = look();
+  // what the display shows as the frame begins (TableScreen draws it from the first 33 rows of
+  // the video card's memory, 0x54 bytes of each plane a row)
+  constexpr std::size_t kDisplayBytes = std::size_t{TableScreen::kDisplayRows} * 0x54;
+  for (std::size_t plane = 0; plane < 4; ++plane)
+    std::copy_n(engine_->videoMemory()[plane].begin(), kDisplayBytes, display_[plane].begin());
   try {
     engine_->frame();
   } catch (const std::exception& e) {
@@ -289,12 +373,19 @@ void TableGame::frame() {
     failure_ = e.what();
     log::error("table " + std::to_string(table() + 1) + ", frame " + std::to_string(frames_) + ": " + failure_);
   }
+  if (engine_->exited() && engine_->CB(0x3732) == 0xff) {
+    // Left from the waiting table's question: the display's script goes straight on to its
+    // next step, whose first frame draws a part of it over the question, and the table stops
+    // there. The question is what is shown while the table fades away.
+    for (std::size_t plane = 0; plane < 4; ++plane)
+      std::copy_n(display_[plane].begin(), kDisplayBytes, engine_->videoMemory()[plane].begin());
+  }
+  link_->give();
+  // the picture shows the ball and the flippers where the frame leaves them
+  if (!engine_->exited()) engine_->showAsNow();
+  aim(sight);
   if (engine_->isPaused()) {
     if (!engine_->asksToQuit()) {
-      if (up_) manual_ -= 4;
-      if (down_) manual_ += 4;
-      const int top = viewTop() - manual_;
-      manual_ = std::clamp(manual_, -top, std::max(-top, TableData::kHeight - viewRows() - top));
       // what the display says while paused, in turn
       if (!wasPaused_) pauseFrames_ = 0;
       ++pauseFrames_;
@@ -307,14 +398,7 @@ void TableGame::frame() {
     }
     wasPaused_ = true;
   } else {
-    if (wasPaused_ && manual_ != 0) {
-      // the screen goes back to the ball from where it was moved to by hand
-      if (options_.resolution == Resolution::High) camera_ = (std::clamp(camera_ >> 4, 0, TableData::kHeight - viewRows()) + manual_) * 16;
-      else if (options_.resolution == Resolution::Normal) engine_->W(0x2f04) += static_cast<u16>(manual_ * 16);
-      manual_ = 0;
-    }
     wasPaused_ = false;
-    follow();
   }
 
   // In a game of one player, the initials for a best score are in and have been shown (the

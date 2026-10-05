@@ -7,8 +7,13 @@
 // ProTracker would: tempo commands only ever set the ticks to a row, a tick is always a
 // fiftieth of a second, and of the effects only these do anything: 0 1 2 3 4 6 9 A B C D E9 F.
 // What is not the driver's is the mixing, which is done here at the sound card's own rate.
+//
+// As on the machines the game was made for, the music is moved on by the sound card: every
+// tick of it is played when the card asks for the sound that tick makes, not when the game
+// draws a frame. So it goes on evenly whatever the game is doing, and a frame that takes long
+// does not break it.
 #include <array>
-#include <functional>
+#include <atomic>
 #include <mutex>
 #include <vector>
 
@@ -16,15 +21,27 @@
 
 namespace encore {
 
+/// Who says where the music goes. It is asked by whoever plays the music, which is the sound
+/// card's thread when there is a card.
+class Conductor {
+ public:
+  virtual ~Conductor() = default;
+  /// Before each tick: a place to go to at once, or -1.
+  virtual int interrupt() { return -1; }
+  /// The music has played a pattern through: it would go on to `following`.
+  virtual u8 next(u8 following) { return following; }
+  /// Function 0x13's callback: the music comes to a jump to `place`; the place to go to.
+  virtual u8 jump(u8 place) { return place; }
+};
+
 class MusicDriver : public SoundDriver {
  public:
   explicit MusicDriver(int outputRate = 48000);
 
   /// Function 0x12: the module (a .MOD file's bytes). False if it is not one.
   bool load(ByteView mod);
-  /// Function 0x13: who is asked at each jump in the music where to go; it is given the
-  /// place the music names and answers with the place to go to.
-  std::function<u8(u8)> onJump;
+  /// Who is asked where the music goes; nobody, and it goes where the module says.
+  Conductor* conductor = nullptr;
 
   void effect(u8 sample, u8 note, u8 volume, u8 channel) override;
   u8 jump(u16 position) override;
@@ -42,17 +59,13 @@ class MusicDriver : public SoundDriver {
   int position() const { return position_; }
   int row() const { return (rowAt_ % 0x300) / 12; }
   /// Function 0x16: fiftieths of a second played.
-  u32 ticks() const { return ticks_; }
+  u32 ticks() const { return ticks_.load(std::memory_order_acquire); }
 
-  /// The game's time moves on: the music is played for that long, tick by tick, and what it
-  /// sounds like is kept until it is asked for. Jumps are asked about from here, so the
-  /// music does to the game the same thing at the same moment in every playing of it.
-  void advance(double seconds);
-  /// The sound made so far, for the sound card: interleaved left and right. What is not
-  /// there yet is silence.
+  /// The sound card asks for the next `frames` of sound, interleaved left and right: the
+  /// music is played on for as long as they last.
   void render(float* out, int frames);
-  /// The same without anybody listening: what was made is thrown away.
-  void discard();
+  /// The same with no sound card: the music is moved on by this much time, unheard.
+  void pass(double seconds);
 
  private:
   struct Sample {
@@ -84,7 +97,7 @@ class MusicDriver : public SoundDriver {
   void slideVolume(Channel& c);
   u32 stepFor(int period) const;
   int periodAt(u16 index) const;
-  void mixTick();
+  void mix(float* out, std::size_t frames);
 
   int rate_;
   std::vector<u8> cells_;                 ///< the patterns, three bytes a note as the driver keeps them
@@ -96,15 +109,16 @@ class MusicDriver : public SoundDriver {
   std::size_t rowAt_ = 0;                 ///< the next row, as bytes into the patterns
   u8 pendingRow_ = 0;                     ///< 0, or one more than the row a jump goes to
   u8 speed_ = 6, ticksLeft_ = 1, rowSample_ = 0;
-  u32 ticks_ = 0;
+  std::atomic<u32> ticks_{0};
   u16 master_ = 0xff;
   bool held_ = false;                     ///< stopped by this version's pause
   bool playing_ = false, loaded_ = false, mono_ = false;
   std::array<Channel, 4> ch_{};
-  double due_ = 0;                        ///< ticks owed
-  double tickSamples_ = 0;                ///< output frames owed to the tick being mixed
+  bool placed_ = false;                   ///< the place to go to has been said: nobody is asked about the next
+  double tickFrames_ = 0;                 ///< output frames left of the tick being played
+  double passed_ = 0;                     ///< time passed without a card, not yet a whole frame of sound
   std::mutex mutex_;
-  std::vector<float> made_;               ///< sound waiting for the card
+  std::vector<float> unheard_;
 };
 
 }  // namespace encore

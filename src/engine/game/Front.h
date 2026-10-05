@@ -45,7 +45,7 @@ class Front {
   void draw(u8* frame, Rgb* colours, HdFrame* hd = nullptr) const;
 
   void sound(float* out, int frames) { music_.render(out, frames); }
-  void noSound() { music_.discard(); }
+  void noSound() { music_.pass(1.0 / 60); }
 
  private:
   // --- a routine that can wait for the next frame, and call others that can

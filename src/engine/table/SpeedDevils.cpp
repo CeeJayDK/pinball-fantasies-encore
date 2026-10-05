@@ -54,7 +54,7 @@ SpeedDevils::SpeedDevils(ByteView prg) : Flow(prg, 1) {
     music(0x0a4d);
     startScript(0x1d1b);
     stopBlinks();
-    lightsOut();
+    lightsDark();
   });
   bindNative(0x1097, [this] { music(0x0a4a); });
   bindNative(0x109e, [this] {  // a flipper pressed: each row of three lane lights moves along one
@@ -126,8 +126,11 @@ void SpeedDevils::scored() {
   }
 }
 
+/// The original has a number of times to add a bonus here that this table never sets, so it
+/// is always once, and the bonus is multiplied only when it is counted. Amended: here too it
+/// is added as many times as the multiplier now stands at.
 void SpeedDevils::addBonus(u16 amount) {
-  u16 times = w(0x3379);
+  u16 times = amended ? b(0x095d) : w(0x3379);
   do addScore(0x3361, amount);
   while (times-- > 1);
 }
@@ -208,6 +211,9 @@ void SpeedDevils::restorePlayer() {
     setLight(0x09);
   }
   for (u16 i = 0; i < w(0x1087); ++i) setLight(static_cast<u8>(0x1a + i));
+  // (amended: the four lights towards the next gear are not carried from ball to ball; each
+  // ball earns its own)
+  if (amended) for (u16 a = 0x3633; a <= 0x3636; ++a) b(a) = 0;
   row(0x3633, 4, 0x16);
   for (u16 i = 0; i < 5; ++i) {
     const u8 light = static_cast<u8>(0x32 + i);
@@ -241,9 +247,11 @@ bool SpeedDevils::leftLanes() {
 
 bool SpeedDevils::rightLanes() {
   at24de();
-  addScore(0x464d, 0x09be);
+  // (the original gives this row ten points and twenty of bonus more than the other;
+  // amended: the two rows score alike)
+  addScore(0x464d, amended ? 0x09b2 : 0x09be);
   scored();
-  addBonus(0x09d6);
+  addBonus(amended ? 0x09ca : 0x09d6);
   sfx(0x0a2a);
   if (b(0x3630) != 0xff || b(0x3631) != 0xff || b(0x3632) != 0xff) return false;
   at0225();
@@ -595,23 +603,27 @@ void SpeedDevils::bindRules() {
         b(0x10aa) = 0xff;
       }
     }
+    // The original keeps the ball a third of a second (two and a half for the greatest
+    // prize) and then a second more, unless a mode's clock is running. Amended: a third of a
+    // second, or a second and a third while a mode's clock runs; two and a half for the prize.
+    pitWait_ = pitStop ? 0x96 : b(0x33aa) == 0xff ? 0x50 : 0x14;
     if (b(0x10a9) != 0xff) addTimer(pitStop ? 0x1a29 : 0x19d1);
   });
   bindNative(0x19d1, [this] {
     hold();
-    if (!countTo(0x367d, 0x14)) return;
-    addTimer(0x1a81);
+    if (!countTo(0x367d, amended ? pitWait_ : 0x14)) return;
+    amended ? addTimerNow(0x1a81) : addTimer(0x1a81);
     endTimer();
   });
   bindNative(0x1a29, [this] {
     hold();
     if (!countTo(0x367f, 0x96)) return;
-    addTimer(0x1a81);
+    amended ? addTimerNow(0x1a81) : addTimer(0x1a81);
     endTimer();
   });
   bindNative(0x1a81, [this] {
     hold();
-    if (b(0x33aa) != 0xff && !countTo(0x3681, 0x3c)) return;
+    if (!amended && b(0x33aa) != 0xff && !countTo(0x3681, 0x3c)) return;
     sfx(0x0a0e);
     hold();
     b(0x2d3a) = 0;

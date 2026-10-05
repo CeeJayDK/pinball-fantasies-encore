@@ -5,6 +5,20 @@ namespace encore {
 
 Engine::Engine(ByteView prg, int table) : Program(prg, table) {
   for (auto& plane : video_) plane.assign(0x10000, 0);
+  // Which slope each stretch of eight dots lies on, worked out once from the masks as the
+  // program comes with them: the first of the stretch to its left, itself and the one to
+  // its right that has nothing solid in it says so (cs:59d9), and 0xff if none has.
+  for (int layer = 0; layer < 2; ++layer) {
+    const u16 marks = S(layer == 0 ? 0x4114 : 0x7734), walls = S(layer == 0 ? 0x3b74 : 0x46b4), slope = S(layer == 0 ? 0x7194 : 0x7cd4);
+    auto& out = slopes_[static_cast<std::size_t>(layer)];
+    out.assign(0x28 * 0x240, 0xff);
+    auto clear = [&](u16 at) { return farB(marks, at) == 0 && farB(walls, at) == 0; };
+    for (u16 at = 0; at < out.size(); ++at) {
+      if (at != 0 && clear(static_cast<u16>(at - 1))) out[at] = farB(slope, static_cast<u16>(at - 1)) & 0x0f;
+      else if (clear(at)) out[at] = farB(slope, at) & 0x0f;
+      else if (clear(static_cast<u16>(at + 1))) out[at] = farB(slope, static_cast<u16>(at + 1)) & 0x0f;
+    }
+  }
   bind(0x69fc, [] {});  // the original's "nothing": a lone ret, which empty slots point at
   bindDisplay();
   bindGame();
@@ -16,9 +30,22 @@ void Engine::effect(u16 record) {
 }
 
 void Engine::frame() {
+  if (keysFirst)
+    for (int i = 0; i < loopsPerFrame; ++i) mainLoop();
   frameCallback();
   midFrameCallback();
-  for (int i = 0; i < loopsPerFrame; ++i) mainLoop();
+  if (!keysFirst)
+    for (int i = 0; i < loopsPerFrame; ++i) mainLoop();
+}
+
+/// The ball's moves at the start of the frame: the two that are due there, and with
+/// `stepsTogether` the ones from part way down the frame as well.
+void Engine::frameSteps() {
+  physicsSteps();
+  if (!stepsTogether) return;
+  B(at::inMidFrame) = 0xff;
+  physicsSteps();
+  B(at::inMidFrame) = 0;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -39,13 +66,13 @@ void Engine::key(u8 al) {
   // left shift, alt, ctrl: the left flipper
   if ((al == 0x2a || al == 0x38 || al == 0x1d) && !(B(at::keys) & 2)) {
     B(at::keys) |= 2;
-    B(0x338b) = 0xff;
+    if (!amended || B(0x33cf) != 0) B(0x338b) = 0xff;  // (amended: not while the flippers are dead)
     if (B(0x33cf) != 0) effect(0xc2d);
     return;
   }
   if (al == 0x36 && !(B(at::keys) & 1)) {  // right shift: the right flipper
     B(at::keys) |= 1;
-    B(0x338b) = 0xff;
+    if (!amended || B(0x33cf) != 0) B(0x338b) = 0xff;  // (amended: not while the flippers are dead)
     if (B(0x33cf) != 0) effect(0xc2d);
     return;
   }
@@ -79,7 +106,7 @@ void Engine::keyExtended(u8 al) {
     case 0x38: case 0x1d:  // right alt, right ctrl
       if (!(B(at::keys) & 1)) {
         B(at::keys) |= 1;
-        B(0x338b) = 0xff;
+        if (!amended || B(0x33cf) != 0) B(0x338b) = 0xff;  // (amended: not while the flippers are dead)
         if (B(0x33cf) != 0) effect(0xc2d);
       }
       break;
@@ -127,18 +154,18 @@ void Engine::frameCallback() {
       drawFlipper(0);
       drawFlipper(1);
     }
-    physicsSteps();
+    frameSteps();
     B(0x2f07) = 0;
   } else if (B(0x2f06) != 0xff) {
     B(0x2f06) = 0xff;
     B(0x2f07) = 0xff;
     B(0x2f09) = 0xff;
     drawBall();
-    physicsSteps();
+    frameSteps();
   } else {
     drawFlipper(0);
     drawFlipper(1);
-    physicsSteps();
+    frameSteps();
     B(0x2f07) = 0xff;
     if (static_cast<u16>(W(0x2f02) + (high() ? 0xa3 : 0x6c)) < kw(0x4359, 1)) drawFlipper(2);
   }
@@ -177,6 +204,7 @@ void Engine::drawBall() {
   shown_.ballX = W(at::ballX).s();
   shown_.ballY = static_cast<i16>(W(at::ballY) + (B(at::ballHidden) == 0xff ? 0 : W(at::nudgeLift)));
   shown_.ramps = B(at::layer) != 0;
+  ballDrawn_ = true;
 }
 
 /// cs:550e: a flipper is drawn as it now stands.
@@ -204,7 +232,7 @@ void Engine::midFrameCallback() {
   scroll();
   if (B(0x23aa) != 0) return;
   B(at::inMidFrame) = 0xff;
-  physicsSteps();
+  if (!stepsTogether) physicsSteps();
   if (B(0x2f07) == 0xff) {
     B(0x2f09) = 0;
     drawBall();
@@ -332,17 +360,28 @@ void Engine::mainLoop() {
         else playersKey();
       }
       if (keys) {
-        if (key == 0x39) { key = 0xff; nudgeKey(); }
+        if (key == 0x39) {
+          key = 0xff;
+          // (amended, with the keys read first: the shake is counted after the frame's moves,
+          // so a tilt takes the flippers from the next frame on, not from this one)
+          if (amended && keysFirst) nudgeDue_ = true;
+          else nudgeKey();
+        }
         if (key == 0x32) { key = 0xff; musicKey(); }
         if (key == 0x19) { key = 0xff; B(0x230f) = 0xff; }
         pauseKey();
         if (pause_ != Pause::No) return;  // the rest of this turn waits with it
       }
+    } else if (amended && (key == 0x19 || key == 0x32) && W(0x33e7) != F(0x0609)) {
+      // While a ball is being lost the original takes no keys, and keeps the last one pressed:
+      // a P or an M pressed then does its work when the next ball comes. Amended: it is
+      // dropped. (Not while initials are typed, which are read from the same place.)
+      key = 0xff;
     }
   }
   if (B(at::lastKey) == 0x01) B(at::lastKey) = 0xff;
   ++W(at::loopCounter);
-  if (B(at::ballHidden) != 0) {  // the spin a ball will be served with is drawn afresh all the while
+  if (B(at::ballHidden) != 0 && !drawsChance()) {  // the spin a ball will be served with is drawn afresh all the while
     u16 spin = W(at::loopCounter) & 0x3ff;
     if (spin & 1) spin = static_cast<u16>(-spin);
     W(at::spin) = spin;
@@ -510,7 +549,7 @@ void Engine::paused() {
   // what the loop does after the pause, which this turn of it has yet to do
   if (B(at::lastKey) == 0x01) B(at::lastKey) = 0xff;
   ++W(at::loopCounter);
-  if (B(at::ballHidden) != 0) {
+  if (B(at::ballHidden) != 0 && !drawsChance()) {
     u16 spin = W(at::loopCounter) & 0x3ff;
     if (spin & 1) spin = static_cast<u16>(-spin);
     W(at::spin) = spin;
@@ -594,6 +633,7 @@ void Engine::addTimer(u16 native) {
     if (nativeW(bx) != F(0x69fc)) continue;
     ++W(0x337f);
     nativeW(bx) = native;
+    if (timersRunning_) (startsNow_ ? startedNow_ : waiting_)[static_cast<std::size_t>(bx - A(0x331b)) / 2 % waiting_.size()] = true;
     return;
   }
   exited_ = true;  // the original gives up when all fifty are taken
@@ -601,11 +641,35 @@ void Engine::addTimer(u16 native) {
 
 void Engine::runTimers() {
   u16 slot = A(0x331b);
+  // In the original a routine started by another of these is run in the same frame if the
+  // free place it was given happens to come later in the list, and in the next if not: by
+  // luck. Amended: it waits for the next frame wherever its place is; or, started with
+  // `startsNow_`, is run in this one wherever its place is.
+  const u16 first = slot;
+  timersRunning_ = amended;
   for (int i = 0, slots = kw(0x5b2a, 1); i < slots; ++i, slot = static_cast<u16>(slot + 2)) {
+    const std::size_t n = static_cast<std::size_t>(i) % waiting_.size();
+    if (waiting_[n]) continue;
+    startedNow_[n] = false;  // (its turn comes anyway)
     W(0x3381) = slot;
     bx = slot;  // as the original has it, which matters to a routine that takes BX for its place in a script
     call(nativeW(slot));
   }
+  for (bool again = amended; again;) {  // the ones started for this frame in places already passed
+    again = false;
+    slot = first;
+    for (int i = 0, slots = kw(0x5b2a, 1); i < slots; ++i, slot = static_cast<u16>(slot + 2)) {
+      const std::size_t n = static_cast<std::size_t>(i) % waiting_.size();
+      if (!startedNow_[n]) continue;
+      startedNow_[n] = false;
+      again = true;
+      W(0x3381) = slot;
+      bx = slot;
+      call(nativeW(slot));
+    }
+  }
+  timersRunning_ = false;
+  waiting_.fill(false);
 }
 
 void Engine::endTimer() {

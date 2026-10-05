@@ -20,9 +20,20 @@ void PartyLand::scored() {
   }
 }
 
+/// The screen is taken up to the top of the table, from where it is (cs:1217, cs:1228). The
+/// two timers that do it start a frame or two after the ball has been put in its hole up
+/// there, and until then the screen would set off after the ball. Amended: it is held where
+/// it is from this moment, and goes up from this frame's turn of the timers on.
+void PartyLand::scrollUp() {
+  if (!amended) return addTimer(0x1217);
+  W(0x3387) = W(0x2f02);
+  W(0x3383) = W(0x2f02);
+  addTimer(0x1228);
+}
+
 void PartyLand::eject() {
   hole();
-  addTimer(0x1217);
+  scrollUp();
   addTimer(0x1175);
   W(0x3387) = W(0x2f02);
 }
@@ -126,7 +137,18 @@ void PartyLand::at1c82() {
   fiveLit();
 }
 
-void PartyLand::at1ddb() { addTimer(W(0x0634, B(0x05b4, static_cast<u16>(B(0x0093) >> 1)))); }
+/// What the arcade gives. The original goes by a count of the frames played, through a list
+/// of 128 (ds:05b4), and gives it a frame later. Amended: one of the six by chance proper,
+/// each as likely as the others, and at once.
+void PartyLand::at1ddb() {
+  if (!amended) return addTimer(W(0x0634, B(0x05b4, static_cast<u16>(B(0x0093) >> 1))));
+  static constexpr u16 kPrizes[6] = {0x1dfa, 0x1e27, 0x1e62, 0x1e95, 0x1ec8, 0x1f0a};
+  const u16 running = W(0x3381);
+  addTimer(kPrizes[chance(6, 0)]);
+  W(0x3381) = bx;
+  call(nativeW(bx));  // (each of them ends itself)
+  W(0x3381) = running;
+}
 
 void PartyLand::at1efb() {
   W(0x05af) = 0x0a;
@@ -304,7 +326,7 @@ void PartyLand::bindRules() {
   });
   after(0x119f, 0x35da, 0x1b, [this] {  // out of the hole, upwards on the ramps' side
     W(0x3383) = 0xffff;
-    const u16 speed = W(at::loopCounter) & 0x7f;
+    const u16 speed = chance(0x80, W(at::loopCounter) & 0x7f);
     hole();
     B(at::layer) = 0xff;
     W(at::ballVy) = speed;
@@ -567,7 +589,7 @@ void PartyLand::bindRules() {
       blink(0x0c, 0, 8);
     }
     W(0x00ac) = 0x82;
-    addTimer(0x1217);
+    scrollUp();
     addTimer(0x1c0f);
     if (B(0x33e2) != 0xff) addTimer(0x1c36);
     B(0x3398) = 0;
@@ -607,12 +629,13 @@ void PartyLand::bindRules() {
       B(0x230b) = B(0x230a);
     } else {
       B(0x230a) = 0x3e;
-      B(0x3389) = 1;
+      // (amended: the arcade's jingle keeps its own priority while it plays)
+      if (!amended) B(0x3389) = 1;
       B(0x338f) = 0;
       B(0x338e) = 0;
       addTimer(0x1da2);
     }
-    addTimer(0x1217);
+    scrollUp();
     hole();
   });
   bind(0x1da2, [this] {
@@ -622,9 +645,18 @@ void PartyLand::bindRules() {
       endTimer();
       return;
     }
+    // (amended: after the arcade the music starts again from the beginning of the table's tune,
+    // not from where it was when the ball went in)
+    if (amended) B(0x230b) = kb(0x34f7, 4);
     B(0x230a) = B(0x230b);
-    B(0x230d) = 1;
-    B(0x3389) = 0;
+    // (amended: the prize's jingle is not cut short by one of less weight: the priority
+    // stays, and a jingle still to be repeated is)
+    if (!amended) {
+      B(0x230d) = 1;
+      B(0x3389) = 0;
+    } else if (B(0x230d) == 0) {
+      B(0x230d) = 1;
+    }
     at1ddb();
     endTimer();
   });
@@ -632,7 +664,7 @@ void PartyLand::bindRules() {
   auto prize = [this](u16 record, u16 show, u16 hold) {
     if (!award(record)) return at1efb();
     B(0x230a) = B(0x230b);
-    B(0x3389) = 0;
+    if (!amended) B(0x3389) = 0;  // (amended: a prize's jingle keeps its priority)
     W(0x00d5) = show;
     W(0x00d8) = hold;
     B(0x00d7) = 0;
@@ -643,7 +675,7 @@ void PartyLand::bindRules() {
     setLight(0x27);
     if (!award(0x0640)) return at1efb();
     B(0x230a) = B(0x230b);
-    B(0x3389) = 0;
+    if (!amended) B(0x3389) = 0;  // (amended: a prize's jingle keeps its priority)
     W(0x05af) = 0xa0;
     addTimer(0x1104);
     endTimer();
@@ -653,7 +685,7 @@ void PartyLand::bindRules() {
     at12ea(at19c7());
     if (B(0x00da) == 0) return at1efb();
     B(0x230a) = B(0x230b);
-    B(0x3389) = 0;
+    if (!amended) B(0x3389) = 0;  // (amended: a prize's jingle keeps its priority)
     W(0x00d5) = 0x8c;
     W(0x00d8) = 0xb4;
     B(0x00d7) = 0;
@@ -666,7 +698,7 @@ void PartyLand::bindRules() {
   bind(0x1f0a, [this] {
     if (award(0x06b1)) {
       B(0x230a) = B(0x230b);
-      B(0x3389) = 0;
+      if (!amended) B(0x3389) = 0;
     }
     W(0x05af) = 0x2d;
     addTimer(0x1104);
@@ -674,7 +706,17 @@ void PartyLand::bindRules() {
   });
   bind(0x1f32, [this] {
     bool done = --W(0x00d8) == 0;
-    if (!done) {
+    if (amended) {
+      // The original lets the ball go when the prize's jingle is over and its time on the
+      // display is up. Amended: when its time is up, once the jingle has been heard to play;
+      // a long jingle no longer keeps the ball back.
+      if (!done && B(0x33e2) != 0xff) {
+        if (W(0x00d5) != 0) --W(0x00d5);
+        if (B(0x230d) == 0 && B(0x00d7) != 0xff) return;
+        B(0x00d7) = 0xff;
+        if (W(0x00d5) != 0) return;
+      }
+    } else if (!done) {
       if (W(0x00d5) != 0) --W(0x00d5);
       if (B(0x00d7) != 0xff) {
         if (B(0x33e2) == 0xff) done = true;
@@ -763,7 +805,7 @@ void PartyLand::bindRules() {
   bind(0x2137, [=, this] {
     held();
     if (!countTo(0x35fa, 0x28)) return;
-    addTimer(0x218f);
+    addTimerNow(0x218f);
     endTimer();
   });
   bind(0x218f, [=, this] {
@@ -909,7 +951,7 @@ void PartyLand::bindRules() {
     if (W(0x00aa) != 0) {
       at2420();
       at2420();
-      award(0x0b54);
+      if (!amended) award(0x0b54);  // (the original gives the skill shot's award twice; amended: once)
       addScore(0x00e8, 0x016c);
       addScore(0x45b6, 0x00e8);
       award(0x0b54);

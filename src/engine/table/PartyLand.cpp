@@ -38,7 +38,7 @@ PartyLand::PartyLand(ByteView prg) : Flow(prg, 0) {
     B(0x230a) = 0x3e;
     startScript(0x1bf0);
     stopBlinks();
-    lightsOut();
+    lightsDark();
     B(0x33f8) = 0xff;
   });
   bind(0x0fc5, [this] { music(0x0c78); });  // the warning before it
@@ -55,13 +55,19 @@ PartyLand::PartyLand(ByteView prg) : Flow(prg, 0) {
   bind(0x52cd, [this] {  // until the music has come round (cs:52cd; Party Land's has a flag of its own in it)
     si = 0xff;
     if (B(0x338e) != 0xff) return;
-    B(0x00d2) = 0;
+    // (after the side lane's extra ball a lost ball is not taken as lost for ten seconds, or,
+    // in the original, until this wait finds the jingle over; amended: the ten seconds)
+    if (!amended) B(0x00d2) = 0;
     si = 0;
   });
   bind(0x2ab1, [this] { everyFrame(); });
   bind(0x0215, [this] { drained(); });
   bind(0x0fcc, [this] {  // a flipper pressed: the four lane lights move along one (cs:0fcc)
-    if (B(0x00cf) == 0xff || B(0x338b) != 0xff) return;
+    if (B(0x338b) != 0xff) return;
+    // (the original keeps a press made while the lights are held, and moves them when they
+    // are let go; amended: such a press is lost)
+    if (amended) B(0x338b) = 0;
+    if (B(0x00cf) == 0xff) return;
     B(0x338b) = 0;
     const u8 fourth = B(0x3596);
     auto put = [this](u8 light, u8 state) { state == 0xff ? setLight(light) : clearLight(light); };
@@ -209,7 +215,8 @@ void PartyLand::drained() {
     return;
   }
   award(0x06d5);
-  B(0x3389) = 0;
+  // (amended: the lost ball's jingle keeps its priority while it plays, so nothing cuts into it)
+  if (!amended) B(0x3389) = 0;
   B(0x230a) = 0x3e;
   addTimer(0x02f1);
 }

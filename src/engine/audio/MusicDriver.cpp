@@ -151,6 +151,7 @@ u8 MusicDriver::jump(u16 position) {
   const u16 was = position_;
   position_ = static_cast<u16>(position - 1);
   pendingRow_ = 1;
+  placed_ = true;
   ticksLeft_ = 1;
   return static_cast<u8>(was);
 }
@@ -238,9 +239,10 @@ void MusicDriver::trigger(Channel& c, u8 sample, u8 note, u8 effect, u8 param) {
       break;
     case 0xb:  // the music jumps: the table is asked where to (cs:12c0)
       if (pendingRow_ != 0) break;
-      position_ = static_cast<u16>((position_ & 0xff00) | (onJump ? onJump(param) : param));
+      position_ = static_cast<u16>((position_ & 0xff00) | (conductor ? conductor->jump(param) : param));
       --position_;
       pendingRow_ = 1;
+      placed_ = true;
       break;
     case 0xc:
       c.volume = static_cast<u16>(std::min<u8>(param, 0x40) << 8);
@@ -329,6 +331,8 @@ void MusicDriver::playRow() {
     position_ = restart_;
     if (restart_ >= length_) break;
   }
+  if (conductor && !placed_) position_ = conductor->next(static_cast<u8>(position_));
+  placed_ = false;
   const u8 row = pendingRow_ ? static_cast<u8>(pendingRow_ - 1) : 0;
   rowAt_ = std::size_t{order_[position_ & 0x7f]} * 0x300 + static_cast<u8>(row << 2) * 3u;
   pendingRow_ = 0;
@@ -345,12 +349,7 @@ void MusicDriver::tick() {
   playRow();
 }
 
-void MusicDriver::mixTick() {
-  tickSamples_ += rate_ / 50.0;
-  const auto frames = static_cast<std::size_t>(tickSamples_);
-  tickSamples_ -= static_cast<double>(frames);
-  const std::size_t at = made_.size();
-  made_.resize(at + frames * 2, 0.0f);
+void MusicDriver::mix(float* out, std::size_t frames) {
   const float master = static_cast<float>(master_) / 255.0f;
   for (std::size_t n = 0; n < 4; ++n) {
     Channel& c = ch_[n];
@@ -364,12 +363,11 @@ void MusicDriver::mixTick() {
         if (c.position >= c.end) c.position = c.loopStart;
       }
       const float s = static_cast<float>(c.data[c.position]) * gain;  // (the byte it is at, as the driver takes it)
-      float* out = &made_[at + i * 2];
       if (mono_) {
-        out[0] += s * 0.5f;
-        out[1] += s * 0.5f;
+        out[i * 2] += s * 0.5f;
+        out[i * 2 + 1] += s * 0.5f;
       } else {
-        out[left ? 0 : 1] += s;
+        out[i * 2 + (left ? 0 : 1)] += s;
       }
       const u32 moved = u32{c.fraction} + (c.step & 0xffff);
       c.fraction = static_cast<u16>(moved);
@@ -379,45 +377,44 @@ void MusicDriver::mixTick() {
   }
 }
 
-void MusicDriver::advance(double seconds) {
-  std::lock_guard lock(mutex_);
-  if (held_) {
-    // paused: nothing sounds, and nothing moves on
-    tickSamples_ += seconds * rate_;
-    const auto frames = static_cast<std::size_t>(tickSamples_);
-    tickSamples_ -= static_cast<double>(frames);
-    made_.resize(made_.size() + frames * 2, 0.0f);
-  } else if (!loaded_ || !playing_) {
-    // no music: time still passes for the sound card
-    tickSamples_ += seconds * rate_;
-    const auto frames = static_cast<std::size_t>(tickSamples_);
-    tickSamples_ -= static_cast<double>(frames);
-    made_.resize(made_.size() + frames * 2, 0.0f);
-  } else {
-    due_ += seconds * 50.0;
-    while (due_ >= 1.0) {
-      due_ -= 1.0;
-      tick();
-      mixTick();
-    }
-  }
-  // never more than a quarter of a second waiting: the card has fallen behind, or is not there
-  const std::size_t most = static_cast<std::size_t>(rate_ / 4) * 2;
-  if (made_.size() > most) made_.erase(made_.begin(), made_.end() - static_cast<std::ptrdiff_t>(most));
-}
-
 void MusicDriver::render(float* out, int frames) {
   std::lock_guard lock(mutex_);
-  const std::size_t want = static_cast<std::size_t>(frames) * 2;
-  const std::size_t have = std::min(want, made_.size());
-  std::copy_n(made_.begin(), have, out);
-  std::fill(out + have, out + want, 0.0f);
-  made_.erase(made_.begin(), made_.begin() + static_cast<std::ptrdiff_t>(have));
+  std::size_t left = frames > 0 ? static_cast<std::size_t>(frames) : 0;
+  std::fill_n(out, left * 2, 0.0f);
+  // stopped, or held by this version's pause: nothing sounds, and nothing moves on
+  if (!loaded_ || !playing_ || held_) return;
+  while (left != 0) {
+    if (tickFrames_ < 1.0) {
+      if (conductor) {
+        if (const int place = conductor->interrupt(); place >= 0) {
+          // Function 0x10 lets the row now due be played first, and goes to the new place
+          // after it: with six ticks to a row, an eighth of a second later. Here the new
+          // place's first row is the one played at this tick, so a jingle is heard at once.
+          position_ = static_cast<u16>(place);
+          while (position_ >= length_ && length_ != 0) position_ = restart_ < length_ ? restart_ : 0;
+          rowAt_ = std::size_t{order_[position_ & 0x7f]} * 0x300;
+          pendingRow_ = 0;
+          placed_ = false;
+          ticksLeft_ = 1;
+        }
+      }
+      tick();
+      tickFrames_ += rate_ / 50.0;
+    }
+    const std::size_t now = std::min(left, static_cast<std::size_t>(tickFrames_));
+    mix(out, now);
+    out += now * 2;
+    left -= now;
+    tickFrames_ -= static_cast<double>(now);
+  }
 }
 
-void MusicDriver::discard() {
-  std::lock_guard lock(mutex_);
-  made_.clear();
+void MusicDriver::pass(double seconds) {
+  passed_ += seconds * rate_;
+  const int frames = static_cast<int>(passed_);
+  passed_ -= frames;
+  unheard_.resize(static_cast<std::size_t>(frames) * 2);
+  render(unheard_.data(), frames);
 }
 
 }  // namespace encore

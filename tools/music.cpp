@@ -21,17 +21,20 @@ int main(int argc, char** argv) {
     return 2;
   }
   const double seconds = std::atof(argv[3]);
-  int jumps = 0;
-  driver.onJump = [&](encore::u8 to) {
-    ++jumps;
-    return to;
-  };
+  struct Counting : encore::Conductor {
+    int jumps = 0;
+    encore::u8 jump(encore::u8 to) override {
+      ++jumps;
+      return to;
+    }
+  } counting;
+  int& jumps = counting.jumps;
+  driver.conductor = &counting;
   driver.start();
   if (argc > 5) driver.jump(static_cast<encore::u16>(std::atoi(argv[5])));
   std::vector<float> sound;
   std::vector<float> chunk(800 * 2);
   for (int frame = 0; frame < static_cast<int>(seconds * 60); ++frame) {
-    driver.advance(1.0 / 60);
     driver.render(chunk.data(), 800);
     sound.insert(sound.end(), chunk.begin(), chunk.end());
   }

@@ -1,4 +1,6 @@
 // A game's comings and goings: starting one, the ball's beginning, scores.
+#include <cstdio>
+
 #include "engine/table/Engine.h"
 
 namespace encore {
@@ -72,6 +74,21 @@ void Engine::lightsOut() {
   }
 }
 
+/// A tilt puts every light out. In the original that is lightsOut, which also forgets which
+/// were lit, so the lights a player keeps from ball to ball are lost with the ball. Amended:
+/// they only go dark, and what was lit is still the player's when the ball is over.
+void Engine::lightsDark() {
+  if (!amended) return lightsOut();
+  if (B(0x2f2b) != 0xff) return;
+  for (u16 light = 1, lights = kw(0x588e, 1); light <= lights; ++light) {
+    u16 record = W(0x12bd, static_cast<u16>((light - 1) * 2));
+    B(0x354e) = 0;
+    std::size_t colour = std::size_t{nativeB(record++)} * 3;
+    const u8 count = nativeB(record++);
+    for (u8 i = 0; i < count; ++i, ++colour) dac_[colour % 768] = (nativeB(record++) >> 1) & 0x3f;
+  }
+}
+
 bool Engine::music(u16 record) {
   if (record == 0) return true;
   const u8 place = nativeB(record), repeats = nativeB(static_cast<u16>(record + 1)), priority = nativeB(static_cast<u16>(record + 2));
@@ -90,6 +107,11 @@ bool Engine::music(u16 record) {
 }
 
 void Engine::addScore(u16 to, u16 amount) {
+  if (debugWatch == -2) {
+    std::fprintf(stderr, "[ours] addScore to %04x from %04x:", to, amount);
+    for (int i = 0; i < 12; ++i) std::fprintf(stderr, "%d", nativeB(static_cast<u16>(amount + i)));
+    std::fprintf(stderr, "\n");
+  }
   // Digit by digit from the right, as the original's "add, then adjust to a decimal digit".
   u8 carry = 0;
   for (int i = 11; i >= 0; --i) {
@@ -172,6 +194,7 @@ void Engine::placeBall(u16 x, u16 y) {
   W(at::ballYFixed, 2) = static_cast<u16>(fy >> 16);
   W(at::ballVy) = 0;
   W(at::ballVx) = 0;
+  spinDue_ = true;
 }
 
 void Engine::patchMask(u16 segment, u16 at, u16 shape, u16 width, u16 rows) { copyShape(S(segment), at, shape, width, rows, width); }

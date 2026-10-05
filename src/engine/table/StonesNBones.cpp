@@ -56,7 +56,7 @@ StonesNBones::StonesNBones(ByteView prg) : Flow(prg, 3) {
     b(0x2795) = 0x34;
     startScript(0x2368);
     stopBlinks();
-    lightsOut();
+    lightsDark();
   });
   bindNative(0x0f77, [this] { music(0x08fb); });
   bindNative(0x0f7e, [this] {  // a flipper pressed: each row of three lights moves along one
@@ -184,7 +184,7 @@ void StonesNBones::clearBall() {
   copy12(0x02e1, 0x02ed);
   w(0x01ea) = 0x0a;
   w(0x01ec) = 0;
-  const u8 first = static_cast<u8>(static_cast<u8>(w(0x3905)) % 3 + 1);  // one of the three lights, by chance
+  const u8 first = static_cast<u8>(chance(3, static_cast<u8>(w(0x3905)) % 3) + 1);  // one of the three lights, by chance
   b(0x0211) = first;
   blink(first, 0, 1);
   for (u16 a : {u16{0x021e}, u16{0x0220}, u16{0x0221}, u16{0x0222}, u16{0x0223}, u16{0x0224}, u16{0x0225}, u16{0x0227}, u16{0x0228},
@@ -294,7 +294,7 @@ void StonesNBones::bindMatch() {
     }
     plain();
     drawText(0x23aa, 0xa8);
-    w(0x23d2) = static_cast<u16>(w(0x3905) % 10);
+    w(0x23d2) = chance(10, static_cast<u16>(w(0x3905) % 10));
     nativeCW(0x089f) = high() ? 0x48 : 0;
     si = 0x24;
     nativeCW(0x08a1) = nativeW(nativeCW(0x089f));

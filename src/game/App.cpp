@@ -414,14 +414,15 @@ void App::openTable(int index, const encore::Recording* recording) {
   if (recording) {
     setup.options = recording->options;
     setup.highScores = recording->highScores;
-    setup.chance = recording->chance;
+    setup.seed = recording->seed;
     setup.carry = recording->carry;
   } else {
     setup.options = config_.options;
     setup.highScores = config_.highScores[static_cast<std::size_t>(index)];
-    setup.chance = static_cast<u16>(std::chrono::steady_clock::now().time_since_epoch().count());
+    setup.seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
   }
   table_ = std::make_unique<encore::TableGame>(tablePrg_, tableMod_, index, setup);
+  if (recording) table_->playBack(recording);
   // A game played back is the recording's, not one to keep or send.
   recordingSaved_ = recording != nullptr;
   replaying_ = fromReplay_ = recording != nullptr;
@@ -455,6 +456,7 @@ bool App::openReplay(const std::filesystem::path& path) {
 /// is one; true when the table is no longer the one that was playing.
 bool App::recordingOver() {
   replaying_ = false;
+  if (table_) table_->playBack(nullptr);
   if (clip_) endClip();
   if (nextReplay_ < options_.replays.size()) {
     if (!openReplay(options_.replays[nextReplay_++])) return recordingOver();
@@ -527,7 +529,7 @@ void App::newGame() {
     setup.options = table_->options();
     setup.highScores = table_->highScores();
   }
-  setup.chance = static_cast<u16>(std::chrono::steady_clock::now().time_since_epoch().count());
+  setup.seed = static_cast<u64>(std::chrono::steady_clock::now().time_since_epoch().count());
   audio_.setSource({});
   table_ = std::make_unique<encore::TableGame>(tablePrg_, tableMod_, index, setup);
   audio_.setSource([t = table_.get()](float* out, int frames) { t->sound(out, frames); });
@@ -613,7 +615,7 @@ void App::update(double dt) {
     if (intro_) {
       using Kind = encore::Front::Action::Kind;
       const encore::Front::Action a = intro_->frame();
-      // (without a sound card nobody takes the music away; it is played by the game's time anyway)
+      // (without a sound card nothing else moves the music on, and the pictures wait for it)
       if (!sound_) intro_->noSound();
       switch (a.kind) {
         case Kind::OpenTable:
@@ -631,7 +633,7 @@ void App::update(double dt) {
       if (replaying_) {
         const auto& events = replay_->events;
         for (; replayNext_ < events.size() && events[replayNext_].frame == replayFrame_; ++replayNext_)
-          table_->key(events[replayNext_].key, events[replayNext_].down);
+          if (events[replayNext_].isKey()) table_->key(events[replayNext_].key(), events[replayNext_].down());
       }
       table_->frame();
       if (replaying_) {
