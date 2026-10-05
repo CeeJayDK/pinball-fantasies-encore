@@ -21,6 +21,7 @@ enum class HdPicture : u16 {
   Playfield1On, Playfield2On, Playfield3On, Playfield4On,
   Playfield1Off, Playfield2Off, Playfield3Off, Playfield4Off,
   Plunger,                                 // the plunger, the same on every table
+  LeftRepeat,                              // a strip of the side panel's plain part, repeated down the tall menu
   Count,
 };
 
@@ -30,7 +31,7 @@ inline const char* hdPictureName(HdPicture p) {
                                            "left", "table1", "table2", "table3", "table4", "hiscores",
                                            "playfield1_on", "playfield2_on", "playfield3_on", "playfield4_on",
                                            "playfield1_off", "playfield2_off", "playfield3_off", "playfield4_off",
-                                           "plunger"};
+                                           "plunger", "left_repeat"};
   return kNames[static_cast<std::size_t>(p)];
 }
 
@@ -63,6 +64,9 @@ struct HdSprite {
 
 struct HdFrame {
   static constexpr u16 kHalfX = 0x100, kHalfY = 0x200;
+  /// The dot is one line of the picture drawn out downwards: every screen row of it shows the
+  /// same line. (Only for pictures without a lit version, whose bits this shares.)
+  static constexpr u16 kFlatY = 0x400;
   /// How lit a playfield pixel is, in the picture's top bits: the renderer blends between the
   /// lit and unlit pictures by it, read smoothly between screen pixels, so a lamp's edge does
   /// not step along the original's pixels.
@@ -74,6 +78,9 @@ struct HdFrame {
   std::vector<HdPixel> map;                       ///< width x height, top row first
   std::array<std::array<u16, 2>, kCount> size{};  ///< each picture's original size
   u32 used = 0;                                   ///< bit per picture drawn this frame
+  /// Per picture: 0, or how many of its rows a screen row covers when it is a strip repeated
+  /// downwards (its place down the strip is then counted in the picture's own rows).
+  std::array<float, kCount> rowStep{};
   std::array<float, kCount> fade{};               ///< per picture: 1 = as drawn, 0 = all fadeColor
   Rgb fadeColor{};
   std::vector<HdSprite> sprites;                  ///< drawn over the pictures, in order
@@ -87,6 +94,7 @@ struct HdFrame {
     map.assign(static_cast<std::size_t>(w) * h, HdPixel{});
     used = 0;
     fade.fill(1.0f);
+    rowStep.fill(0.0f);
     fadeColor = {};
     sprites.clear();
     spriteTint = 1.0f;

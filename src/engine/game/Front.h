@@ -41,8 +41,17 @@ class Front {
   Action frame();
   const Options& options() const { return options_; }
 
-  /// The screen: 640 x 480, each dot one of 256 colours.
+  /// The screen: 640 across and height() down, each dot one of 256 colours.
+  /// With the whole table on one screen asked for in the options, the screen is as tall as
+  /// that one, two of the usual: the slides stand in the middle of it, and the menu is laid
+  /// out down it, with all four tables on one page and all four lists of best scores on one.
   void draw(u8* frame, Rgb* colours, HdFrame* hd = nullptr) const;
+  bool tall() const { return options_.resolution == Resolution::Full; }
+  /// There is a picture of the panel's plain part to repeat down the tall menu
+  /// (HdPicture::LeftRepeat), this many dots across and down; without one, a line of the
+  /// panel's own picture is drawn out instead.
+  void setPanelStrip(int width, int height) { stripWidth_ = width, stripHeight_ = height; }
+  int height() const { return tall() ? 2 * kHeight : kHeight; }
 
   void sound(float* out, int frames) { music_.render(out, frames); }
   void noSound() { music_.pass(1.0 / 60); }
@@ -203,6 +212,14 @@ class Front {
   int optionRow_ = 0;              ///< cs:3f4b
   bool optionsDone_ = false;       ///< cs:4265
   int launch_ = -1;                ///< a table asked for while a page was shown
+  // for the tall screen: what the part beside the panel shows, and which rows of the
+  // banners have been drawn in
+  enum class Showing { Banners, Page, Scores } showing_ = Showing::Banners;
+  std::array<bool, 96> bannerTop_{}, bannerBottom_{};
+  int stripWidth_ = 0, stripHeight_ = 0;
+  bool lastWasScores_ = false;     ///< the page shown last was one of best scores
+  void drawScreen(u8* frame, HdFrame* hd, int top) const;
+  void drawTallMenu(u8* frame, HdFrame* hd) const;
   u16 lastVolume_ = 0;
 };
 

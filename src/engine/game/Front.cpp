@@ -578,6 +578,7 @@ Front::Task Front::banners(u16 which) {
     if (row != 0xff) {
       copy(static_cast<u16>(0x334 + row * 0x50), static_cast<u16>(0x5c80 + which + row * 0x37), 0x37);  // cs:260a
       const u8 other = static_cast<u8>(0x5e - row);                                                      // cs:262c
+      bannerTop_[row % 96] = bannerBottom_[other % 96] = true;
       copy(static_cast<u16>(0x2a44 + other * 0x50), static_cast<u16>(0x70e9 + which + other * 0x37), 0x37);
       ++at;
       continue;
@@ -592,6 +593,7 @@ Front::Task Front::rubOutBanners() {
   for (u16 at = 0x597a;;) {
     const u8 row = ds(at);
     if (row != 0xff) {
+      bannerTop_[static_cast<u8>(0x5e - row) % 96] = bannerBottom_[row % 96] = false;
       fill(static_cast<u16>(0x334 + static_cast<u8>(0x5e - row) * 0x50), 0x37);  // cs:2654
       fill(static_cast<u16>(0x2a44 + row * 0x50), 0x37);                         // cs:266f
       ++at;
@@ -622,15 +624,23 @@ Front::Task Front::page() {
   splitPalette_ = false;
   colourSelect_ = 0;
   u16 words = 0;
-  for (;;) {
-    const u16 at = pageAt_;
-    pageAt_ = static_cast<u16>(pageAt_ + 2);
-    words = dsw(static_cast<u16>(at + 0x4c01));
-    if (words == 0xffff) words = dsw(0x4c01);
-    if (words != 0) break;
-    pageAt_ = 2;
+  bool scores = false;
+  for (int pass = 0; pass < 2; ++pass) {
+    for (;;) {
+      const u16 at = pageAt_;
+      pageAt_ = static_cast<u16>(pageAt_ + 2);
+      words = dsw(static_cast<u16>(at + 0x4c01));
+      if (words == 0xffff) words = dsw(0x4c01);
+      if (words != 0) break;
+      pageAt_ = 2;
+    }
+    scores = dsw(static_cast<u16>(pageAt_ + 0x4bff)) == 0xffff;
+    // (the tall screen has all four tables' scores on one page: the other pair's page, which
+    // would come next, is passed over)
+    if (!(tall() && scores && lastWasScores_)) break;
   }
-  const bool scores = dsw(static_cast<u16>(pageAt_ + 0x4bff)) == 0xffff;
+  lastWasScores_ = scores;
+  showing_ = scores ? Showing::Scores : Showing::Page;
   drawAt_ = kPage1;
   fontAt_ = 0x8c0;
   if (scores) {  // cs:13cb
@@ -674,6 +684,7 @@ Front::Task Front::page() {
     }
   }
   co_await closePage();
+  showing_ = Showing::Banners;
 }
 
 void Front::optionText(int row, u16& words) {
@@ -781,6 +792,7 @@ Front::Task Front::chooseOptions() {
 Front::Task Front::optionsMenu() {
   scrollerText_ = 0x2906;
   co_await rubOutBanners();
+  showing_ = Showing::Page;
   writeMode_ = 0;
   sendColours(0, 6);
   splitPalette_ = false;
@@ -834,6 +846,7 @@ Front::Task Front::optionsMenu() {
   rubOutText(true);
   setStart(0);
   splitPalette_ = true;
+  showing_ = Showing::Banners;
   if (options_.balls != saved_.balls || options_.angle != saved_.angle || options_.scrollSpeed != saved_.scrollSpeed ||
       options_.resolution != saved_.resolution || options_.noMusic != saved_.noMusic || options_.mono != saved_.mono) {
     saved_ = options_;
@@ -1001,20 +1014,48 @@ Front::Task Front::main() {
 // ---------------------------------------------------------------------------------------
 void Front::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
   if (hd) {
-    hd->reset(kWidth, kHeight);
+    hd->reset(kWidth, height());
     hd->fade.fill(level_);
     hd->fade[static_cast<std::size_t>(HdPicture::HiScores)] = level_ * textLevel_;
     hd->fadeColor = fadeWhite_ ? Rgb{0xff, 0xff, 0xff} : Rgb{};
   }
+  if (!tall()) {
+    drawScreen(frame, hd, 0);
+  } else if (mode_ != Mode::Planar240) {  // a slide: in the middle
+    std::fill_n(frame, static_cast<std::size_t>(kWidth) * static_cast<std::size_t>(height()), u8{0});
+    drawScreen(frame, hd, kHeight / 2);
+  } else {
+    drawTallMenu(frame, hd);
+  }
+  auto wide = [](u8 v) { return static_cast<u8>((v << 2) | (v >> 4)); };
+  for (std::size_t i = 0; i < 256; ++i) colours[i] = Rgb{wide(dac_[i * 3]), wide(dac_[i * 3 + 1]), wide(dac_[i * 3 + 2])};
+  if (tall() && mode_ == Mode::Planar240) {
+    // the four banners' own colours, a set of sixteen each from 0x40 on, as bright as the screen is
+    for (std::size_t t = 0; t < 4; ++t) {
+      const u16 picture = static_cast<u16>(6 + t * 2);
+      const u16 segment = const_cast<Front*>(this)->dsw(static_cast<u16>(0x589e + picture));
+      const u16 at = const_cast<Front*>(this)->dsw(static_cast<u16>(0x58ac + picture));
+      for (std::size_t i = 0; i < 16; ++i) {
+        auto part = [&](std::size_t n) {
+          const u8 v = const_cast<Front*>(this)->far(segment, static_cast<u32>(at + i * 3 + n)) & 0x3f;
+          return static_cast<u8>(static_cast<float>(wide(v)) * level_);
+        };
+        colours[0x40 + t * 16 + i] = Rgb{part(0), part(1), part(2)};
+      }
+    }
+  }
+}
+
+void Front::drawScreen(u8* frame, HdFrame* hd, int top) const {
   auto mark = [&](int x, int y, HdPicture is, u32 across8, u32 down8, u16 halves, u16 width, u16 height) {
     const auto id = static_cast<std::size_t>(is);
-    hd->map[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)] =
+    hd->map[static_cast<std::size_t>(y + top) * kWidth + static_cast<std::size_t>(x)] =
         HdPixel{static_cast<u16>(across8), static_cast<u16>(down8), static_cast<u16>(id | halves), 0};
     hd->used |= 1u << id;
     hd->size[id] = {width, height};
   };
   for (int y = 0; y < kHeight; ++y) {
-    u8* out = frame + static_cast<std::size_t>(y) * kWidth;
+    u8* out = frame + static_cast<std::size_t>(y + top) * kWidth;
     if (mode_ == Mode::Chunky320) {
       const u16 row = static_cast<u16>(start_ + (y / 2) * 80);
       for (int x = 0; x < kWidth; ++x) {
@@ -1050,8 +1091,124 @@ void Front::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
            is == HdPicture::Left ? 130 : banner ? 440 : 400, is == HdPicture::Left ? 240 : banner ? 95 : 40);
     }
   }
-  auto wide = [](u8 v) { return static_cast<u8>((v << 2) | (v >> 4)); };
-  for (std::size_t i = 0; i < 256; ++i) colours[i] = Rgb{wide(dac_[i * 3]), wide(dac_[i * 3 + 1]), wide(dac_[i * 3 + 2])};
+}
+
+/// The menu down a screen twice as tall. Its rows are counted as the card counts the menu's,
+/// each shown twice: 480 of them. The panel on the left is drawn out to that length (its top,
+/// a stretch of its plain middle, its foot), with its picture and its text both there all the
+/// time; beside it are all four banners, or all four lists of best scores, or the page the
+/// card has, set in the middle.
+void Front::drawTallMenu(u8* frame, HdFrame* hd) const {
+  Front& self = *const_cast<Front*>(this);
+  auto mark = [&](int x, int y, HdPicture is, u32 across8, u32 down8, u16 width, u16 height, u16 more = 0) {
+    const auto id = static_cast<std::size_t>(is);
+    hd->map[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)] =
+        HdPixel{static_cast<u16>(across8), static_cast<u16>(down8), static_cast<u16>(id | HdFrame::kHalfY | more), 0};
+    hd->used |= 1u << id;
+    hd->size[id] = {width, height};
+  };
+  auto dots = [&](u16 at, int x) {
+    const int bit = 7 - (x & 7);
+    return static_cast<u8>(((planes_[0][at] >> bit) & 1) | (((planes_[1][at] >> bit) & 1) << 1) | (((planes_[2][at] >> bit) & 1) << 2) |
+                           (((planes_[3][at] >> bit) & 1) << 3));
+  };
+  auto upper = [&](int row) { return selectBits_ ? static_cast<u8>((((row * 2) < 0xe6 ? selectTop_ : selectBottom_) & 3) << 4) : u8{0}; };
+  const bool settled = (start_ == 0 || start_ == kPage1) && shownWidth_ >= 160;
+  static constexpr int kBanner[4] = {12, 132, 252, 372};
+  for (int y = 0; y < 2 * kHeight; ++y) {
+    u8* out = frame + static_cast<std::size_t>(y) * kWidth;
+    const int u = y / 2;
+    for (int x = 0; x < kWidth; ++x) {
+      out[x] = 0;
+      if (x >= shownWidth_) continue;
+      // which of the card's rows this is a row of, if any
+      int row = -1;
+      if (x < 160) {
+        row = u <= 186 ? u : u <= 427 ? 186 : u - 240;
+      } else if (showing_ == Showing::Banners && settled) {
+        for (int t = 0; t < 4; ++t) {
+          const int r = u - kBanner[t];
+          if (r < 0 || r >= 95 || x >= 160 + 440 || !(t < 2 ? bannerTop_ : bannerBottom_)[static_cast<std::size_t>(r)]) continue;
+          const int bx = x - 160;
+          out[x] = static_cast<u8>(0x40 + t * 16 + dots(static_cast<u16>(0x5c80 + (t * 95 + r) * 0x37 + (bx >> 3)), bx));
+          if (hd) mark(x, y, static_cast<HdPicture>(static_cast<int>(HdPicture::Table1) + t), static_cast<u32>(bx * 8), static_cast<u32>(r * 8 + (y & 1) * 4), 440, 95);
+        }
+        continue;
+      } else if (showing_ == Showing::Scores && settled) {
+        row = u < 40 ? u : -1;  // the heading; the lists are written below
+      } else {
+        row = u >= 120 && u < 360 ? u - 120 : -1;
+      }
+      if (row < 0) continue;
+      const u16 at = static_cast<u16>(start_ + row * 80 + x / 8);
+      // under the panel's text the picture is kept aside (cs:2b8a): it is shown, not the text
+      const bool kept = settled && x >= 16 && x < 128 && row >= 95 && row < 185;
+      const u8 colour = kept ? dots(static_cast<u16>(0xfb14 + (row - 95) * 14 + (x >> 3) - 2), x) : dots(at, x);
+      const u32 dot = kept ? (static_cast<u32>(HdPicture::Left) << 20) | (static_cast<u32>(x) << 10) | static_cast<u32>(row)
+                           : from_[std::size_t{at} * 8 + static_cast<std::size_t>(x & 7)];
+      if (showing_ == Showing::Scores && settled && x >= 160 && static_cast<HdPicture>(dot >> 20) != HdPicture::HiScores) continue;
+      out[x] = static_cast<u8>(upper(row) | colour);
+      if (!hd || dot == 0) continue;
+      const auto is = static_cast<HdPicture>(dot >> 20);
+      const bool banner = is >= HdPicture::Table1 && is <= HdPicture::Table4;
+      // (the panel's plain stretch is one line of its picture all the way down)
+      const bool drawnOut = x < 160 && u > 186 && u <= 427;
+      if (drawnOut && is == HdPicture::Left && stripHeight_ > 0) {
+        // the strip is as fine as the panel's picture: so many of its rows to a row of the screen
+        const int perRow8 = stripWidth_ * 4 / 130, down = y - 187 * 2;
+        mark(x, y, HdPicture::LeftRepeat, ((dot >> 10) & 0x3ff) * 8, static_cast<u32>((down * perRow8) % (stripHeight_ * 8)), 130,
+             static_cast<u16>(stripHeight_));
+        hd->map[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)].picture &= static_cast<u16>(~HdFrame::kHalfY);
+        hd->rowStep[static_cast<std::size_t>(HdPicture::LeftRepeat)] = static_cast<float>(perRow8) / 8.0f;
+        continue;
+      }
+      mark(x, y, is, ((dot >> 10) & 0x3ff) * 8, (dot & 0x3ff) * 8 + (drawnOut ? 4 : static_cast<u32>(y & 1) * 4),
+           is == HdPicture::Left ? 130 : banner ? 440 : 400, is == HdPicture::Left ? 240 : banner ? 95 : 40, drawnOut ? HdFrame::kFlatY : u16{0});
+    }
+  }
+  auto put = [&](int x, int u, u8 index) {
+    if (x < 0 || x >= kWidth || x >= shownWidth_ || u < 0 || u >= kHeight) return;
+    for (int half = 0; half < 2; ++half) {
+      const std::size_t at = static_cast<std::size_t>(u * 2 + half) * kWidth + static_cast<std::size_t>(x);
+      frame[at] = index;
+      if (hd) hd->map[at].picture = 0;
+    }
+  };
+  if (settled) {
+    // the panel's text, on the plain stretch below its picture (ten lines of twelve letters)
+    for (int line = 0; line < 10; ++line)
+      for (int column = 0; column < 12; ++column) {
+        const u8 letter = cs(static_cast<u16>(scrollerText_ + 12 * line + column));
+        for (int r = 0; r < 8; ++r) {
+          const u8 rowDots = romRow(letter, r);
+          for (int b = 0; b < 8; ++b)
+            if (rowDots & (0x80 >> b)) put(16 + column * 8 + b, 257 + line * 9 + r, upper(186));
+        }
+      }
+  }
+  if (showing_ == Showing::Scores && settled) {
+    // the four tables' best scores: the two pages of them, one under the other (cs:2cf2)
+    int y = 24;
+    for (const u16 first : {u16{0x4efc}, u16{0x501c}}) {
+      u16 page = first;
+      for (int line = 0; line < 12; ++line, y += 0x12) {
+        u16 left = 0;
+        for (u16 i = 0; i < 0x18; ++i)
+          if (self.ds(static_cast<u16>(page + i)) == 0) {
+            left = static_cast<u16>(0x18 - i - 1);
+            break;
+          }
+        int x = 0xa4 + ((0x12 * left) >> 1);
+        for (u16 n = static_cast<u16>(0x18 - left); n > 0; --n, x += 0x12) {
+          const u16 from = self.dsw(static_cast<u16>(0x59ed + self.ds(page++) * 2));
+          if (from == 0xffff) continue;
+          for (int r = 0; r < 14; ++r)
+            for (int b = 0; b < 24; ++b)
+              if (const u8 colour = dots(static_cast<u16>(from + r * 80 + (b >> 3)), b); colour != 0) put(x + b, y + r, colour);
+        }
+      }
+    }
+  }
 }
 
 }  // namespace encore

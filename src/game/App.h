@@ -107,6 +107,7 @@ class App {
   AskFont askFont_;  ///< the letters for the screens shown before the game
   Palette palette_;
   HdFrame hd_;
+  std::array<int, 2> panelStrip_{};  ///< the size of the picture repeated down the tall menu's panel, if there is one
   u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own
   bool ballTrail_ = true;      ///< the fading ghosts behind the ball
   std::unique_ptr<encore::Front> intro_;

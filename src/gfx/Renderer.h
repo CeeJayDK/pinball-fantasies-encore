@@ -31,6 +31,7 @@ class Renderer {
   /// A high-resolution replacement for one of the original pictures, RGBA.
   void setHdPicture(HdPicture p, int width, int height, const u8* rgba);
   bool hasHdPictures() const { return hdLoaded_ != 0; }
+  bool hasHdPicture(HdPicture p) const { return (hdLoaded_ >> static_cast<unsigned>(p)) & 1u; }
   void setHdEnabled(bool on) { hdEnabled_ = on; }
   /// A picture drawn over the scene at an angle (a flipper), RGBA; `slot` is HdSprite::picture.
   void setSpritePicture(std::size_t slot, int width, int height, const u8* rgba);

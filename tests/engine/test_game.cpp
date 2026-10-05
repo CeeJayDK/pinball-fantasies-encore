@@ -196,6 +196,26 @@ TEST(the_menu_starts_a_table) {
   CHECK(opened);
 }
 
+// With the whole table on one screen chosen, the menu is as tall as that screen and has all
+// four tables' banners on its first page: there is a picture in each quarter of it.
+TEST(the_tall_menu_shows_four_tables) {
+  if (!haveData()) return;
+  Config config = Config::defaults();
+  config.options.resolution = Resolution::Full;
+  Front front(read("INTRO.PRG"), read("MOD2.MOD"), config, 0);
+  CHECK(front.height() == 960);
+  for (int f = 0; f < 250; ++f) front.frame(), front.noSound();
+  std::vector<u8> pixels(static_cast<std::size_t>(Front::kWidth) * 960);
+  std::vector<Rgb> colours(256);
+  front.draw(pixels.data(), colours.data());
+  for (int quarter = 0; quarter < 4; ++quarter) {
+    int banner = 0;
+    for (int y = quarter * 240 + 60; y < quarter * 240 + 200; ++y)
+      for (int x = 200; x < 560; ++x) banner += pixels[static_cast<std::size_t>(y) * Front::kWidth + static_cast<std::size_t>(x)] >= 0x40 + quarter * 16;
+    CHECK(banner > 20000);
+  }
+}
+
 // Leaving a table from the pause is not a cut: its picture fades away over 128 frames, as
 // the original's does, and only then is the table left.
 TEST(a_table_left_fades_out) {

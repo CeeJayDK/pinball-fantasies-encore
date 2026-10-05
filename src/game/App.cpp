@@ -311,6 +311,7 @@ void App::loadHdPictures() {
       continue;
     }
     renderer_.setHdPicture(p, image->width, image->height, image->pixels.data());
+    if (p == HdPicture::LeftRepeat) panelStrip_ = {image->width, image->height};
     ++count;
   }
   if (count) log::info("replacement pictures: " + std::to_string(count));
@@ -394,7 +395,8 @@ void App::openIntro(int returningFrom) {
   const auto mod = file::readAll(returningFrom < 0 ? files_.introMusic : files_.menuMusic);
   if (!prg || !mod) throw DataError("cannot read INTRO.PRG or its music");
   intro_ = std::make_unique<encore::Front>(*prg, *mod, config_, returningFrom);
-  resizeFrame(encore::Front::kWidth, encore::Front::kHeight, 1.0);
+  intro_->setPanelStrip(panelStrip_[0], panelStrip_[1]);
+  resizeFrame(encore::Front::kWidth, intro_->height(), 1.0);
   audio_.setSource([f = intro_.get()](float* out, int frames) { f->sound(out, frames); });
 }
 
@@ -904,7 +906,7 @@ void App::render(double now) {
   if (table_)
     resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   else if (intro_)
-    resizeFrame(encore::Front::kWidth, encore::Front::kHeight, 1.0);
+    resizeFrame(encore::Front::kWidth, intro_->height(), 1.0);
   if (table_) {
     table_->ballTrail = ballTrail_;
     table_->draw(frame_.data(), colors.data(), hd);

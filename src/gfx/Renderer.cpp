@@ -138,7 +138,7 @@ void Renderer::setHdPicture(HdPicture p, int width, int height, const u8* rgba) 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, p == HdPicture::LeftRepeat ? GL_REPEAT : GL_CLAMP_TO_EDGE);
   hdLoaded_ |= 1u << i;
 }
 
@@ -191,6 +191,7 @@ void Renderer::drawHd(const HdFrame& hd) {
     glUniform1ui(hdPass_.uniform("uId"), static_cast<GLuint>(i));
     glUniform2f(hdPass_.uniform("uSourceSize"), hd.size[i][0], hd.size[i][1]);
     glUniform1f(hdPass_.uniform("uFade"), hd.fade[i]);
+    glUniform1f(hdPass_.uniform("uRowStep"), hd.rowStep[i]);
     glDrawArrays(GL_TRIANGLES, 0, 3);
   }
   glActiveTexture(GL_TEXTURE0);

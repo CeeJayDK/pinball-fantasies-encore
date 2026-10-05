@@ -46,8 +46,11 @@ int main(int argc, char** argv) {
     return path ? file::readAll(*path).value_or(Bytes{}) : Bytes{};
   };
   const Bytes prg = read("INTRO.PRG"), mod = read(from < 0 ? "INTRO.MOD" : "MOD2.MOD");
-  Front front(prg, mod, Config::defaults(), from);
-  std::vector<u8> pixels(640 * 480);
+  Config config = Config::defaults();
+  for (int i = 4; i < argc; ++i)
+    if (!std::strcmp(argv[i], "--full")) config.options.resolution = Resolution::Full;  // the tall screen
+  Front front(prg, mod, config, from);
+  std::vector<u8> pixels(640 * 960);
   std::vector<Rgb> colours(256);
   for (int f = 0; f < frames; ++f) {
     for (auto [it, end] = keys.equal_range(f); it != end; ++it) front.key(it->second, true);
@@ -56,7 +59,7 @@ int main(int argc, char** argv) {
     if (a.kind != Front::Action::Kind::None) std::printf("frame %d: action %d, table %d\n", f, static_cast<int>(a.kind), a.table + 1);
     if ((every && f % every == every - 1) || f == frames - 1) {
       front.draw(pixels.data(), colours.data());
-      writeIndexedPng(prefix + std::to_string(f + 1) + ".png", pixels.data(), 640, 480, colours);
+      writeIndexedPng(prefix + std::to_string(f + 1) + ".png", pixels.data(), 640, front.height(), colours);
     }
   }
   return 0;

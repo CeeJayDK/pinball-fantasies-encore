@@ -11,6 +11,7 @@ uniform uint uId;            // the picture this pass draws
 uniform vec2 uSourceSize;    // the original picture's size in pixels
 uniform float uFade;         // 1 = as drawn, 0 = all uFadeColor
 uniform vec3 uFadeColor;
+uniform float uRowStep;      // not 0: a strip repeated downwards, this many of its rows to a screen row
 
 void main() {
   ivec2 size = textureSize(uMap, 0);
@@ -19,6 +20,8 @@ void main() {
   uvec4 m = texelFetch(uMap, p, 0);
   if ((m.b & 0xffu) != uId) discard;
   vec2 step = vec2((m.b & 0x100u) != 0u ? 0.5 : 1.0, (m.b & 0x200u) != 0u ? 0.5 : 1.0);
+  if (uHasLit == 0u && (m.b & 0x400u) != 0u) step.y = 0.0;  // one line of the picture, drawn out
+  if (uRowStep > 0.0) step.y = uRowStep;
   vec2 src = vec2(m.rg) / 8.0 + fract(f) * step;
   // How fast the picture passes under the screen, for choosing between its smaller copies
   // (mipmaps). Left to the hardware it is read off the neighbouring pixels, and where those

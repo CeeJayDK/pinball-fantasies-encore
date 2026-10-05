@@ -76,3 +76,11 @@ with what the original does instead, in [differences-from-the-original.md](diffe
 it: it draws into a model of the video card's memory and is left wherever the original waits
 for the next frame. The question out of the manual that the original asks is not asked.
 `encore-front` writes frames of it as pictures.
+
+With the whole table on one screen chosen in the options, the menu's screen is as tall as that
+one (640 by 960): the slides stand in the middle of it, the panel on the left is drawn out to
+its length with its picture and its text both there, and beside it are all four tables'
+banners on one page and all four lists of best scores on one (`Front::drawTallMenu`). The
+card's memory and the routine are as ever; only what is made of them for the screen differs.
+In high resolution the panel's plain stretch is `left_repeat.png`, a strip repeated down it; a
+set of pictures without one has a single line of `left.png` drawn out there instead.
