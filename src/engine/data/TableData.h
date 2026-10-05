@@ -49,6 +49,8 @@ struct TableData {
   ByteView plungerImage;  ///< 10 x 23 chunky pixels of the plunger
 
   static TableData load(const std::filesystem::path& prg, int index);
+  /// The same from the file's bytes; `name` is for saying what is wrong with them.
+  static TableData parse(Bytes prg, const std::string& name, int index);
 };
 
 }  // namespace encore

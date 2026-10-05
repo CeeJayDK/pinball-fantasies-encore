@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-#include "assets/Bcd.h"
+#include "core/Bcd.h"
 #include "assets/Exe.h"
 #include "assets/Grid.h"
 

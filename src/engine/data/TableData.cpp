@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "core/Error.h"
+#include "core/File.h"
 #include "core/Log.h"
 
 namespace encore {
@@ -19,10 +20,17 @@ constexpr std::size_t kOcclusionOverhead = 0x6400;
 }  // namespace
 
 TableData TableData::load(const std::filesystem::path& prg, int index) {
+  const auto bytes = file::readAll(prg);
+  if (!bytes) throw DataError("cannot read " + prg.string());
+  return parse(*bytes, prg.filename().string(), index);
+}
+
+TableData TableData::parse(Bytes bytes, const std::string& file, int index) {
+  const std::filesystem::path prg = file;
   TableData t;
   t.index = index;
   t.name = kNames[std::clamp(index, 0, 3)];
-  t.image = MzImage::load(prg);
+  t.image = MzImage::parse(std::move(bytes), file);
   const MzImage& mz = t.image;
   const auto& segs = mz.segments();
   if (segs.size() < 20) throw DataError(prg.string() + ": unexpected segment layout");
@@ -76,7 +84,6 @@ TableData TableData::load(const std::filesystem::path& prg, int index) {
     if (i >= segs.size()) throw DataError(prg.string() + ": missing image strip");
     auto img = decodeIff(view(i++));
     if (!img || img->width != kWidth) throw DataError(prg.string() + ": bad image strip");
-    if (img->height != 144) log::warn(prg.filename().string() + ": strip height " + std::to_string(img->height));
     const int rows = std::min(img->height, 144);
     std::memcpy(t.playfield.data() + static_cast<std::size_t>(s) * 144 * kWidth, img->pixels.data(),
                 static_cast<std::size_t>(rows) * kWidth);

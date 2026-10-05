@@ -2,7 +2,7 @@
 #include "Test.h"
 
 #include <optional>
-#include "assets/Bcd.h"
+#include "core/Bcd.h"
 #include "core/Sha256.h"
 #include "sound/Sequencer.h"
 

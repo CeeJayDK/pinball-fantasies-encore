@@ -163,6 +163,10 @@ bool Engine::probeBall() {
     const i16 speed = static_cast<i16>(w(0x1a));
     W(at::flipperVy) = static_cast<u16>(speed * dx);
     W(at::flipperVx) = static_cast<u16>(speed * dy);
+    if (angle_ == 2) {  // this version's steeper table: a quarter more push
+      W(at::flipperVy) = static_cast<u16>(W(at::flipperVy).s() * 5 / 4);
+      W(at::flipperVx) = static_cast<u16>(W(at::flipperVx).s() * 5 / 4);
+    }
     return true;
   }
   return true;
@@ -302,6 +306,9 @@ void Engine::integrate() {
   W(at::ballY) = move(at::ballYFixed, at::ballVy);
   if (W(at::ballY).s() >= 0x240) B(at::ballLost) = 0xff;
   W(at::ballX) = move(at::ballXFixed, at::ballVx);
+  for (std::size_t i = 1; i < kSteps; ++i) steps_[i - 1] = steps_[i];
+  steps_[kSteps - 1] = {static_cast<i32>(u32{W(at::ballXFixed)} | (u32{W(at::ballXFixed, 2)} << 16)),
+                        static_cast<i32>(u32{W(at::ballYFixed)} | (u32{W(at::ballYFixed, 2)} << 16))};
   W(at::ballVy) += W(at::gravityY);
   W(at::ballVx) += W(at::gravityX);
   const i16 spin = W(at::spin).s();
@@ -448,7 +455,8 @@ void Engine::bindPlunger() {
   bind(0x5e6a, [=, this] {
     if (const u8 pull = B(0x23a5); pull != 0) {
       if (B(0x338a) != 0) {  // a ball waits on it
-        const i16 speed = static_cast<i16>((high() ? -166 : -138) * pull - (W(at::loopCounter) & 0xff));
+        i16 speed = static_cast<i16>((high() ? -166 : -138) * pull - (W(at::loopCounter) & 0xff));
+        if (angle_ == 2) speed = static_cast<i16>(speed * 5 / 4);  // this version's steeper table
         if (B(at::loopCounter, 2) != 0xff) {
           W(at::ballVy) = static_cast<u16>(speed);
           W(at::ballVx) = 0;

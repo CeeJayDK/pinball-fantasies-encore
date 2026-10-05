@@ -18,6 +18,7 @@ void Engine::start(const Options& o, ByteView bestScores) {
   B(0x3632) = o.highResolution;
   B(0x3633) = o.mono;
   B(at::highResolution) = o.highResolution ? 0xff : 0;
+  angle_ = o.lowAngle ? 0 : 1;
   if (o.lowAngle) {  // cs:30e9: the table lies flatter: less pull down it on every slope
     const u16 slopes = high() ? kw(0x30f6, 1) : kw(0x30e9, 1);
     for (u16 i = 0, n = kw(0x30f9, 1); i < n; ++i) nativeW(static_cast<u16>(slopes + i * 4 + 2)) -= 3;
@@ -221,6 +222,41 @@ void Engine::start(const Options& o, ByteView bestScores) {
   sound->start();
   B(0x2f2b) = 0xff;
   B(0x2f29) = 0xff;
+  speedLimits_ = {W(0x68a2).s(), W(0x68a4).s()};
+}
+
+void Engine::setAngle(int angle) {
+  angle = angle < 0 ? 0 : angle > 2 ? 2 : angle;
+  // the pull down the table on each of its slopes: three less when it lies low (cs:30e9), and
+  // three more when steeper
+  const u16 slopes = high() ? kw(0x30f6, 1) : kw(0x30e9, 1);
+  for (u16 i = 0, n = kw(0x30f9, 1); i < n; ++i) nativeW(static_cast<u16>(slopes + i * 4 + 2)) += static_cast<u16>((angle - angle_) * 3);
+  angle_ = angle;
+  B(0x362f) = angle == 0;
+  W(0x68a2) = static_cast<u16>(angle == 2 ? speedLimits_[0] * 5 / 4 : speedLimits_[0]);
+  W(0x68a4) = static_cast<u16>(angle == 2 ? speedLimits_[1] * 5 / 4 : speedLimits_[1]);
+}
+
+void Engine::setScrolling(u8 scrolling) {
+  B(0x3630) = scrolling;
+  W(0x23ac) = scrolling < 1 ? 0x14 : scrolling == 1 ? 0x0b : 0x09;
+}
+
+void Engine::write(std::string_view text) {
+  W(0x3700) = 0xa8;
+  W(0x3702) = 0x50;
+  W(0x3704) = 0x10;
+  fillDisplay(0xa8, 0x50, 0x10);
+  setFont(0);
+  W(0x447b) = 0;
+  W(0x447d) = 0;
+  if (text.size() > 20) text = text.substr(0, 20);
+  u16 at = static_cast<u16>(0x150 + (20 - text.size()) * 2);  // in the middle, as GAME PAUSED is
+  for (const char c : text) {
+    u16 place = at;
+    drawChar(static_cast<u8>(c >= '0' && c <= '9' ? c - '0' + 0x37 : c), place);
+    at = static_cast<u16>(at + 4);
+  }
 }
 
 }  // namespace encore

@@ -1,7 +1,7 @@
 #pragma once
 // A 16-bit MZ executable as the game's code sees it: segment:offset access into the load
 // image, with the entry code segment and the data segment the program sets up at start.
-#include "assets/Bcd.h"
+#include "core/Bcd.h"
 #include "core/Error.h"
 #include "core/Types.h"
 

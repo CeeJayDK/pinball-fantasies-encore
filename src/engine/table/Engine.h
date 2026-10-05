@@ -2,6 +2,7 @@
 // The engine the four tables share, written again routine by routine from Party Land's
 // program (docs/own-engine.md). A comment "cs:1234" is where the routine is in TABLE1.PRG.
 #include <array>
+#include <string_view>
 
 #include "engine/table/Program.h"
 
@@ -77,6 +78,33 @@ class Engine : public Program {
   std::function<void(u16 record, u16 was, u16 now)> onFlipperDrawn;
   /// The row of the picture at the top of the screen.
   u16 screenRow() const { return screenRow_; }
+
+  // --- what this version lets be changed while a table is played. The original takes its
+  // options once, as it starts; these put right what its start-up made of them.
+  /// How steeply the table lies: 0 low, 1 high, and 2 steeper than the original has it. At
+  /// that one the pull down the table is as much greater again as high is over low, and so
+  /// that the top of the table can still be reached the flippers' push, the plunger and the
+  /// fastest the ball may go are a quarter more.
+  void setAngle(int angle);
+  int angle() const { return angle_; }
+  /// How quickly the screen follows the ball: 0 hard, 1 medium, 2 soft.
+  void setScrolling(u8 scrolling);
+  void toggleMusic() { musicKey(); }
+  bool musicIsOff() { return B(0x231a) != 0; }
+  /// The game is paused (the original then waits for a key and does nothing else).
+  bool isPaused() const { return pause_ != Pause::No; }
+  bool asksToQuit() const { return pause_ == Pause::YesOrNo; }
+  /// A line on the display, in the letters the pause is told in: capitals, digits and
+  /// spaces, and \ and ] for brackets. What the display showed is not kept: for while the
+  /// game is paused, which keeps it and puts it back.
+  void write(std::string_view text);
+  /// Where the ball was after each of its last steps (there are four to a frame), the newest
+  /// last: in 1024ths of a dot.
+  struct Step {
+    i32 x = 0, y = 0;
+  };
+  static constexpr std::size_t kSteps = 12;
+  const std::array<Step, kSteps>& steps() const { return steps_; }
 
   /// The video card's memory, four planes of 64 KB, as far as the table's logic depends on
   /// it. The display is at its start: in the first and third planes, 168 bytes a row, each
@@ -221,6 +249,9 @@ class Engine : public Program {
   enum class Pause { No, AnyKey, YesOrNo } pause_ = Pause::No;
   u16 screenRow_ = 0;
   Shown shown_;
+  int angle_ = 1;
+  std::array<i16, 2> speedLimits_{};  ///< as the start-up left them, while the steeper angle has them greater
+  std::array<Step, kSteps> steps_{};
 };
 
 }  // namespace encore

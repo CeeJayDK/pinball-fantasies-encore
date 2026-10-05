@@ -4,7 +4,7 @@
 #include <array>
 #include <filesystem>
 
-#include "assets/Bcd.h"
+#include "core/Bcd.h"
 
 namespace pfr {
 
