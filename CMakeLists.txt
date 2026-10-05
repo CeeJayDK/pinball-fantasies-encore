@@ -240,6 +240,9 @@ add_executable(encore-oracle-physics tools/oracle/physics.cpp tools/oracle/Cpu.c
 target_include_directories(encore-oracle-physics PRIVATE tools/oracle)
 target_link_libraries(encore-oracle-physics PRIVATE encore_engine)
 
+add_executable(encore-music tools/music.cpp)
+target_link_libraries(encore-music PRIVATE encore_engine)
+
 add_executable(encore-oracle-table tools/oracle/table.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
 target_include_directories(encore-oracle-table PRIVATE tools/oracle)
 target_link_libraries(encore-oracle-table PRIVATE encore_engine)

@@ -53,6 +53,10 @@ class Engine : public Program {
   int loopsPerFrame = 8;
   /// As the silent driver: the music's callback is called every time the driver is polled.
   bool pollCallsMusic = true;
+  /// The sound driver's question at each jump in the music (cs:3a6a): the place the music
+  /// names, and the place to go to instead. For a driver that plays; the silent one is
+  /// answered through `pollCallsMusic`.
+  u8 musicAsks(u8 place) { return musicCallback(place); }
   /// The program asked to end.
   bool exited() const { return exited_; }
   /// The row of the picture at the top of the screen.
