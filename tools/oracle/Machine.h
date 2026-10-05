@@ -102,6 +102,7 @@ class Machine : public Bus {
   bool polling_ = false;
   u32 loopAt_ = 0;
   int loops_ = 0, loopLimit_ = 1 << 30;
+  bool midTurn_ = false;
 };
 
 }  // namespace oracle

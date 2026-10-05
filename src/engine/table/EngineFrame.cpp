@@ -257,6 +257,7 @@ void Engine::scroll() {
 // cs:35fd, the program's own loop
 // ---------------------------------------------------------------------------------------
 void Engine::mainLoop() {
+  if (pause_ != Pause::No) return paused();  // the original waits inside the pause for a key
   if (CB(0x3475) != 0) {
     u8& key = B(at::lastKey);
     if (key == 0x43) { key = 0xff; W(0x23ac) = 0x09; }  // F9, F10: how fast the screen follows
@@ -277,9 +278,15 @@ void Engine::mainLoop() {
     } else if (B(0x33ce) != 0xff) {
       bool keys = true;
       if (B(0x338a) == 0xff) {
-        if (key == 0x01) {
+        if (key == 0x01) {  // escape while the ball waits on the plunger: the game is given up (cs:32b1)
           key = 0xff;
-          todo(0x32b1);
+          placeBall(0x12c, 0x23a);
+          CB(0x3475) = 0xff;
+          addTimer(F(0x0b73));
+          call(F(0x01cd));
+          B(at::lastKey) = 0xff;
+          displaySteady();
+          startScript(A(0x19d4));
         }
         if (CB(0x3475) == 0) keys = false;
         else playersKey();
@@ -289,6 +296,7 @@ void Engine::mainLoop() {
         if (key == 0x32) { key = 0xff; musicKey(); }
         if (key == 0x19) { key = 0xff; B(0x230f) = 0xff; }
         pauseKey();
+        if (pause_ != Pause::No) return;  // the rest of this turn waits with it
       }
     }
   }
@@ -415,10 +423,104 @@ void Engine::musicKey() {
   }
 }
 
-/// cs:31cd: P pauses. The original waits here for a key, which is for later.
+/// cs:31cd: P pauses. The callbacks stop doing anything, the music stops, and the display
+/// says so over what it showed, which is kept to put back.
 void Engine::pauseKey() {
   if (B(0x230f) == 0) return;
-  todo(0x31d7);
+  B(0x2f29) = 0;
+  sound->stop();
+  saveDisplay();
+  B(at::lastKey) = 0xff;
+  pause_ = Pause::AnyKey;
+}
+
+void Engine::paused() {
+  const u8 key = B(at::lastKey);
+  if (key == 0xff) return;
+  if (pause_ == Pause::AnyKey && key == 0x01) {  // escape: leave the table?
+    message(A(0x4432), 0x150);
+    B(at::lastKey) = 0xff;
+    pause_ = Pause::YesOrNo;
+    return;
+  }
+  if (pause_ == Pause::YesOrNo && B(0x3654, key) == 0x59) {  // yes (cs:323a)
+    B(at::ballHidden) = 0xff;
+    restoreDisplay();
+    B(0x230f) = 0;
+    B(0x231a) ^= 0xff;
+    CB(0x3a10) = 0xff;
+    sound->volume(0);
+    B(0x2f29) = 0xff;
+    sound->start();
+    exited_ = true;
+    pause_ = Pause::No;
+    return;
+  }
+  // any other key: on with the game (cs:3203)
+  B(0x33f0) = 0x1e;
+  B(at::lastKey) = 0xff;
+  sound->start();
+  restoreDisplay();
+  B(0x2f29) = 0xff;
+  B(0x230f) = 0;
+  pause_ = Pause::No;
+  // what the loop does after the pause, which this turn of it has yet to do
+  if (B(at::lastKey) == 0x01) B(at::lastKey) = 0xff;
+  ++W(at::loopCounter);
+  if (B(at::ballHidden) != 0) {
+    u16 spin = W(at::loopCounter) & 0x3ff;
+    if (spin & 1) spin = static_cast<u16>(-spin);
+    W(at::spin) = spin;
+  }
+  if (pollCallsMusic) musicCallback(8);
+}
+
+void Engine::message(u16 text, u16 at) {
+  W(0x3700) = 0xa8;
+  W(0x3702) = 0x50;
+  W(0x3704) = 0x10;
+  fillDisplay(0xa8, 0x50, 0x10);
+  setFont(0);
+  W(0x447b) = 0;
+  W(0x447d) = 0;
+  drawText(text, at);
+}
+
+void Engine::saveDisplay() {
+  displayNormal();
+  flushColours();
+  u16 to = A(0x33fd);
+  B(0x33fc) = 0x80;
+  for (int plane = 0; plane < 2; ++plane)
+    for (u16 row = 0; row < 0x10; ++row) {
+      nativeB(to) = 0;
+      for (u16 x = 0; x < 0x50; ++x) {
+        if (dot(plane, static_cast<u16>(0xa8 + row * 0xa8 + x)) == 0xf2) nativeB(to) |= B(0x33fc);
+        const bool wrapped = B(0x33fc) & 1;
+        B(0x33fc) = static_cast<u8>((B(0x33fc) >> 1) | (wrapped ? 0x80 : 0));
+        if (wrapped) nativeB(++to) = 0;
+      }
+    }
+  W(0x33fa) = to;
+  W(0x36fc) = A(0x353e);
+  W(0x36fe) = 0x162;
+  message(A(0x353e), 0x162);
+  displayNormal();
+  flushColours();
+}
+
+void Engine::restoreDisplay() {
+  u16 from = A(0x33fd);
+  B(0x33fc) = 0x80;
+  for (int plane = 0; plane < 2; ++plane)
+    for (u16 row = 0; row < 0x10; ++row)
+      for (u16 x = 0; x < 0x50; ++x) {
+        dot(plane, static_cast<u16>(0xa8 + row * 0xa8 + x)) = (nativeB(from) & B(0x33fc)) ? 0xf2 : 0x60;
+        const bool wrapped = B(0x33fc) & 1;
+        B(0x33fc) = static_cast<u8>((B(0x33fc) >> 1) | (wrapped ? 0x80 : 0));
+        if (wrapped) ++from;
+      }
+  W(0x33fa) = from;
 }
 
 /// cs:3a6a: called by the driver when the music comes to a jump (and by the silent driver

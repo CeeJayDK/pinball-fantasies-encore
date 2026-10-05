@@ -6,6 +6,8 @@
 //
 //   encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...]
 //                       [--flip <seed>]  plays at random from frame 400 on
+//                       [--wild]   with --flip: nudges, letters and more players too
+//                       [--options 001010]  balls, angle, scrolling, music off, resolution, mono
 //                       [--start]  the engine starts by itself, and that is compared first
 //                       [--all]   goes on after a difference, taking the original's value for
 //                                 it, and says each place that ever differs once
@@ -34,10 +36,19 @@ int main(int argc, char** argv) {
   std::vector<std::pair<int, int>> keys;
   bool all = false;
   int flip = -1;
-  bool ownStart = false;
+  bool ownStart = false, wild = false;
+  oracle::Machine::Config config;
+  encore::Engine::Options options;
   for (int i = 4; i < argc; ++i) {
     if (!std::strcmp(argv[i], "--all")) all = true;
     else if (!std::strcmp(argv[i], "--start")) ownStart = true;
+    else if (!std::strcmp(argv[i], "--wild")) wild = true;
+    else if (!std::strcmp(argv[i], "--options") && i + 1 < argc) {  // six digits, as PINBALL.CFG's bytes
+      const char* o = argv[++i];
+      for (int k = 0; k < 6 && o[k]; ++k) config.bytes[k] = static_cast<oracle::u8>(o[k] - '0');
+      options = {config.bytes[0] != 0, config.bytes[1] != 0, config.bytes[2], config.bytes[3] != 0, config.bytes[4] != 0, config.bytes[5] != 0};
+      ownStart = true;
+    }
     else if (!std::strcmp(argv[i], "--flip") && i + 1 < argc) flip = std::atoi(argv[++i]);
     else if (!std::strcmp(argv[i], "--keys") && i + 1 < argc) {
       for (const char* p = argv[++i]; *p;) {
@@ -59,7 +70,7 @@ int main(int argc, char** argv) {
   try {
     std::unique_ptr<encore::Engine> made = table == 0 ? std::make_unique<encore::PartyLand>(*prg) : std::make_unique<encore::Engine>(*prg, table);
     encore::Engine& e = *made;
-    oracle::Machine m(dir, table, {});
+    oracle::Machine m(dir, table, config);
     m.setLoop(0x10, e.F(encore::at::mainLoop));
     m.loopsPerFrame = e.loopsPerFrame;
     m.boot();
@@ -69,7 +80,7 @@ int main(int argc, char** argv) {
     if (ownStart) {
       // The engine starts by itself, and what that leaves is compared with what the original's
       // start-up left, before it is taken over like every other difference.
-      e.start({});
+      e.start(options);
       int differ = 0;
       unsigned lastAt = 0xfffffff;
       const char* lastWhat = "";
@@ -127,13 +138,24 @@ int main(int argc, char** argv) {
         }
       if (flip >= 0 && frame > 400) {  // a game played at random, the same for both
         auto random = [&] { rng = rng * 1664525u + 1013904223u; return rng >> 16; };
-        auto both = [&](int code) { m.key(static_cast<oracle::u8>(code)); e.key(static_cast<encore::u8>(code)); };
+        auto both = [&](int code) {
+          if (std::getenv("ENCORE_KEYS")) std::printf("key %02x at frame %d\n", code, frame);
+          m.key(static_cast<oracle::u8>(code));
+          e.key(static_cast<encore::u8>(code));
+        };
         if (random() % 23 == 0) { left = !left; both(left ? 0x2a : 0xaa); }
         if (random() % 23 == 0) { right = !right; both(right ? 0x36 : 0xb6); }
         if (frame % 900 == 0) both(0x1c);
         if (frame % 900 == 5) both(0x9c);
         if (frame % 300 == 100) { both(0xe0); both(0x50); }
         if (frame % 300 == 100 + static_cast<int>(random() % 60) + 20) { both(0xe0); both(0xd0); }
+        if (wild) {  // and the rest of the keyboard: nudges, letters, more players
+          if (random() % 500 == 0) both(0x39);
+          if (random() % 500 == 1) both(0xb9);
+          if (random() % 700 == 0) { const int letter = 0x10 + static_cast<int>(random() % 35); both(letter); both(letter | 0x80); }
+          if (random() % 2500 == 0) { both(0x1c); both(0x9c); }
+          if (random() % 4000 == 0) { const int f = 0x3b + static_cast<int>(random() % 4); both(f); both(f | 0x80); }
+        }
       }
       m.frame();
       e.frame();
@@ -205,11 +227,12 @@ int main(int argc, char** argv) {
         for (unsigned a = 0xc7d4; a < 0x10000; ++a)
           if (e.videoMemory()[p][a] != m.vga.planes[p][a]) {
             // The original draws the ball there as it leaves the bottom of the table, over the
-            // first rows of a mask's copy. The engine does not draw; the bytes are taken over
-            // and counted, and said only if asked (ENCORE_VIDEO).
+            // first rows of a mask's copy, and puts back what was there when the ball moves on.
+            // The engine does not draw. The bytes are counted, said only if asked
+            // (ENCORE_VIDEO), and left as the engine has them unless ENCORE_TAKE_VIDEO is set.
             ++videoDiffers;
             if (std::getenv("ENCORE_VIDEO")) report("video memory past the picture,", a, e.videoMemory()[p][a], m.vga.planes[p][a]);
-            e.videoMemory()[p][a] = m.vga.planes[p][a];
+            if (std::getenv("ENCORE_TAKE_VIDEO")) e.videoMemory()[p][a] = m.vga.planes[p][a];
           }
       for (unsigned a = 0; a < 768; ++a)
         if (e.colours()[a] != m.vga.dac[a]) {
@@ -226,7 +249,7 @@ int main(int argc, char** argv) {
       }
     }
     std::printf(reported ? "%d places differed over %d frames\n" : "the same for %2$d frames\n", reported, frames);
-    if (videoDiffers) std::printf("(%ld bytes of video memory past the picture were taken from the original)\n", videoDiffers);
+    if (videoDiffers) std::printf("(the original's drawing past the picture: %ld bytes, frame by frame)\n", videoDiffers);
     return reported ? 1 : 0;
   } catch (const std::exception& ex) {
     std::printf("stopped at frame %d: %s\n", frame, ex.what());

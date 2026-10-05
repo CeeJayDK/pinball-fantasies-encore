@@ -366,10 +366,13 @@ void Machine::frame() {
   }
   if (loopAt_) {
     // The loop is where boot() or the last frame left it: at its first instruction.
-    loops_ = -1;
+    // The loop is at its first instruction, which is not a turn done; unless the last frame
+    // ran out of time inside a turn (the program waiting for a key), which this one will finish.
+    loops_ = midTurn_ ? 0 : -1;
     loopLimit_ = loopsPerFrame;
     cpu.pause = false;
     for (std::uint64_t i = 0; i < 2'000'000 && !cpu.pause && !exited_; ++i) cpu.step();
+    midTurn_ = !cpu.pause;
     loopLimit_ = 1 << 30;  // the callbacks and keys of the next frame are not counted
   } else if (!exited_) {
     cpu.run(loopBudget);

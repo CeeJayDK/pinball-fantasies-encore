@@ -34,6 +34,16 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
     B(0x3712) = 0;
   });
   bind(0x0bca, [this] { serve(); });
+  bind(0x0fa0, [this] {  // tilt
+    B(0x33cf) = 0;
+    music(0x0c7b);
+    B(0x230a) = 0x3e;
+    startScript(0x1bf0);
+    stopBlinks();
+    lightsOut();
+    B(0x33f8) = 0xff;
+  });
+  bind(0x0fc5, [this] { music(0x0c78); });  // the warning before it
   bind(0x2ab1, [this] { everyFrame(); });
   bind(0x0215, [this] { drained(); });
   bind(0x0fcc, [this] {  // a flipper pressed: the four lane lights move along one (cs:0fcc)

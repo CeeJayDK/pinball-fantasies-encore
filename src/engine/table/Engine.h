@@ -85,6 +85,10 @@ class Engine : public Program {
   void typeCheat();         // cs:3549
   void playersKey();        // cs:33f9
   void pauseKey();          // cs:31cd
+  void paused();            // the same routine's waits for a key, a frame at a time
+  void saveDisplay();       // cs:4a6a
+  void restoreDisplay();    // cs:4b2a
+  void message(u16 nativeText, u16 at);  // cs:4aae: the display cleared, and a line on it
   void nudgeKey();          // cs:3478
   void musicKey();          // cs:34e3
 
@@ -185,6 +189,7 @@ class Engine : public Program {
   std::array<std::vector<u8>, 4> video_;
   SoundDriver silent_;
   bool exited_ = false;
+  enum class Pause { No, AnyKey, YesOrNo } pause_ = Pause::No;
   u16 screenRow_ = 0;
 };
 

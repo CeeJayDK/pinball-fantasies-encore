@@ -166,6 +166,29 @@ void Engine::patchMask(u16 segment, u16 at, u16 shape, u16 width, u16 rows) {
 }
 
 void Engine::bindGame() {
+  bind(0x353b, [this] {  // the music turned off: silence, as soon as it may
+    B(0x3389) = 0;
+    music(A(0x0c6c));
+    endTimer();
+  });
+  // the words that can be typed while no game is played, each with what it shows (cs:6b01 on)
+  struct Word { u16 at, script; };
+  for (const Word w : {Word{0x6b01, 0x439c}, {0x6b0d, 0x43dc}, {0x6b19, 0x43d4}, {0x6b25, 0x43c4}, {0x6b31, 0x43cc}, {0x6b3d, 0x43a4},
+                       {0x6b49, 0x43e4}, {0x6b5a, 0x43ac}, {0x6b66, 0x43b4}, {0x6b72, 0x43bc}, {0x6b7e, 0x43ec}, {0x6b8f, 0x43f4},
+                       {0x6ba0, 0x43fc}}) {
+    bind(w.at, [this, w] {
+      B(0x372c) = 0xff;
+      if (w.at == 0x6b49) B(0x372a) = 0xff;  // no tilt
+      startScript(A(w.script));
+      if (w.at == 0x6b7e) B(at::keys) |= 4;
+      if (w.at == 0x6b8f) B(0x33dd) = 5;     // five balls
+      if (w.at == 0x6ba0) {                  // and back to as it was
+        B(at::keys) &= 0xfb;
+        B(0x372a) = 0;
+        B(0x33dd) = 3;
+      }
+    });
+  }
   bind(0x61e9, [this] {  // players may be added again a moment after the last
     if (!countTo(A(0x3616), 0x0f)) return;
     B(0x33e3) = 0xff;
