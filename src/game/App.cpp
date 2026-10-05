@@ -23,10 +23,10 @@
 #include "platform/DataLocator.h"
 #include "platform/ImageFile.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
-constexpr double kFrame = 1.0 / 60.0;  ///< both screens run 60 frames a second, as in pfr
+constexpr double kFrame = 1.0 / 60.0;  ///< the menu and the tables both run 60 frames a second
 
 /// The table's 240- and 350-line screens fill a 4:3 display, so their pixels are not
 /// square. The full-height mode keeps the 350-line pixel shape and shows the whole table.
@@ -998,4 +998,4 @@ int App::run() {
   return 0;
 }
 
-}  // namespace pfr
+}  // namespace encore

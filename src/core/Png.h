@@ -6,7 +6,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 struct RgbaPng {
   int width = 0, height = 0;
@@ -19,4 +19,4 @@ std::optional<RgbaPng> readPng(const std::filesystem::path& path);
 bool writeIndexedPng(const std::filesystem::path& path, const u8* pixels, int width, int height, const std::vector<Rgb>& palette);
 bool writeRgbPng(const std::filesystem::path& path, const u8* rgb, int width, int height, bool flipVertically = false);
 
-}  // namespace pfr
+}  // namespace encore

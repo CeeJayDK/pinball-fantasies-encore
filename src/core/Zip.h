@@ -6,7 +6,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 struct ZipEntry {
   std::string name;  ///< as the archive spells it, with forward slashes
@@ -16,4 +16,4 @@ struct ZipEntry {
 /// Every file in the archive, folders left out. Empty when it cannot be read.
 std::vector<ZipEntry> readZip(ByteView zip);
 
-}  // namespace pfr
+}  // namespace encore

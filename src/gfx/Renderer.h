@@ -11,7 +11,7 @@
 #include "gfx/Palette.h"
 #include "gfx/ShaderProgram.h"
 
-namespace pfr {
+namespace encore {
 
 class Renderer {
  public:
@@ -89,4 +89,4 @@ class Renderer {
   std::filesystem::path shaderDir_;
 };
 
-}  // namespace pfr
+}  // namespace encore

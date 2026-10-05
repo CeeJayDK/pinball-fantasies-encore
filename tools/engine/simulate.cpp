@@ -1,4 +1,4 @@
-// pfr-simulate: runs a table headlessly and prints the ball's path.
+// encore-simulate: runs a table headlessly and prints the ball's path.
 // Used to check the simulation without opening a window.
 #include <cmath>
 #include <cstdio>
@@ -41,7 +41,7 @@ const char* partyLandName(bool rolled, unsigned handler) {
 
 int main(int argc, char** argv) {
   if (argc < 2) {
-    std::puts("usage: pfr-simulate <TABLEn.PRG> [frames] [everyNframes] [out.png] [lit]");
+    std::puts("usage: encore-simulate <TABLEn.PRG> [frames] [everyNframes] [out.png] [lit]");
     return 2;
   }
   const std::filesystem::path prg = argv[1];
@@ -65,8 +65,8 @@ int main(int argc, char** argv) {
     in.plunger = false;
     std::printf("%s: plunger released\n", table.name.c_str());
 
-    // PFR_MAP=<file.png>: the top 160 rows of both layers' walls with the ball's path.
-    if (const char* a = std::getenv("PFR_ASCII")) {
+    // ENCORE_MAP=<file.png>: the top 160 rows of both layers' walls with the ball's path.
+    if (const char* a = std::getenv("ENCORE_ASCII")) {
       int x0, x1, y0, y1;
       std::sscanf(a, "%d,%d,%d,%d", &x0, &x1, &y0, &y1);
       for (int y = y0; y < y1; ++y) {
@@ -78,8 +78,8 @@ int main(int argc, char** argv) {
         std::putchar('\n');
       }
     }
-    const char* mapPng = std::getenv("PFR_MAP");
-    if (std::getenv("PFR_PATCHES"))
+    const char* mapPng = std::getenv("ENCORE_MAP");
+    if (std::getenv("ENCORE_PATCHES"))
       for (const auto& p : encore::extractPhysmapPatches(table.dataSegment, index))
         std::printf("patch %s x %d..%d y %d..%d\n", p.overhead ? "overhead" : "ground", p.byteX * 8,
                     (p.byteX + p.byteWidth) * 8, p.y, p.y + p.height);

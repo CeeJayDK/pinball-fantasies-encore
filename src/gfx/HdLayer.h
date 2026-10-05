@@ -9,7 +9,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 enum class HdPicture : u16 {
   None,
@@ -93,4 +93,4 @@ struct HdFrame {
   }
 };
 
-}  // namespace pfr
+}  // namespace encore

@@ -4,9 +4,9 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 /// Lower-case hex digest of `data`.
 std::string sha256Hex(ByteView data);
 
-}  // namespace pfr
+}  // namespace encore

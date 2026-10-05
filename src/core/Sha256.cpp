@@ -2,7 +2,7 @@
 
 #include <array>
 
-namespace pfr {
+namespace encore {
 
 namespace {
 
@@ -59,4 +59,4 @@ std::string sha256Hex(ByteView data) {
   return out;
 }
 
-}  // namespace pfr
+}  // namespace encore

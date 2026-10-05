@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace pfr {
+namespace encore {
 
 Framebuffer::Framebuffer(int width, int height)
     : width_(width), height_(height), pixels_(static_cast<std::size_t>(width) * height, 0) {}
@@ -36,4 +36,4 @@ void Framebuffer::blitKeyed(const u8* src, int srcPitch, int w, int h, int dx, i
   }
 }
 
-}  // namespace pfr
+}  // namespace encore

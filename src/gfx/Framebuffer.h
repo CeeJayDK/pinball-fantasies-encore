@@ -4,7 +4,7 @@
 // palette effects and later shaders straightforward.
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 class Framebuffer {
  public:
@@ -35,4 +35,4 @@ class Framebuffer {
   Bytes pixels_;
 };
 
-}  // namespace pfr
+}  // namespace encore

@@ -6,7 +6,7 @@
 
 #include "core/Error.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 bool tagIs(ByteView b, std::size_t off, const char* tag) {
@@ -132,4 +132,4 @@ std::optional<IffImage> decodeIff(ByteView data) {
   return img;
 }
 
-}  // namespace pfr
+}  // namespace encore

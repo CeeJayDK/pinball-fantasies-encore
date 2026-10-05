@@ -5,7 +5,7 @@
 
 #include "core/Log.h"
 
-namespace pfr {
+namespace encore {
 
 Renderer::~Renderer() {
   if (vao_) glDeleteVertexArrays(1, &vao_);
@@ -278,4 +278,4 @@ void Renderer::draw(const Framebuffer& frame, int windowWidth, int windowHeight,
   glBindVertexArray(0);
 }
 
-}  // namespace pfr
+}  // namespace encore

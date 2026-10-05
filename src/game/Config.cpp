@@ -2,7 +2,7 @@
 
 #include "core/File.h"
 
-namespace pfr {
+namespace encore {
 
 namespace {
 HighScore hs(const char* name, std::string_view score) {
@@ -68,4 +68,4 @@ void Config::saveHighScores(const std::filesystem::path& dir, int table, const H
   file::writeAll(hiFile(dir, table), raw);
 }
 
-}  // namespace pfr
+}  // namespace encore

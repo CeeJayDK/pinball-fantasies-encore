@@ -3,7 +3,7 @@
 #include "core/Inflate.h"
 #include "core/Log.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 constexpr u32 kEndOfCentralDirectory = 0x06054b50;
@@ -72,4 +72,4 @@ std::vector<ZipEntry> readZip(ByteView zip) {
   return entries;
 }
 
-}  // namespace pfr
+}  // namespace encore

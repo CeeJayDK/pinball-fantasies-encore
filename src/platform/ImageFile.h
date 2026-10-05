@@ -6,7 +6,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 struct RgbaImage {
   int width = 0, height = 0;
@@ -15,4 +15,4 @@ struct RgbaImage {
 
 std::optional<RgbaImage> loadImageFile(const std::filesystem::path& path);
 
-}  // namespace pfr
+}  // namespace encore

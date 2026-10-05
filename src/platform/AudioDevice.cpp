@@ -7,7 +7,7 @@
 
 #include "core/Log.h"
 
-namespace pfr {
+namespace encore {
 
 AudioDevice::~AudioDevice() { close(); }
 
@@ -58,4 +58,4 @@ void SDLCALL AudioDevice::callback(void* userdata, SDL_AudioStream* stream, int 
   SDL_PutAudioStreamData(stream, self->scratch_.data(), frames * static_cast<int>(sizeof(float) * 2));
 }
 
-}  // namespace pfr
+}  // namespace encore

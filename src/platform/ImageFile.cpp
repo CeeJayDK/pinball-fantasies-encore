@@ -5,7 +5,7 @@
 
 #include "core/Png.h"
 
-namespace pfr {
+namespace encore {
 
 std::optional<RgbaImage> loadImageFile(const std::filesystem::path& path) {
   auto png = readPng(path);
@@ -23,4 +23,4 @@ std::optional<RgbaImage> loadImageFile(const std::filesystem::path& path) {
   return out;
 }
 
-}  // namespace pfr
+}  // namespace encore

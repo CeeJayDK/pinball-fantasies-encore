@@ -61,9 +61,12 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 
 | Tool | Purpose |
 | --- | --- |
-| `encore-play <dir> <table> [frames] [seed] [out.png]` | plays a game headlessly with a simple autopilot and prints the ball, the score, every trigger and (with `ENCORE_DM=1`) the dot matrix |
-| `encore-assets <dir>` | loads every table and prints what was extracted, including each flipper's rectangle, hinge and sweep |
-| `encore-extract <dir> <out>` | writes every table's artwork, collision maps, flipper frames, ball and plunger out as PNGs |
+| `encore-play <dir> <table> <frames> <seed> [out.png] [out.wav]` | plays games with no window by keys pressed at random, twice and from their recording, and says whether all three came out the same |
+| `encore-play <dir> --replay <file.RPL>`, `--verify <file.RPL>` | plays a recording again; or checks it as the server does, and answers in JSON |
+| `encore-front <dir> <frames> <out prefix> [--menu <table>] [--keys ...]` | the slides and the menu with no window, frames of it written as pictures |
+| `encore-music <dir> <module> <seconds> <out.wav>` | a module of the game's played through the sound driver of ours, into a sound file |
+| `encore-extract <dir> <out>` | writes each table's playfield as the original draws it, with every lamp lit and with every lamp out |
+| `encore-oracle-table <dir> <table> <frames> ...` | the engine against the original's own program, frame by frame ([own-engine.md](own-engine.md)) |
 | `tools/hd_import.py <name>=<picture> ...` | prepares redrawn pictures (trims, resizes to 3x the original) into `assets/hd` |
 | `tools/hd_unlit.py <lit.png> <unlit.png> <table dir>` | derives a playfield's lights-off picture from its lights-on one, using the original's lamps (needs `encore-extract` output) |
 | `tools/mkico.py <icon.png> <out.ico>` | the Windows icon, compiled into the `.exe`; run once when the icon changes, and commit `packaging/windows/pinball.ico` |
@@ -73,10 +76,11 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 
 | Path | Purpose |
 | --- | --- |
-| `src/assets` | Reading a table executable: artwork, collision maps, gates, triggers, lights, sounds, fonts and the table script |
-| `src/table` | A table in play: physics, script interpreter, tasks, game flow, and one file per table's rules |
-| `src/intro` | The slideshow and the table menu with its text, high-score and options pages |
-| `src/sound` | The four-channel module player and the jingle sequencer |
+| `src/engine/table` | The tables: the engine the four share, and each one's rules, written from the game's own programs ([own-engine.md](own-engine.md)) |
+| `src/engine/audio` | The sound driver the tables and the menu talk to, playing their music modules |
+| `src/engine/view` | A table's screen, and what the high-resolution pictures need to know of it |
+| `src/engine/game` | A table as the game plays it, recordings of games, and the slides and the menu |
+| `src/engine/data`, `src/engine/sim` | Reading a table's pictures and masks; an earlier model of the ball, kept for its tests |
 | `src/game` | Application shell and the options and high-score files |
 | `assets/hd` | Redrawn, high-resolution pictures drawn in place of the originals: the intro's slides, the menu's side panel, table banners and high-score heading, each table's playfield lit and unlit, the flippers and the ball |
 | `assets/app` | The application icon, built into `icon.icns` at build time |
@@ -85,4 +89,3 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 | `src/core`, `src/data` | Types, files, PNG, deflate and zip, SHA-256, IFF pictures, the game-version check |
 | `tests` | Pure-logic tests, and tests that play full games when the game files are present |
 | `docs` | Notes from the reverse-engineering work |
-| `src/engine` | The engine of our own, being written to replace it ([own-engine.md](own-engine.md)) |

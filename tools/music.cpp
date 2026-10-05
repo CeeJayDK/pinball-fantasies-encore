@@ -13,8 +13,8 @@ int main(int argc, char** argv) {
     std::puts("usage: encore-music <the game's folder> <module> <seconds> <out.wav> [place]");
     return 2;
   }
-  const auto path = pfr::file::findCaseInsensitive(argv[1], argv[2]);
-  const auto bytes = path ? pfr::file::readAll(*path) : std::nullopt;
+  const auto path = encore::file::findCaseInsensitive(argv[1], argv[2]);
+  const auto bytes = path ? encore::file::readAll(*path) : std::nullopt;
   encore::MusicDriver driver(48000);
   if (!bytes || !driver.load(*bytes)) {
     std::puts("cannot read the module");
@@ -22,12 +22,12 @@ int main(int argc, char** argv) {
   }
   const double seconds = std::atof(argv[3]);
   int jumps = 0;
-  driver.onJump = [&](pfr::u8 to) {
+  driver.onJump = [&](encore::u8 to) {
     ++jumps;
     return to;
   };
   driver.start();
-  if (argc > 5) driver.jump(static_cast<pfr::u16>(std::atoi(argv[5])));
+  if (argc > 5) driver.jump(static_cast<encore::u16>(std::atoi(argv[5])));
   std::vector<float> sound;
   std::vector<float> chunk(800 * 2);
   for (int frame = 0; frame < static_cast<int>(seconds * 60); ++frame) {
@@ -35,11 +35,11 @@ int main(int argc, char** argv) {
     driver.render(chunk.data(), 800);
     sound.insert(sound.end(), chunk.begin(), chunk.end());
   }
-  std::vector<pfr::u8> wav;
-  auto put = [&](pfr::u32 v, int n) {
-    for (int i = 0; i < n; ++i) wav.push_back(static_cast<pfr::u8>(v >> (8 * i)));
+  std::vector<encore::u8> wav;
+  auto put = [&](encore::u32 v, int n) {
+    for (int i = 0; i < n; ++i) wav.push_back(static_cast<encore::u8>(v >> (8 * i)));
   };
-  const auto size = static_cast<pfr::u32>(sound.size() * 2);
+  const auto size = static_cast<encore::u32>(sound.size() * 2);
   wav.insert(wav.end(), {'R', 'I', 'F', 'F'});
   put(36 + size, 4);
   wav.insert(wav.end(), {'W', 'A', 'V', 'E', 'f', 'm', 't', ' '});
@@ -50,9 +50,9 @@ int main(int argc, char** argv) {
   for (float s : sound) {
     peak = std::max(peak, s < 0 ? -s : s);
     const float c = s < -1 ? -1 : s > 1 ? 1 : s;
-    put(static_cast<pfr::u16>(static_cast<pfr::i16>(c * 32767)), 2);
+    put(static_cast<encore::u16>(static_cast<encore::i16>(c * 32767)), 2);
   }
-  pfr::file::writeAll(argv[4], pfr::ByteView(wav.data(), wav.size()));
+  encore::file::writeAll(argv[4], encore::ByteView(wav.data(), wav.size()));
   std::printf("%.1f seconds, loudest %.2f, %d jumps, at place %d row %d\n", seconds, peak, jumps, driver.position(), driver.row());
   return 0;
 }

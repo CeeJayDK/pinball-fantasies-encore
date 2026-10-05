@@ -13,7 +13,7 @@
 #include "game/Online.h"
 #include "platform/Http.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 /// An archive says where each file goes, so it decides where the writing happens: anything
@@ -124,4 +124,4 @@ bool downloadFantasyOnce(const std::filesystem::path& into, const FantasyAsk& as
   return true;
 }
 
-}  // namespace pfr
+}  // namespace encore

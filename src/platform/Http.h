@@ -7,7 +7,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 /// The whole body of a GET, or nothing on any failure, with why in error when it is given.
 std::optional<Bytes> httpDownload(const std::string& url, std::string* error = nullptr);
@@ -22,4 +22,4 @@ struct HttpReply {
 std::optional<HttpReply> httpPost(const std::string& url, ByteView body, const std::vector<std::string>& headers,
                                   std::string* error = nullptr);
 
-}  // namespace pfr
+}  // namespace encore

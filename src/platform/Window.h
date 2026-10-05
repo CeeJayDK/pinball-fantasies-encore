@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace pfr {
+namespace encore {
 
 /// SDL3 window with an OpenGL 4.1 core context.
 class Window {
@@ -26,4 +26,4 @@ class Window {
   bool fullscreen_ = false;
 };
 
-}  // namespace pfr
+}  // namespace encore

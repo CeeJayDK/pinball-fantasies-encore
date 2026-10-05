@@ -12,7 +12,7 @@
 #include "core/File.h"
 #include "core/Inflate.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 u32 crc32(ByteView data, u32 crc = 0xffffffffu) {
@@ -217,4 +217,4 @@ std::optional<RgbaPng> readPng(const std::filesystem::path& path) {
   return out;
 }
 
-}  // namespace pfr
+}  // namespace encore

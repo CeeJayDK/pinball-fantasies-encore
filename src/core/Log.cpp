@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <mutex>
 
-namespace pfr::log {
+namespace encore::log {
 namespace {
 Level g_minimum = Level::Info;
 std::mutex g_mutex;
@@ -31,4 +31,4 @@ void info(std::string_view m) { write(Level::Info, m); }
 void warn(std::string_view m) { write(Level::Warn, m); }
 void error(std::string_view m) { write(Level::Error, m); }
 
-}  // namespace pfr::log
+}  // namespace encore::log

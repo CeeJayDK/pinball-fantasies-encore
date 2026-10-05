@@ -4,7 +4,7 @@
 #include <iterator>
 #include <vector>
 
-namespace pfr {
+namespace encore {
 namespace {
 
 /// A stream of bits, lowest first, as deflate stores them.
@@ -154,4 +154,4 @@ bool inflateZlib(ByteView z, Bytes& out) {
   return inflateRaw(ByteView(z.data() + 2, z.size() - 2), out);
 }
 
-}  // namespace pfr
+}  // namespace encore

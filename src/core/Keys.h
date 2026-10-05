@@ -2,7 +2,7 @@
 // The keys the game reacts to, independent of the windowing library.
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 enum class Key : u8 {
   None,
@@ -19,4 +19,4 @@ inline u8 keyChar(Key k) {
   return k == Key::Space ? ' ' : 0;
 }
 
-}  // namespace pfr
+}  // namespace encore

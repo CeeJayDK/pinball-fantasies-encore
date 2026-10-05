@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-namespace pfr {
+namespace encore {
 
 struct ReleaseInfo {
   std::string version;  ///< as 1.2.3
@@ -33,4 +33,4 @@ bool newerVersion(std::string_view a, std::string_view b);
 std::string offeredRelease(const std::filesystem::path& saveDir);
 void rememberOffered(const std::filesystem::path& saveDir, const std::string& version);
 
-}  // namespace pfr
+}  // namespace encore

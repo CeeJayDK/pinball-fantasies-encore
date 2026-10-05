@@ -52,7 +52,6 @@ jobs:
             "build/RelWithDebInfo/shaders/post.frag",
             "build/RelWithDebInfo/font.png",
             "build/RelWithDebInfo/encore-play.exe",
-            "build/RelWithDebInfo/encore-assets.exe",
             "build/RelWithDebInfo/encore-extract.exe")) {
             if (-not (Test-Path $f)) { throw "missing $f" }
           }

@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <functional>
 
-namespace pfr {
+namespace encore {
 
 /// Offers the download on the first start and fetches it if it is wanted, unpacking
 /// everything the archive holds into `into`. False when the offer was turned down,
@@ -21,4 +21,4 @@ using FantasyWaitTick = std::function<void(double seconds)>;
 
 bool downloadFantasyOnce(const std::filesystem::path& into, const FantasyAsk& ask, const FantasyWaitTick& tick);
 
-}  // namespace pfr
+}  // namespace encore

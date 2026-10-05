@@ -6,7 +6,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 struct Bcd {
   static constexpr std::size_t kDigits = 12;
@@ -75,4 +75,4 @@ struct Bcd {
 
 inline const Bcd Bcd::kZero{};
 
-}  // namespace pfr
+}  // namespace encore

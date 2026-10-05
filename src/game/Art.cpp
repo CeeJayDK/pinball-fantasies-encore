@@ -10,7 +10,7 @@
 #include "game/Online.h"
 #include "platform/Http.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 /// Where the sets are kept, and what the set in a folder holds (the server's text, as fetched).
@@ -191,4 +191,4 @@ bool fetchArt(const std::filesystem::path& saveDir, const ArtSet& set, const std
   return true;
 }
 
-}  // namespace pfr
+}  // namespace encore

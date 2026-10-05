@@ -9,7 +9,7 @@
 #include "core/Log.h"
 #include "data/GameVersion.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 bool holdsGameFiles(const std::filesystem::path& dir) {
@@ -76,4 +76,4 @@ void reportError(const std::string& message) {
   SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Pinball Fantasies: Encore!", message.c_str(), nullptr);
 }
 
-}  // namespace pfr
+}  // namespace encore

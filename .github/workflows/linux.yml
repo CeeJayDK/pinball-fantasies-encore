@@ -79,7 +79,7 @@ jobs:
           test -x "build/Pinball Fantasies"
           test -f build/shaders/post.frag
           test -f build/font.png
-          test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract
+          test -x build/encore-play && test -x build/encore-extract
 
       # SDL travels in lib/ beside the binary, which is told to look there first, so the
       # package runs on a machine that has no SDL3 of its own.

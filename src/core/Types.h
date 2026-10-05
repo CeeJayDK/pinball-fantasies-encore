@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace pfr {
+namespace encore {
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
@@ -48,9 +48,4 @@ struct Rgb {
   u8 r = 0, g = 0, b = 0;
 };
 
-}  // namespace pfr
-
-/// The engine being written (docs/own-engine.md) is in a namespace of its own, and shares these.
-namespace encore {
-using namespace pfr;
-}
+}  // namespace encore

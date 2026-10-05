@@ -3,7 +3,7 @@
 #include "core/Error.h"
 #include "core/File.h"
 
-namespace pfr {
+namespace encore {
 
 GameFiles GameFiles::fromDirectory(const std::filesystem::path& dir) {
   auto require = [&](std::string_view name) {
@@ -24,4 +24,4 @@ GameFiles GameFiles::fromDirectory(const std::filesystem::path& dir) {
   return g;
 }
 
-}  // namespace pfr
+}  // namespace encore

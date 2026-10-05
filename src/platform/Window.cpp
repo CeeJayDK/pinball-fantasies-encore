@@ -6,7 +6,7 @@
 #include "platform/MacMenu.h"
 #endif
 
-namespace pfr {
+namespace encore {
 
 Window::~Window() {
   if (context_) SDL_GL_DestroyContext(context_);
@@ -61,4 +61,4 @@ void Window::setFullscreen(bool on) {
 
 void Window::drawableSize(int& w, int& h) const { SDL_GetWindowSizeInPixels(window_, &w, &h); }
 
-}  // namespace pfr
+}  // namespace encore

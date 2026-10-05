@@ -47,26 +47,9 @@ add_library(encore_core STATIC
   src/core/Zip.cpp
   src/data/IffImage.cpp
   src/data/GameFiles.cpp
-  src/assets/Exe.cpp
   src/core/Sha256.cpp
   src/data/GameVersion.cpp
-  src/assets/TableAssets.cpp
-  src/sound/Mod.cpp
-  src/sound/Sequencer.cpp
-  src/sound/Player.cpp
   src/game/Config.cpp
-  src/intro/IntroAssets.cpp
-  src/intro/Intro.cpp
-  src/table/Table.cpp
-  src/table/Replay.cpp
-  src/table/TablePhysics.cpp
-  src/table/TableScript.cpp
-  src/table/TableTasks.cpp
-  src/table/TableGame.cpp
-  src/table/Party.cpp
-  src/table/Speed.cpp
-  src/table/Show.cpp
-  src/table/Stones.cpp
   src/gfx/Framebuffer.cpp
   src/gfx/Palette.cpp
 )
@@ -128,9 +111,9 @@ endif()
 # other build is of no release, and never asks whether there is a newer one.
 set(ENCORE_VERSION "" CACHE STRING "the release this build is, as 1.2.3 (given by the release builds)")
 if(ENCORE_VERSION)
-  set(PFR_BUNDLE_VERSION "${ENCORE_VERSION}")
+  set(ENCORE_BUNDLE_VERSION "${ENCORE_VERSION}")
 else()
-  set(PFR_BUNDLE_VERSION "${PROJECT_VERSION}")
+  set(ENCORE_BUNDLE_VERSION "${PROJECT_VERSION}")
 endif()
 target_compile_definitions(pinball-fantasies PRIVATE GL_SILENCE_DEPRECATION=1 ENCORE_VERSION="${ENCORE_VERSION}")
 set_target_properties(pinball-fantasies PROPERTIES OUTPUT_NAME "Pinball Fantasies")
@@ -139,8 +122,8 @@ if(APPLE)
   set_target_properties(pinball-fantasies PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "Pinball Fantasies"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.encore.pinball-fantasies"
-    MACOSX_BUNDLE_BUNDLE_VERSION "${PFR_BUNDLE_VERSION}"
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "${PFR_BUNDLE_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${ENCORE_BUNDLE_VERSION}"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${ENCORE_BUNDLE_VERSION}"
     MACOSX_BUNDLE_ICON_FILE "icon"
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/packaging/macos/Info.plist.in")
 
@@ -172,22 +155,22 @@ endif()
 # This runs on every build, not only when the executable is relinked, so editing a shader
 # alone still reaches the application.
 if(APPLE)
-  set(PFR_RESOURCE_DIR "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources")
+  set(ENCORE_RESOURCE_DIR "$<TARGET_BUNDLE_CONTENT_DIR:pinball-fantasies>/Resources")
 else()
-  set(PFR_RESOURCE_DIR "$<TARGET_FILE_DIR:pinball-fantasies>")
+  set(ENCORE_RESOURCE_DIR "$<TARGET_FILE_DIR:pinball-fantasies>")
 endif()
 
 add_custom_target(encore_shaders ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory
-          "${CMAKE_SOURCE_DIR}/shaders" "${PFR_RESOURCE_DIR}/shaders"
+          "${CMAKE_SOURCE_DIR}/shaders" "${ENCORE_RESOURCE_DIR}/shaders"
   COMMAND ${CMAKE_COMMAND} -E copy
-          "${CMAKE_SOURCE_DIR}/assets/hd/font.png" "${PFR_RESOURCE_DIR}/font.png"
+          "${CMAKE_SOURCE_DIR}/assets/hd/font.png" "${ENCORE_RESOURCE_DIR}/font.png"
   DEPENDS pinball-fantasies
   COMMENT "Copying shaders and letters next to the application")
 
 if(APPLE)
   add_custom_command(TARGET encore_shaders POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${PFR_RESOURCE_DIR}/icon.icns")
+    COMMAND ${CMAKE_COMMAND} -E copy "${ICON_FILE}" "${ENCORE_RESOURCE_DIR}/icon.icns")
 endif()
 
 endif()  # NOT ENCORE_TOOLS_ONLY
@@ -204,22 +187,16 @@ enable_testing()
 add_executable(encore-tests
   tests/main.cpp
   tests/test_core.cpp
-  tests/test_game.cpp
 )
 target_compile_definitions(encore-tests PRIVATE ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(encore-tests PRIVATE encore_core)
 add_test(NAME unit COMMAND encore-tests)
 
-add_executable(encore-assets tools/assets_check.cpp)
-target_link_libraries(encore-assets PRIVATE encore_core)
-
 add_executable(encore-play tools/play.cpp)
 target_link_libraries(encore-play PRIVATE encore_engine)
 
-# The engine being written (docs/own-engine.md), beside the one it will replace.
+# The engine (docs/own-engine.md).
 file(GLOB ENCORE_ENGINE_SOURCES CONFIGURE_DEPENDS src/engine/audio/*.cpp src/engine/data/*.cpp src/engine/sim/*.cpp src/engine/game/*.cpp src/engine/table/*.cpp src/engine/view/*.cpp)
-# The front end (intro, menu) comes last, and is not built until then.
-list(FILTER ENCORE_ENGINE_SOURCES EXCLUDE REGEX "game/(Menu|Intro)\\.cpp$")
 add_library(encore_engine STATIC ${ENCORE_ENGINE_SOURCES})
 target_link_libraries(encore_engine PUBLIC encore_core)
 file(GLOB ENCORE_ENGINE_TESTS CONFIGURE_DEPENDS tests/engine/*.cpp)
@@ -228,9 +205,6 @@ target_include_directories(encore-engine-tests PRIVATE tests)
 target_compile_definitions(encore-engine-tests PRIVATE ENCORE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_link_libraries(encore-engine-tests PRIVATE encore_engine)
 add_test(NAME engine COMMAND encore-engine-tests)
-
-add_executable(encore-trace tools/trace.cpp)
-target_link_libraries(encore-trace PRIVATE encore_core)
 
 # The referee: the game's own table programs, run in a small machine of ours (docs/own-engine.md).
 add_executable(encore-oracle tools/oracle/main.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
@@ -243,8 +217,11 @@ target_link_libraries(encore-oracle-physics PRIVATE encore_engine)
 add_executable(encore-front tools/front.cpp)
 target_link_libraries(encore-front PRIVATE encore_engine)
 
-add_executable(encore-front-compare tools/front_compare.cpp)
-target_link_libraries(encore-front-compare PRIVATE encore_engine)
+add_executable(encore-extract tools/engine/extract.cpp)
+target_link_libraries(encore-extract PRIVATE encore_engine)
+
+add_executable(encore-simulate tools/engine/simulate.cpp)
+target_link_libraries(encore-simulate PRIVATE encore_engine)
 
 add_executable(encore-music tools/music.cpp)
 target_link_libraries(encore-music PRIVATE encore_engine)
@@ -253,6 +230,3 @@ target_link_libraries(encore-music PRIVATE encore_engine)
 add_executable(encore-oracle-table tools/oracle/table.cpp tools/oracle/Cpu.cpp tools/oracle/Vga.cpp tools/oracle/Machine.cpp)
 target_include_directories(encore-oracle-table PRIVATE tools/oracle)
 target_link_libraries(encore-oracle-table PRIVATE encore_engine)
-
-add_executable(encore-extract tools/extract.cpp)
-target_link_libraries(encore-extract PRIVATE encore_core)

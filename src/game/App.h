@@ -26,7 +26,7 @@
 
 union SDL_Event;
 
-namespace pfr {
+namespace encore {
 
 struct AppOptions {
   std::optional<std::filesystem::path> dataDir;
@@ -136,4 +136,4 @@ class App {
   bool sound_ = false;            ///< a sound card is playing the music
 };
 
-}  // namespace pfr
+}  // namespace encore

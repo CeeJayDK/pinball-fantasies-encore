@@ -6,7 +6,7 @@
 #include "core/File.h"
 #include "core/Sha256.h"
 
-namespace pfr {
+namespace encore {
 
 std::vector<std::string> unsupportedGameFiles(const std::filesystem::path& dir) {
   static constexpr std::pair<const char*, const char*> kFiles[] = {
@@ -30,4 +30,4 @@ std::vector<std::string> unsupportedGameFiles(const std::filesystem::path& dir) 
   return bad;
 }
 
-}  // namespace pfr
+}  // namespace encore

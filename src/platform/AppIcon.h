@@ -3,7 +3,7 @@
 // The window's own icon, for the taskbar and the window list on Linux and Windows.
 #include <cstdint>
 
-namespace pfr {
+namespace encore {
 
 inline constexpr int kAppIconSize = 128;
 inline constexpr std::uint8_t kAppIcon[65536] = {
@@ -2057,4 +2057,4 @@ inline constexpr std::uint8_t kAppIcon[65536] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
 
-}  // namespace pfr
+}  // namespace encore

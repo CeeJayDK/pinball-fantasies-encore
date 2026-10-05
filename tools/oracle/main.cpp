@@ -98,10 +98,10 @@ int main(int argc, char** argv) {
     if (png) {
       const int height = 350;
       const auto pic = m.vga.picture(height);
-      pfr::Bytes rgb(static_cast<std::size_t>(320 * height * 3));
+      encore::Bytes rgb(static_cast<std::size_t>(320 * height * 3));
       for (std::size_t i = 0; i < pic.size(); ++i)
-        for (std::size_t c = 0; c < 3; ++c) rgb[i * 3 + c] = static_cast<pfr::u8>(m.vga.dac[pic[i] * 3u + c] * 255 / 63);
-      pfr::writeRgbPng(png, rgb.data(), 320, height);
+        for (std::size_t c = 0; c < 3; ++c) rgb[i * 3 + c] = static_cast<encore::u8>(m.vga.dac[pic[i] * 3u + c] * 255 / 63);
+      encore::writeRgbPng(png, rgb.data(), 320, height);
     }
   } catch (const std::exception& e) {
     std::printf("stopped at frame %u: %s\n%s\n", m.frames, e.what(), m.cpu.history().c_str());

@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
       }
     }
   }
-  const auto prg = pfr::file::readAll(dir / ("TABLE" + std::to_string(table + 1) + ".PRG"));
+  const auto prg = encore::file::readAll(dir / ("TABLE" + std::to_string(table + 1) + ".PRG"));
   if (!prg) {
     std::puts("cannot read the table's program");
     return 2;
@@ -161,7 +161,7 @@ int main(int argc, char** argv) {
     unsigned throwEvery = 350;
     long pictureFrames = 0, picturePixels = 0;
     std::unique_ptr<encore::TableScreen> screen;
-    if (picture) screen = std::make_unique<encore::TableScreen>(*pfr::file::findCaseInsensitive(dir, "TABLE" + std::to_string(table + 1) + ".PRG"), table);
+    if (picture) screen = std::make_unique<encore::TableScreen>(*encore::file::findCaseInsensitive(dir, "TABLE" + std::to_string(table + 1) + ".PRG"), table);
     if (screen) screen->attach(e);
     int wrongPlayer = 0;
     int reported = 0;
@@ -411,7 +411,7 @@ int main(int argc, char** argv) {
             std::vector<encore::u8> rgb(static_cast<std::size_t>(320 * height * 3));
             for (std::size_t i = 0; i < static_cast<std::size_t>(320 * height); ++i)
               for (std::size_t c = 0; c < 3; ++c) rgb[i * 3 + c] = static_cast<encore::u8>(m.vga.dac[px[i] * 3u + c] * 255 / 63);
-            pfr::writeRgbPng(name, rgb.data(), 320, height);
+            encore::writeRgbPng(name, rgb.data(), 320, height);
           };
           save("ours.png", ours.data());
           save("theirs.png", theirs.data());

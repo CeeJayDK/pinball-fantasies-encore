@@ -82,6 +82,8 @@ class TableGame {
   std::vector<bool> flipperIsLeft() const { return screen_ ? screen_->flipperIsLeft(*engine_) : std::vector<bool>{}; }
   Cutout ballPicture() const { return screen_ ? screen_->ballPicture(*engine_) : Cutout{}; }
   bool ballTrail = true;
+  /// The lamps as the game has them (0), all lit (1) or all out (2): for looking at the artwork.
+  void showLamps(int how) { lamps_ = how; }
 
   /// The sound made since it was last asked for, for the sound card (48000 a second, left and
   /// right); from any thread.

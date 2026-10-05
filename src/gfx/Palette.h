@@ -4,7 +4,7 @@
 #include "core/Types.h"
 #include "data/IffImage.h"
 
-namespace pfr {
+namespace encore {
 
 /// 256-entry VGA palette (8-bit per channel in our representation; the original used 6-bit DACs).
 class Palette {
@@ -25,4 +25,4 @@ class Palette {
   std::vector<double> cycleAccumulators_;
 };
 
-}  // namespace pfr
+}  // namespace encore
