@@ -22,6 +22,9 @@ class SoundDriver {
   virtual void stop() {}
   /// Function 0x04: start it.
   virtual u8 start() { return 0; }
+  /// Function 0x15: what is playing; bit 3 is set while an effect still sounds. The silent
+  /// driver always answers that one does.
+  virtual u8 status() { return 0x0a; }
 };
 
 class Engine : public Program {
@@ -42,10 +45,13 @@ class Engine : public Program {
   /// The row of the picture at the top of the screen.
   u16 screenRow() const { return screenRow_; }
 
-  /// The display's memory as the original lays it out in the video card: two planes (the
-  /// card's first and third), 168 bytes a row, each byte a dot, 0xf2 lit and 0x60 not.
-  const std::array<std::array<u8, 0x4000>, 2>& displayMemory() const { return vram_; }
-  std::array<std::array<u8, 0x4000>, 2>& displayMemory() { return vram_; }
+  /// The video card's memory, four planes of 64 KB, as far as the table's logic depends on
+  /// it. The display is at its start: in the first and third planes, 168 bytes a row, each
+  /// byte a dot, 0xf2 lit and 0x60 not. Past the picture are the copies of three masks that the
+  /// original reads the ramps' slopes and materials from, and, over parts of those, the
+  /// pictures it keeps there to draw with: what it reads there, the engine must read too.
+  const std::array<std::vector<u8>, 4>& videoMemory() const { return video_; }
+  std::array<std::vector<u8>, 4>& videoMemory() { return video_; }
 
   /// The video card's colours as the table has set them: 256 of red, green, blue, 0-63.
   const std::array<u8, 768>& colours() const { return dac_; }
@@ -86,6 +92,9 @@ class Engine : public Program {
   void bindPlunger();
   /// One dot of a collision mask (a segment of the program's, 40 bytes a row).
   bool maskBit(u16 partyLandSegment, int x, int y);
+  /// A byte of one of the three mask copies in video memory, by its place in the mask
+  /// (cs:5a48, cs:5a80): 0 the ramps' marks, 1 the ramps' slopes, 2 the playfield's slopes.
+  u8 copiedMask(int which, u16 offset);
 
   // --- timers: up to 50 routines run once a frame (cs:5b0b, cs:5b2a, cs:576a)
   void addTimer(u16 native);
@@ -127,7 +136,7 @@ class Engine : public Program {
   void setFont(int which);          // 0 to 3: 13, 11, 8 and 5 dots high
   /// Runs one of the original's pictures that are code: a row of "store this register there".
   void compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane);
-  u8& dot(int plane, u16 offset) { return vram_[plane][offset & 0x3fff]; }
+  u8& dot(int plane, u16 offset) { return video_[static_cast<std::size_t>(plane * 2)][offset]; }
 
   // --- a game's comings and goings (EngineGame.cpp)
   void bindGame();
@@ -160,7 +169,7 @@ class Engine : public Program {
   bool high() { return B(at::highResolution) == 0xff; }
 
   std::array<u8, 768> dac_{};
-  std::array<std::array<u8, 0x4000>, 2> vram_{};
+  std::array<std::vector<u8>, 4> video_;
   SoundDriver silent_;
   bool exited_ = false;
   u16 screenRow_ = 0;

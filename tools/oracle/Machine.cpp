@@ -71,7 +71,10 @@ u8 Machine::read(u32 a) {
 void Machine::write(u32 a, u8 v) {
   a &= 0xfffff;
   if (a >= 0xa0000 && a < 0xb0000) vga.write(a - 0xa0000, v);
-  else mem_[a] = v;
+  else {
+    if (a == watchWrite) std::fprintf(stderr, "[write] %05x = %02x at %s (frame %u)\n", a, v, cpu.where().c_str(), frames);
+    mem_[a] = v;
+  }
 }
 
 u8 Machine::portIn(u16 port) {

@@ -60,14 +60,17 @@ int main(int argc, char** argv) {
     m.setLoop(0x10, e.F(encore::at::mainLoop));
     m.loopsPerFrame = e.loopsPerFrame;
     m.boot();
+    if (const char* w = std::getenv("ENCORE_WATCH")) e.debugWatch = static_cast<int>(std::strtol(w, nullptr, 16));
+    if (const char* w = std::getenv("ENCORE_WATCH")) m.watchWrite = (oracle::u32{m.seg(e.dataSegment())} << 4) + static_cast<oracle::u32>(std::strtol(w, nullptr, 16));
     const oracle::u16 ds = m.seg(e.dataSegment()), cs = m.seg(0x10);
     for (unsigned a = 0; a < 0x10000; ++a) {
       e.memory()[a] = m.peek8(ds, static_cast<oracle::u16>(a));
       e.codeMemory()[a] = m.peek8(cs, static_cast<oracle::u16>(a));
     }
+    for (std::size_t a = 0; a < e.image().size() && a < 0x90000; ++a)
+      e.image()[a] = m.peek8(static_cast<oracle::u16>(encore::Program::kLoadSegment + (a >> 4)), static_cast<oracle::u16>(a & 15));
     e.colours() = m.vga.dac;
-    for (int p = 0; p < 2; ++p)
-      for (unsigned a = 0; a < 0x4000; ++a) e.displayMemory()[static_cast<std::size_t>(p)][a] = m.vga.planes[static_cast<std::size_t>(p * 2)][a];
+    e.videoMemory() = m.vga.planes;
 
     // The data segment ends where the next begins; the code's variables are among its code.
     const unsigned dataEnd = 0x6c00, codeEnd = 0xac00;
@@ -97,16 +100,36 @@ int main(int argc, char** argv) {
       // What only the original's drawing uses is not kept: where it last drew the ball, and
       // the drawing routines' own variables among the code.
       auto drawing = [&](const char* what, unsigned a) {
-        if (what[0] == 'd') return (a >= e.A(0x2ef8) && a < e.A(0x2ef8) + 4u) || a == e.A(0x2f08);
+        if (!std::strcmp(what, "data")) {
+          if ((a >= e.A(0x2ef8) && a < e.A(0x2ef8) + 4u) || a == e.A(0x2f08)) return true;
+          // each flipper's record keeps which picture of it was last drawn, and where
+          for (unsigned f = e.A(0x6950); f < e.A(0x6950) + 3 * 0x3cu; f += 0x3c)
+            if ((a >= f + 0x2c && a < f + 0x2e) || (a >= f + 0x34 && a < f + 0x36)) return true;
+          return false;
+        }
         if (what[0] == 'c') return a >= e.F(0x9240) && a < e.F(0x9240) + 0x1a00u;
         return false;
       };
       auto report = [&](const char* what, unsigned a, unsigned ours, unsigned theirs) {
         if (drawing(what, a)) return;
         differs = true;
-        if (!seen.insert((static_cast<unsigned>(what[0] + what[9]) << 20) | a).second) return;
+        if (!seen.insert((static_cast<unsigned>(what[0] * 31 + what[1] * 7 + what[std::strlen(what) - 2]) << 20) | a).second) return;
         ++reported;
-        if (what[0] == 'd') {
+        if (std::getenv("ENCORE_VRAM")) {
+          const unsigned base = m.peek16(ds, e.A(0x239f));
+          int bad = 0, first = -1;
+          for (unsigned si = 0; si < 20400; ++si)
+            if (m.vga.planes[si & 3][(base + (si >> 2)) & 0xffff] != m.peek8(m.seg(0x7734), static_cast<oracle::u16>(si))) {
+              ++bad;
+              if (first < 0) first = static_cast<int>(si);
+            }
+          std::printf("  (the copy of the ramps' marks in video memory at %04x: %d bytes differ, the first at row %d column %d)\n", base, bad,
+                      first / 40, first % 40 * 8);
+        }
+        if (std::getenv("ENCORE_BALL"))
+          std::printf("  (trigger %04x, ours %04x) (ball %d,%d layer %02x nudge %d)\n", m.peek16(ds, e.A(0x3316)), static_cast<unsigned>(e.W(0x3316)), m.peek16(ds, e.A(encore::at::ballX)), m.peek16(ds, e.A(encore::at::ballY)),
+                      m.peek8(ds, e.A(encore::at::layer)), m.peek16(ds, e.A(encore::at::nudgeLift)));
+        if (!std::strcmp(what, "data")) {
           const encore::u16 pl = e.partyLandData(static_cast<encore::u16>(a));
           std::printf("frame %d: data %04x (Party Land's %04x) ours %02x, the original's %02x\n", frame, a, pl, ours, theirs);
         } else {
@@ -128,14 +151,21 @@ int main(int argc, char** argv) {
         }
       }
       for (int p = 0; p < 2; ++p)
-        for (unsigned a = 0; a < 0x1000; ++a) {
+        for (unsigned a = 0; a < 0x0ad4; ++a) {  // up to where the table's picture begins
           const oracle::u8 theirs = m.vga.planes[static_cast<std::size_t>(p * 2)][a];
-          encore::u8& ours = e.displayMemory()[static_cast<std::size_t>(p)][a];
+          encore::u8& ours = e.videoMemory()[static_cast<std::size_t>(p * 2)][a];
           if (ours != theirs) {
             report(p ? "display, third plane," : "display, first plane,", a, ours, theirs);
             if (all) ours = theirs;
           }
         }
+      // past the picture: the mask copies and the pictures kept over them
+      for (std::size_t p = 0; p < 4; ++p)
+        for (unsigned a = 0xc7d4; a < 0x10000; ++a)
+          if (e.videoMemory()[p][a] != m.vga.planes[p][a]) {
+            report("video memory past the picture,", a, e.videoMemory()[p][a], m.vga.planes[p][a]);
+            if (all) e.videoMemory()[p][a] = m.vga.planes[p][a];
+          }
       for (unsigned a = 0; a < 768; ++a)
         if (e.colours()[a] != m.vga.dac[a]) {
           report("colour byte", a, e.colours()[a], m.vga.dac[a]);

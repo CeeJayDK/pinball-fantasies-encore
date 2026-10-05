@@ -90,12 +90,14 @@ bool Engine::music(u16 record) {
 }
 
 void Engine::addScore(u16 to, u16 amount) {
+  // Digit by digit from the right, as the original's "add, then adjust to a decimal digit".
   u8 carry = 0;
   for (int i = 11; i >= 0; --i) {
-    // as the original's "add, then adjust": a digit over nine carries one up
-    u8 sum = static_cast<u8>(nativeB(static_cast<u16>(to + i)) + nativeB(static_cast<u16>(amount + i)) + carry);
+    const u8 a = nativeB(static_cast<u16>(to + i)), b = nativeB(static_cast<u16>(amount + i));
+    u8 sum = static_cast<u8>(a + b + carry);
+    const bool half = (a & 0x0f) + (b & 0x0f) + carry > 0x0f;
     carry = 0;
-    if ((sum & 0x0f) > 9) {
+    if ((sum & 0x0f) > 9 || half) {
       sum = static_cast<u8>(sum + 6);
       carry = 1;
     }

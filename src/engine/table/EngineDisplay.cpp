@@ -302,7 +302,37 @@ void Engine::bindDisplay() {
     si = 0;
   });
 
+  bind(0x52cd, [this] {  // until the music has come round
+    si = 0xff;
+    if (B(0x338e) != 0xff) return;
+    B(0x00d2) = 0;
+    si = 0;
+  });
+  bind(0x52e3, [this] {  // until an effect has ended, but no longer than so many frames
+    si = 0xff;
+    if (sound->status() & 8) {
+      if (--W(0x3551) == 0) si = 0;
+    } else if (B(0x338e) == 0xff) {
+      si = 0;
+    }
+  });
+
   // --- steps
+  bind(0x5273, [this] {
+    W(0x33e7) = F(0x52cd);
+    nextStep(4);
+  });
+  bind(0x527c, [this] {
+    W(0x33e7) = F(0x52e3);
+    nextStep(4);
+  });
+  bind(0x4736, [=, this] {  // a piece of music, come what may
+    wait(1);
+    B(0x3389) = 0;
+    B(0x230d) = 1;
+    music(arg(2));
+    nextStep(4);
+  });
   bind(0x2cf1, [=, this] {  // go on from another place in the script
     bx = arg(2);
     W(0x33e5) = bx;

@@ -93,10 +93,16 @@ class Program {
   std::vector<u8>& memory() { return ds_; }
   const std::vector<u8>& codeMemory() const { return cs_; }
   std::vector<u8>& codeMemory() { return cs_; }
+  /// The whole program as loaded, from its load segment on: for the same tools.
+  std::vector<u8>& image() { return image_; }
   /// Segment values as the program's listing has them.
   u16 dataSegment() const { return dataSegment_; }
   /// For reports: Party Land's address for one of this table's, or 0xffff.
   u16 partyLandData(u16 native) const;
+
+  /// For finding a mistake: a place in the data segment; each routine reached through a
+  /// pointer that changes it is said on stderr.
+  int debugWatch = -1;
 
   // What the original passes between routines in registers, for those reached through
   // pointers: a script's place in BX, a task's answer in SI, and so on.

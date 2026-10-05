@@ -47,6 +47,7 @@ class Machine : public Bus {
   Cpu cpu{*this};
   Vga vga;
   bool log = false;            ///< every service call, to stderr
+  u32 watchWrite = 0xffffffff; ///< a place in memory: who writes there is said on stderr
   std::uint64_t loopBudget = 20000;  ///< instructions of the program's own loop per frame
   u32 frames = 0;
 

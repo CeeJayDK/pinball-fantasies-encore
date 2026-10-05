@@ -51,8 +51,19 @@ void Engine::physicsSteps() {
 }
 
 bool Engine::maskBit(u16 partyLandSegment, int x, int y) {
-  if (x < 0 || y < 0 || x >= 320 || y >= 576) return false;
-  return farB(S(partyLandSegment), static_cast<u16>(y * 0x28 + (x >> 3))) & (0x80 >> (x & 7));
+  // As the original, nothing stops a place beyond an edge: it is a dot of the row above or
+  // below, or of what lies beside the mask.
+  const u16 column = static_cast<u16>(x);
+  return farB(S(partyLandSegment), static_cast<u16>(y * 0x28 + (column >> 3))) & (0x80 >> (column & 7));
+}
+
+u8 Engine::copiedMask(int which, u16 offset) {
+  const auto& plane = video_[offset & 3];
+  if (which == 0) return plane[static_cast<u16>(W(0x239f) + (offset >> 2))];
+  if (which == 1) return plane[static_cast<u16>(W(0x23a1) + (offset >> 2))];
+  // the playfield's is in two pieces: its top rows beside the display, the rest after the others
+  if (offset < 0x23f0) return plane[static_cast<u16>(((offset >> 4) + 1) * 0x50 + (offset >> 2) + 0x0ad4)];
+  return plane[static_cast<u16>(W(0x23a3) + (offset >> 2) - 0x8fc)];
 }
 
 /// cs:8829
@@ -82,14 +93,16 @@ bool Engine::probeBall() {
   if (my >= 0x240) return false;
   my += W(at::nudgeLift).s();
   u8 material = 0;
+  const u16 place = static_cast<u16>(my * 0x28 + (static_cast<u16>(mx) >> 3));
+  const u8 bit = static_cast<u8>(0x80 >> (mx & 7));
   if (B(at::layer) != 0xff) {
-    if (maskBit(0x4114, mx, my)) material |= 1;
-    if (maskBit(0x3b74, mx, my)) material |= 2;
-    if (maskBit(0x7194, mx, my)) material |= 4;
+    if (farB(S(0x4114), place) & bit) material |= 1;
+    if (farB(S(0x3b74), place) & bit) material |= 2;
+    if (copiedMask(2, place) & bit) material |= 4;
   } else {
-    if (maskBit(0x46b4, mx, my)) material |= 2;
-    if (maskBit(0x7734, mx, my)) material |= 1;
-    if (maskBit(0x7cd4, mx, my)) material |= 4;
+    if (farB(S(0x46b4), place) & bit) material |= 2;
+    if (copiedMask(0, place) & bit) material |= 1;
+    if (copiedMask(1, place) & bit) material |= 4;
   }
   B(0x2eda) = material;
 
@@ -336,10 +349,10 @@ void Engine::pickGravity() {
     u8 solid = 0, slope = 0;
     if (ground) {
       solid = farB(S(0x4114), at) | farB(S(0x3b74), at);
-      slope = farB(S(0x7194), at) & 0x0f;
+      slope = copiedMask(2, at) & 0x0f;
     } else {
-      solid = farB(S(0x7734), at) | farB(S(0x46b4), at);
-      slope = farB(S(0x7cd4), at) & 0x0f;
+      solid = copiedMask(0, at) | farB(S(0x46b4), at);
+      slope = copiedMask(1, at) & 0x0f;
     }
     if (solid != 0) continue;
     if (slope >= cs_[static_cast<u16>(F(0x5a15) + 2)]) return;  // more than the table has
