@@ -20,6 +20,10 @@ class PartyLand : public Engine {
   void drained();         // cs:0215
   void bindRules();       // PartyLandRules.cpp
   void bindSteps();
+  void bindGameSteps();   // PartyLandGame.cpp
+  /// The step after this one is run at once (cs:0b1d).
+  void chain();
+  void goTo(u16 script);  ///< go on from another script, at once
 
   // (named by where they are in the program until what they are is clearer)
   void hole() { placeBall(0x0f, 0x2f); }   ///< the ball put away, out of sight

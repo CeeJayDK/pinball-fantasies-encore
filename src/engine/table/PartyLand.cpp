@@ -17,6 +17,7 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
   });
   bindRules();
   bindSteps();
+  bindGameSteps();
   bind(0x0bca, [this] { serve(); });
   bind(0x2ab1, [this] { everyFrame(); });
   bind(0x0215, [this] { drained(); });

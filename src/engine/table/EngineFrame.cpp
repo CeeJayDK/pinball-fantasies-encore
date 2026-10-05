@@ -442,10 +442,13 @@ u8 Engine::musicCallback(u8 al) {
 // timers
 // ---------------------------------------------------------------------------------------
 void Engine::addTimer(u16 native) {
-  for (u16 slot = A(0x331b); slot != A(0x337f); slot = static_cast<u16>(slot + 2)) {
-    if (nativeW(slot) != F(0x69fc)) continue;
+  // The original looks for a free slot with BX and leaves it there. A step that goes on to
+  // use BX as its place in the script, without having kept it, goes astray in the original
+  // too (Party Land's cs:0b5b does), so BX is left the same way here.
+  for (bx = A(0x331b); bx != A(0x337f); bx = static_cast<u16>(bx + 2)) {
+    if (nativeW(bx) != F(0x69fc)) continue;
     ++W(0x337f);
-    nativeW(slot) = native;
+    nativeW(bx) = native;
     return;
   }
   exited_ = true;  // the original gives up when all fifty are taken
@@ -455,6 +458,7 @@ void Engine::runTimers() {
   u16 slot = A(0x331b);
   for (int i = 0; i < 0x32; ++i, slot = static_cast<u16>(slot + 2)) {
     W(0x3381) = slot;
+    bx = slot;  // as the original has it, which matters to a routine that takes BX for its place in a script
     call(nativeW(slot));
   }
 }

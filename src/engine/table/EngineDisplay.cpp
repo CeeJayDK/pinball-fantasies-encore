@@ -318,6 +318,22 @@ void Engine::bindDisplay() {
   });
 
   // --- steps
+  bind(0x5456, [this] {  // has the score passed the table's best? then say so first
+    if (B(0x33f1) != 0xff) {
+      for (u16 i = 0; i < 12; ++i) {
+        const u8 best = B(0x0016, i), score = B(0x45b6, i);
+        if (score < best) break;
+        if (score > best) {
+          B(0x33f1) = 0xff;
+          bx = A(0x13cd);
+          call(nativeW(bx));
+          return;
+        }
+      }
+    }
+    bx = static_cast<u16>(bx + 2);
+    call(nativeW(bx));
+  });
   bind(0x5273, [this] {
     W(0x33e7) = F(0x52cd);
     nextStep(4);
