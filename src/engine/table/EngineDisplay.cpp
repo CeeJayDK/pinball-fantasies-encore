@@ -577,6 +577,16 @@ void Engine::bindDisplay() {
     B(0x36f4) = static_cast<u8>(0x38 + arg(4));
     nextStep(8);
   };
+  bind(0x4757, [=, this] {  // cs:4757: on from where it was, and no longer held
+    B(0x33e4) = 0;
+    W(0x33e9) = 1;
+    W(0x33e7) = F(0x47db);
+    forgetNumber();
+    W(0x36f0) = arg(6);
+    W(0x36ee) = 1;
+    B(0x33f7) = 0;
+    nextStep(8);
+  });
   bind(0x4780, countDown);
   bind(0x47bc, [=, this] {  // or on from where it was, unless it is to begin again
     if (B(0x33e4) == 0xff) return countDown();

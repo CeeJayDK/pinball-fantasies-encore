@@ -219,6 +219,11 @@ int main(int argc, char** argv) {
                 speed = where == 3 ? 1500 : 300;
               }
             }
+            // (on the table: left of its edge the original draws the ball over what it reads the
+            // slopes from, which no game gets to)
+            x = static_cast<int>(x) < 0 ? 0 : x > 304 ? 304 : x;
+            y = static_cast<int>(y) < 40 ? 40 : y;
+            if (std::getenv("ENCORE_KEYS")) std::printf("thrown to %u,%u layer %02x at frame %d\n", x, y, layer, frame);
             poke(encore::at::ballX, x, 2);
             poke(encore::at::ballY, y, 2);
             poke(encore::at::ballXFixed, x * 0x400, 4);
@@ -226,6 +231,17 @@ int main(int argc, char** argv) {
             poke(encore::at::ballVx, static_cast<unsigned>(static_cast<int>(random() % static_cast<unsigned>(2 * speed + 1)) - speed), 2);
             poke(encore::at::ballVy, static_cast<unsigned>(static_cast<int>(random() % static_cast<unsigned>(2 * speed + 1)) - speed), 2);
             poke(encore::at::layer, layer, 1);
+          }
+          // a light the rules remember as lit or not is switched: most of what the rules do
+          // depends on those, and whole rows of them seldom come about by chance
+          if (random() % 150 == 0 && m.peek8(ds, e.A(encore::at::betweenBalls)) == 0) {
+            const unsigned light = 1 + random() % e.kw(0x5912, 1);
+            const encore::u16 flag = static_cast<encore::u16>(e.A(0x3591) + light);
+            const oracle::u8 now = m.peek8(ds, flag);
+            if (now == 0 || now == 0xff) {
+              m.poke8(ds, flag, static_cast<oracle::u8>(~now));
+              e.memory()[flag] = static_cast<encore::u8>(~now);
+            }
           }
           if (random() % 9000 == 0) shakeUntil = frame + 60;
           if (frame < shakeUntil && frame % 4 == 0) both(0x39);
@@ -253,12 +269,9 @@ int main(int argc, char** argv) {
       }
       // (one past the last is where the match stops looking)
       // (and a new game's first moments still have the last game's player)
-      if (m.peek8(ds, e.A(encore::at::player)) > m.peek8(ds, e.A(encore::at::players)) + 1 && m.peek8(ds, e.A(encore::at::betweenBalls)) == 0 &&
-          m.peek8(ds, e.A(encore::at::playersMayJoin)) != 0xff)
-        ++wrongPlayer;
-      else
-        wrongPlayer = 0;
-      if (!astray && wrongPlayer > 100) astray = "fewer players were asked for than the one whose turn it is";
+      if (m.peek8(ds, e.A(encore::at::player)) <= m.peek8(ds, e.A(encore::at::players)) + 1) wrongPlayer = 0;
+      else if (m.peek8(ds, e.A(encore::at::betweenBalls)) == 0 && m.peek8(ds, e.A(encore::at::ballHidden)) == 0) ++wrongPlayer;
+      if (!astray && wrongPlayer > 30) astray = "fewer players were asked for than the one whose turn it is";
       if (astray) {
         std::printf("the original goes astray at frame %d (%s)\n", frame, astray);
         frames = frame;
@@ -367,6 +380,25 @@ int main(int argc, char** argv) {
           report("colour byte", a, e.colours()[a], m.vga.dac[a]);
           if (all) e.colours()[a] = m.vga.dac[a];
         }
+      if (const char* at = std::getenv("ENCORE_GRAVITY"); at && frame == std::atoi(at)) {
+        // what the pull on the ball is read from, under where the ball is now, in both
+        unsigned x = m.peek16(ds, e.A(encore::at::ballX)), y = m.peek16(ds, e.A(encore::at::ballY));
+        if (const char* xy = std::getenv("ENCORE_GRAVITY_XY")) {
+          int gx = 0, gy = 0;
+          std::sscanf(xy, "%d,%d", &gx, &gy);
+          x = static_cast<unsigned>(gx) & 0xffff;
+          y = static_cast<unsigned>(gy) & 0xffff;
+        }
+        unsigned place = (((x + 8) & 0xffff) >> 3) + (y + 8) * 0x28 - 1;
+        const unsigned copy = m.peek16(ds, e.A(0x23a3));
+        for (int i = 0; i < 3; ++i, ++place) {
+          const auto o = static_cast<oracle::u16>(place);
+          const unsigned v = o < 0x23f0 ? ((o >> 4) + 1) * 0x50 + (o >> 2) + 0x0ad4 : copy + (o >> 2) - 0x8fc;
+          std::printf("place %04x: masks %02x %02x (ours %02x %02x), slope %02x (ours %02x) at video %04x plane %d\n", o,
+                      m.peek8(e.S(0x4114), o), m.peek8(e.S(0x3b74), o), e.farB(e.S(0x4114), o), e.farB(e.S(0x3b74), o),
+                      m.vga.planes[o & 3][v & 0xffff], e.videoMemory()[o & 3][v & 0xffff], v & 0xffff, o & 3);
+        }
+      }
       if (const char* at = std::getenv("ENCORE_SEGMENTS"); at && frame == std::atoi(at)) {
         // the whole program, once: where its other segments (the masks, say) differ
         int n = 0;
