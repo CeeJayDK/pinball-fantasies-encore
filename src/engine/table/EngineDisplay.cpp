@@ -303,6 +303,11 @@ void Engine::bindDisplay() {
   });
 
   // --- steps
+  bind(0x2cf1, [=, this] {  // go on from another place in the script
+    bx = arg(2);
+    W(0x33e5) = bx;
+    call(nativeW(bx));
+  });
   bind(0x453a, [=, this] {  // the score
     W(0x33e9) = arg(2);
     W(0x33e7) = F(0x531c);

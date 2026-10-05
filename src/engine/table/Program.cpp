@@ -98,6 +98,9 @@ u16 Program::F(u16 a) const {
   // engine calls or jumps to from an instruction that does
   const auto& targets = maps().target[static_cast<std::size_t>(table_ - 1)];
   if (auto it = targets.find(a); it != targets.end()) return it->second;
+  // or one kept as a pointer, which an instruction that lines up carries as a number
+  const auto& values = maps().value[static_cast<std::size_t>(table_ - 1)];
+  if (auto it = values.find(a); it != values.end()) return it->second;
   lost("routine", a, table_);
 }
 
