@@ -307,9 +307,7 @@ void Engine::bindDisplay() {
 
   bind(0x52cd, [this] {  // until the music has come round
     si = 0xff;
-    if (B(0x338e) != 0xff) return;
-    B(0x00d2) = 0;
-    si = 0;
+    if (B(0x338e) == 0xff) si = 0;
   });
   bind(0x52e3, [this] {  // until an effect has ended, but no longer than so many frames
     si = 0xff;

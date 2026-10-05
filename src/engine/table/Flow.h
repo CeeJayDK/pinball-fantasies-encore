@@ -26,6 +26,8 @@ class Flow : public Engine {
   virtual void matchPace() { CW(0x089d) = high() ? 0x0b : 0x09; }
   /// How many digits the match runs through before it stops.
   virtual u16 matchLength() { return high() ? kw(0x087a, 1) : kw(0x0866, 1); }
+  /// Whether the score shown goes back to nought when a game is over (Party Land: cs:0b99).
+  virtual bool clearsScoreAtEnd() { return true; }
   /// The lights left on when a game is over (Party Land: cs:0ba5).
   virtual void gameOverLights() {
     setLight(kb(0x0ba5, 1));

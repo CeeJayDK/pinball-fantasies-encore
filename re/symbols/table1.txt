@@ -143,4 +143,5 @@ d 3713 attract
 
 # --- placed by hand in the tables where the line-up does not find them
 c 0735 eachScoreBegin @2:063d @3:05c8
-c 0762 eachScoreNext @2:066f
+c 0762 eachScoreNext @2:066f @4:06d8
+c 089f matchDigit @4:08a4 ; the match: its digit changes (a jump mistaken for it in Stones 'n Bones)

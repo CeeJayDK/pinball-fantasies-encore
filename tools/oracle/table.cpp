@@ -30,6 +30,7 @@
 #include "engine/table/PartyLand.h"
 #include "engine/table/Gameshow.h"
 #include "engine/table/SpeedDevils.h"
+#include "engine/table/StonesNBones.h"
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -79,7 +80,7 @@ int main(int argc, char** argv) {
     if (table == 0) made = std::make_unique<encore::PartyLand>(*prg);
     else if (table == 1) made = std::make_unique<encore::SpeedDevils>(*prg);
     else if (table == 2) made = std::make_unique<encore::Gameshow>(*prg);
-    else made = std::make_unique<encore::Engine>(*prg, table);
+    else made = std::make_unique<encore::StonesNBones>(*prg);
     encore::Engine& e = *made;
     oracle::Machine m(dir, table, config);
     m.setLoop(0x10, e.F(encore::at::mainLoop));
@@ -153,6 +154,7 @@ int main(int argc, char** argv) {
     bool left = false, right = false;
     int shakeUntil = 0;
     unsigned throwEvery = 350;
+    int wrongPlayer = 0;
     int reported = 0;
     long videoDiffers = 0;
     bool shown = false;
@@ -237,10 +239,10 @@ int main(int argc, char** argv) {
           if (random() % 4000 == 0) { const int f = 0x3b + static_cast<int>(random() % 4); both(f); both(f | 0x80); }
         }
       }
-      // The original can go astray by itself, and then there is nothing to compare with: its
-      // players counted past the eighth (a game begun again with fewer players while a later
-      // one's turn was kept), after which it writes over its own tables; or a routine of its
-      // own that never ends.
+      // The original can go astray by itself, and then there is nothing to compare with: while
+      // more players may still join, it also lets their number be put below the player whose
+      // turn it is, and then counts players on past the eighth, reading and writing past their
+      // records; or a routine of its own never ends.
       const char* astray = nullptr;
       std::string why;
       try {
@@ -249,8 +251,14 @@ int main(int argc, char** argv) {
         why = ex.what();
         astray = why.c_str();
       }
-      // (a ninth is where the match stops looking when eight play)
-      if (!astray && m.peek8(ds, e.A(encore::at::player)) > 9) astray = "it counts its players past the eighth";
+      // (one past the last is where the match stops looking)
+      // (and a new game's first moments still have the last game's player)
+      if (m.peek8(ds, e.A(encore::at::player)) > m.peek8(ds, e.A(encore::at::players)) + 1 && m.peek8(ds, e.A(encore::at::betweenBalls)) == 0 &&
+          m.peek8(ds, e.A(encore::at::playersMayJoin)) != 0xff)
+        ++wrongPlayer;
+      else
+        wrongPlayer = 0;
+      if (!astray && wrongPlayer > 100) astray = "fewer players were asked for than the one whose turn it is";
       if (astray) {
         std::printf("the original goes astray at frame %d (%s)\n", frame, astray);
         frames = frame;

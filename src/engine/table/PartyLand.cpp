@@ -52,6 +52,12 @@ PartyLand::PartyLand(ByteView prg) : Flow(prg, 0) {
     effect(0x0c31);
     endTimer();
   });
+  bind(0x52cd, [this] {  // until the music has come round (cs:52cd; Party Land's has a flag of its own in it)
+    si = 0xff;
+    if (B(0x338e) != 0xff) return;
+    B(0x00d2) = 0;
+    si = 0;
+  });
   bind(0x2ab1, [this] { everyFrame(); });
   bind(0x0215, [this] { drained(); });
   bind(0x0fcc, [this] {  // a flipper pressed: the four lane lights move along one (cs:0fcc)

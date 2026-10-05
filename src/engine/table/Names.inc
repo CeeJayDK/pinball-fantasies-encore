@@ -128,3 +128,4 @@ constexpr u16 startKey = 0x3714;
 constexpr u16 attract = 0x3713;
 constexpr u16 eachScoreBegin = 0x0735;
 constexpr u16 eachScoreNext = 0x0762;
+constexpr u16 matchDigit = 0x089f;  ///< the match: its digit changes (a jump mistaken for it in Stones 'n Bones)

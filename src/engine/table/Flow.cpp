@@ -43,7 +43,7 @@ void Flow::serve() {
 void Flow::startBall() {
   addTimer(F(0x0cca));
   addTimer(F(0x0cf0));
-  addTimer(F(0x0ca4));
+  if (has(0x0ca4)) addTimer(F(0x0ca4));  // (Stones 'n Bones has no sound here)
   B(0x33cf) = 0xff;
   B(at::tilted) = 0;
   W(at::tiltCounter) = 0;
@@ -72,7 +72,7 @@ void Flow::bindFlow() {
     startBall();
     endTimer();
   });
-  bind(0x0ca4, [this] {
+  if (has(0x0ca4)) bind(0x0ca4, [this] {
     if (!countTo(A(0x35d0), 5)) return;
     effect(0x0c1d);
     endTimer();
@@ -415,7 +415,8 @@ void Flow::bindFlow() {
     toAttract();
     W(0x3383) = high() ? 0x103 : 0x171;
     W(0x3718) = 0xffff;
-    for (u16 i = 0; i < 12; ++i) B(0x45b6, i) = 0;
+    if (clearsScoreAtEnd())
+      for (u16 i = 0; i < 12; ++i) B(0x45b6, i) = 0;
     lightsOut();
     B(0x33e3) = 0xff;
     gameOverLights();

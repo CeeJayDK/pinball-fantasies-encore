@@ -104,6 +104,8 @@ class Program {
   u16 A(u16 a) const { return data(a); }
   /// Party Land's address of a routine, as this table has it: to keep as a pointer.
   u16 F(u16 a) const;
+  /// Whether this table has that routine of Party Land's at all.
+  bool has(u16 a) const;
 
   /// Runs the routine at an address of this table's (a pointer read from its memory).
   void call(u16 native);

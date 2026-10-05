@@ -119,6 +119,14 @@ u16 Program::F(u16 a) const {
   lost("routine", a, table_);
 }
 
+bool Program::has(u16 a) const {
+  if (table_ == 0) return true;
+  const std::size_t t = static_cast<std::size_t>(table_ - 1);
+  for (const auto& run : maps().code[t])
+    if (a >= run.first && a <= run.last) return true;
+  return maps().target[t].contains(a) || maps().value[t].contains(a);
+}
+
 u16 Program::partyLandData(u16 native) const {
   if (table_ == 0) return native;
   const auto& m = maps();
