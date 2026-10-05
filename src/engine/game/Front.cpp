@@ -519,7 +519,7 @@ Front::Task Front::slides() {
   }
   if (!skip_) {
     setStart(0);
-    for (auto& plane : planes_) std::fill(plane.begin(), plane.begin() + 0x12c0, u8{0});
+    for (auto& plane : planes_) std::fill(plane.begin(), plane.begin() + 0x4b00, u8{0});  // (0x2580 words: the screen's 240 rows)
     fadeBuffer_.fill(0);
     setDac(0, fadeBuffer_.data(), 0x300);
     slide_ = 4;
