@@ -40,6 +40,7 @@ void Engine::physicsSteps() {
   const bool twice = !((B(at::keys) & B(at::inMidFrame)) & 4);
   for (int i = 0; i < (twice ? 2 : 1); ++i) {
     if (B(at::ballHidden) == 0xff) {
+      stepsKept_ = 0;
       nudgeAndFlippers();
       stampFlippers();
       continue;
@@ -307,6 +308,7 @@ void Engine::integrate() {
   if (W(at::ballY).s() >= 0x240) B(at::ballLost) = 0xff;
   W(at::ballX) = move(at::ballXFixed, at::ballVx);
   for (std::size_t i = 1; i < kSteps; ++i) steps_[i - 1] = steps_[i];
+  if (stepsKept_ < kSteps) ++stepsKept_;
   steps_[kSteps - 1] = {static_cast<i32>(u32{W(at::ballXFixed)} | (u32{W(at::ballXFixed, 2)} << 16)),
                         static_cast<i32>(u32{W(at::ballYFixed)} | (u32{W(at::ballYFixed, 2)} << 16))};
   W(at::ballVy) += W(at::gravityY);

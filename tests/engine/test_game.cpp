@@ -155,9 +155,8 @@ TEST(flipper_pictures_turn_about_the_artwork_hinge) {
     CHECK(hd.sprites.size() > static_cast<std::size_t>(e.flipper));
     if (hd.sprites.size() <= static_cast<std::size_t>(e.flipper)) continue;
     const HdSprite& s = hd.sprites[static_cast<std::size_t>(e.flipper)];
-    // (the shape the ball bounces off is a dot or so off the drawn one)
-    CHECK(std::abs(s.pivotSpriteX - e.x) < 0.03f);
-    CHECK(std::abs(s.pivotSpriteY - e.y) < 0.03f);
+    CHECK(std::abs(s.pivotSpriteX - e.x) < 0.02f);
+    CHECK(std::abs(s.pivotSpriteY - e.y) < 0.02f);
   }
 }
 

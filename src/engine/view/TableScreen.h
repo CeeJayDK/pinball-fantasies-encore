@@ -54,8 +54,7 @@ class TableScreen {
   /// picture as the engine says they move. The engine must outlive this.
   void attach(Engine& engine);
 
-  /// Once the table has started: the maps of what hides the ball are then where the table
-  /// keeps them. Needed for the high-resolution pictures only.
+  /// Once the table has started: works out what the high-resolution pictures need.
   void started(Engine& engine);
 
   /// Each flipper as it lies at rest, cut out of the playfield's picture; and whether it is
@@ -67,23 +66,33 @@ class TableScreen {
   const TableData& data() const { return data_; }
 
  private:
-  void flipperDrawn(Engine& engine, u16 record, u16 was, u16 now);
-  void lightAmounts(Engine& engine, int lamps, std::array<u8, 256>& amount) const;
+  /// A flipper taken out of its artwork.
+  struct FlipperArt {
+    u16 record = 0;            ///< the table's record of it
+    int x = 0, y = 0, w = 0, h = 0, steps = 0;  ///< its rectangle on the playfield, and how many pictures it has
+    Bytes shape;               ///< per step and dot: the flipper is there
+    Bytes atRest;              ///< its rectangle of the playfield with it at rest, as colours
+    Bytes background;          ///< the artwork with the flipper taken out
+    Bytes covered;             ///< per dot: the flipper reaches it at some angle
+    Bytes rest;                ///< per dot: the flipper covers it at rest
+    std::vector<float> angle;  ///< radians, per step
+    float axisX = 0, axisY = 0;  ///< what it turns about, in the rectangle's dots
+  };
+  void turnFlipper(Engine& engine, Bytes& picture, u16 record, u16 was, u16 now) const;
+  void buildCover(Engine& engine);
+  void buildFlipperArt(Engine& engine);
+  void buildLampAreas(Engine& engine);
+  float flipperAngle(Engine& engine, const FlipperArt& art) const;
+  void lampsLit(Engine& engine, int lamps, std::array<bool, 256>& lit) const;
 
   TableData data_;
   BallSprite ball_;
   Bytes picture_;  ///< the playfield as it now is on the screen: its picture, and the flippers as they stand
-  std::array<Bytes, 2> cover_;      ///< how much of the ball each dot hides, on the playfield and on the ramps
-  std::vector<Bytes> flipperRest_;  ///< each flipper's shape at rest, a byte to a dot of its rectangle
-  /// Where each flipper's artwork hinges, in dots from its rectangle's corner, and how far it
-  /// turns from one of its pictures to the next, in radians: measured from its pictures.
-  struct Hinge {
-    float x = 0, y = 0, step = 0;
-  };
-  std::vector<Hinge> hinge_;
-
- public:
-  const std::vector<Hinge>& hinges() const { return hinge_; }
+  std::array<Bytes, 2> hides_;      ///< per dot: the artwork hides the ball there, on the playfield and on the ramps
+  std::array<Bytes, 2> cover_;      ///< and how much of it, 0 to 255
+  std::vector<FlipperArt> art_;
+  Bytes lampAreas_;                 ///< per dot of the playfield: the lamp it belongs to, or 0
+  std::vector<u16> lamps_;          ///< each lamp's record of colours in the table's memory
 };
 
 }  // namespace encore

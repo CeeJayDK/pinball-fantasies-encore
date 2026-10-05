@@ -103,8 +103,10 @@ class Engine : public Program {
   struct Step {
     i32 x = 0, y = 0;
   };
-  static constexpr std::size_t kSteps = 12;
+  static constexpr std::size_t kSteps = 14;
   const std::array<Step, kSteps>& steps() const { return steps_; }
+  /// How many of them are of the ball now in play (the last ones).
+  std::size_t stepsKept() const { return stepsKept_; }
 
   /// The video card's memory, four planes of 64 KB, as far as the table's logic depends on
   /// it. The display is at its start: in the first and third planes, 168 bytes a row, each
@@ -252,6 +254,7 @@ class Engine : public Program {
   int angle_ = 1;
   std::array<i16, 2> speedLimits_{};  ///< as the start-up left them, while the steeper angle has them greater
   std::array<Step, kSteps> steps_{};
+  std::size_t stepsKept_ = 0;
 };
 
 }  // namespace encore

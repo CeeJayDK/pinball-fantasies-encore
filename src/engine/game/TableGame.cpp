@@ -287,10 +287,10 @@ void TableGame::frame() {
     follow();
   }
 
-  // The first player's initials for a best score are in (the display waits a second on them,
-  // cs:06c0): this version then asks whether the game is to be sent online.
+  // In a game of one player, the initials for a best score are in (the display waits a second
+  // on them, cs:06c0): this version then asks whether the game is to be sent online.
   const u16 wait = engine_->W(0x33e7);
-  if (wait != lastWait_ && wait == engine_->F(0x06c0) && engine_->CB(0x047c) == 1 && !recording_.cheated() && failure_.empty()) {
+  if (wait != lastWait_ && wait == engine_->F(0x06c0) && players() == 1 && !recording_.cheated() && failure_.empty()) {
     asking_ = true;
     engine_->write("SEND ONLINE \\Y OR N]");
   }
