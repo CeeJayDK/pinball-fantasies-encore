@@ -143,6 +143,11 @@ class Engine : public Program {
   /// cs:5b9f: an award: its music if nothing more important plays, its score and bonus, and
   /// its script on the display. True if the script was started.
   bool award(u16 nativeRecord);
+  /// cs:5c98: lights the next of a row of lights, one more each time; true when that was
+  /// the last, and the row starts again.
+  bool nextOfRow(u16 nativeRow);
+  /// The timer whose turn it is gives up its slot without being counted off (as cs:140b).
+  void dropTimer() { nativeW(W(0x3381)) = F(0x69fc); }
   /// Copies a shape into a collision mask (cs:5f5a): `width` bytes a row for `rows` rows.
   void patchMask(u16 partyLandSegment, u16 at, u16 nativeShape, u16 width, u16 rows);
   /// Called when a collision mask changes, for whoever keeps a copy.

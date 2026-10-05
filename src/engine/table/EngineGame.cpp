@@ -129,6 +129,17 @@ bool Engine::award(u16 record) {
   return true;
 }
 
+bool Engine::nextOfRow(u16 row) {
+  const u8 n = nativeB(row);
+  setLight(nativeB(static_cast<u16>(row + 1 + n)));
+  if (nativeB(static_cast<u16>(row + 2 + n)) == 0xff) {
+    nativeB(row) = 0;
+    return true;
+  }
+  ++nativeB(row);
+  return false;
+}
+
 void Engine::placeBall(u16 x, u16 y) {
   W(at::ballX) = x;
   W(at::ballY) = y;

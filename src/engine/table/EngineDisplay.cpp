@@ -488,6 +488,62 @@ void Engine::bindDisplay() {
     }
   });
 
+  // --- a count down from a number of seconds, shown as two digits (cs:47db)
+  bind(0x4757, [=, this] {
+    B(0x33e4) = 0;
+    W(0x33e9) = 1;
+    W(0x33e7) = F(0x47db);
+    forgetNumber();
+    W(0x36f0) = arg(6);
+    W(0x36ee) = 1;
+    B(0x33f7) = 0;
+    nextStep(8);
+  });
+  bind(0x47bc, [=, this] {
+    W(0x33e9) = 1;
+    W(0x33e7) = F(0x47db);
+    forgetNumber();
+    if (B(0x33e4) == 0xff) {
+      B(0x33e4) = 0;
+      W(0x36f0) = arg(6);
+      B(0x36f3) = static_cast<u8>(0x37 + arg(2));
+      B(0x36f4) = static_cast<u8>(0x38 + arg(4));
+    }
+    W(0x36ee) = 1;
+    nextStep(8);
+  });
+  bind(0x47db, [this] {
+    if (B(0x33f7) != 0xff && --W(0x36ee) == 0) {
+      W(0x36ee) = W(0x36ec);
+      if (B(0x36f4) == 0x37 && B(0x36f3) == 0x2a) {  // nought: done
+        W(0x33e9) = 0;
+        si = 0;
+        return;
+      }
+      if (--B(0x36f4) == 0x36) {
+        B(0x36f4) += 0x0a;
+        --B(0x36f3);
+      }
+      if (B(0x36f3) == 0x37) B(0x36f3) = 0x2a;  // no nought in front
+      const u16 keep = si;
+      call(F(0x2ddc));  // the table's own, each second
+      si = keep;
+      setFont(1);
+      W(0x447b) = 0;
+      W(0x447d) = 0;
+      W(0x36fc) = A(0x36f3);
+      W(0x36fe) = 0x240;
+      W(0x36fa) = F(0x6ca5);
+      si = 1;
+      return;
+    }
+    W(0x447d) = 0;
+    W(0x4485) = W(0x36f0);
+    W(0x4487) = 0x158;
+    W(0x36fa) = F(0x45af);
+    si = 1;
+  });
+
   // --- text that slides in from below, or out upwards
   auto slide = [this] {  // cs:4988
     const i16 row = W(0x370a).s();

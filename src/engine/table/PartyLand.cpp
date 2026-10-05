@@ -15,6 +15,8 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
     B(0x230c) = B(0x0c71);
     B(0x230a) = 0;
   });
+  bindRules();
+  bindSteps();
   bind(0x0bca, [this] { serve(); });
   bind(0x2ab1, [this] { everyFrame(); });
   bind(0x0215, [this] { drained(); });
@@ -29,10 +31,7 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
     put(4, fourth);
   });
   bind(0x2bd1, [this] {  // after a bumper's score (cs:2bd1)
-    if (B(0x05b1) == 0xff) {
-      addScore(0x00f4, 0x016c);
-      B(0x33df) = 0xff;
-    }
+    at2b9d();
     W(0x36f6) = 0;
     if (W(0x36f8) == 0xff) {
       startScript(0x1acc);
