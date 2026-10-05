@@ -96,6 +96,7 @@ def main(game, out):
                 asm = out / f'{name}_seg{seg:04x}.asm'
                 asm.write_text(disassemble(binf))
                 names = pathlib.Path(__file__).parent / 'symbols' / f'{name.lower()}.txt'
+                if not names.exists(): names = out / f'{name.lower()}.txt'   # carried over from Party Land's
                 subprocess.run([sys.executable, str(pathlib.Path(__file__).parent / 'annot.py'), str(asm),
                                 str(out / f'{name}_seg{seg:04x}.lst')] + ([str(names)] if seg == cs and names.exists() else []),
                                capture_output=True)

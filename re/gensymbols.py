@@ -31,15 +31,18 @@ for t in (2, 3, 4):
 names = ['// Written by re/gensymbols.py from re/symbols/table1.txt. Do not edit.',
          '// Party Land\'s addresses: c code, d data, v variables kept among the code, i values.', '']
 kinds = {'c': 'code', 'd': 'data', 'v': 'csdata', 'i': 'imm'}
+pending = []
 for line in (here / 'symbols' / 'table1.txt').read_text().splitlines():
     m = re.match(r'^([cdiv]) ([0-9a-f]+) (\w+)((?:\s+@\d:[0-9a-f]+)*)\s*(?:;\s*(.*))?$', line.split('#')[0].strip())
     if not m: continue
     kind, addr, name, hand, note = m.group(1), int(m.group(2), 16), m.group(3), m.group(4), m.group(5)
     names.append(f'constexpr u16 {name} = 0x{addr:04x};' + (f'  ///< {note}' if note else ''))
+    pending.append((kind, addr, name, note or ''))
     for t, a in re.findall(r'@(\d):([0-9a-f]+)', hand):
         if kind == 'c': tables[int(t)]['code'].append((addr, addr, int(a, 16)))
         else: tables[int(t)][kinds[kind]][addr] = int(a, 16)
 (dest / 'Names.inc').write_text('\n'.join(names) + '\n')
+carry = []   # (kind, Party Land's address, name, note), to write the other tables' names from
 
 # Routines the engine's source names that the line-up did not place (ones a table only has
 # in its scripts, say) are looked for by their first instructions, numbers left out: where
@@ -87,4 +90,16 @@ for t in (2, 3, 4):
     for a, b, to in sorted(tables[t]['code']):
         out.append(f'ENCORE_MAP_CODE({t - 1}, 0x{a:04x}, 0x{b:04x}, 0x{to:04x})')
 (dest / 'Maps.inc').write_text('\n'.join(out) + '\n')
+# The same names for the other tables' listings (re/disasm.py reads these).
+for t in (2, 3, 4):
+    lines = [f'# TABLE{t}: Party Land\'s names, carried over by re/gensymbols.py. Do not edit.']
+    for kind, addr, name, note in pending:
+        if kind == 'c':
+            to = next((to + addr - a for a, b, to in tables[t]['code'] if a <= addr <= b), None)
+            if to is None: to = tables[t]['target'].get(addr, tables[t]['imm'].get(addr))
+        else:
+            to = tables[t][kinds[kind]].get(addr)
+            if to is None and kind == 'd': to = tables[t]['imm'].get(addr)
+        if to is not None and kind != 'i': lines.append(f'{kind} {to:04x} {name}' + (f' ; {note}' if note else ''))
+    (here / 'fantasy' / f'table{t}.txt').write_text('\n'.join(lines) + '\n')
 print(f'{len(names) - 3} names; {len(out) - 2} map lines; {found} routines placed by their first instructions')

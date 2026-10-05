@@ -69,3 +69,74 @@ d 33ed loopCounter              ; the program's source of chance
 d 23a7 plungerRoutine
 d 23a9 inMidFrame
 d 36e9 lastKey
+
+# --- routines the tables' rules call
+c 5788 setLight                 ; BL: lit, and remembered as lit
+c 5795 clearLight
+c 5728 lightOn                  ; BL: its colours, without remembering
+c 5747 lightOff
+c 57a2 blink                    ; DL light, DH half period, AL where in the period to begin
+c 57c7 stopBlink                ; DL
+c 57e1 stopBlinks
+c 57f0 runBlinks
+c 5867 lightsOut
+c 5918 flushColours
+c 5b0b addTimer                 ; DX: a routine to run every frame
+c 576a endTimer
+c 5777 countTo                  ; BX counter, DX limit: carry when reached
+c 5b2a runTimers
+c 5c3f music                    ; SI: place, repeats, priority
+c 5b9f award                    ; SI: music, score, bonus, script
+c 5c98 nextOfRow
+c 44b0 startScript              ; BX
+c 44c3 runStep
+c 6a5e addScore                 ; DI += SI, twelve digits
+c 6ad4 restoreLight
+c 6ae8 saveLight
+c 5344 next4                    ; the script moves on four bytes
+c 4c57 next6
+c 4c6a next8
+c 4da6 next2
+c 5285 waitTask
+c 49eb fillDisplay
+c 6ca5 drawText
+c 6c0f drawNumber
+c 37ea beginBall
+c 3881 newGame
+c 5fff toAttract
+c 4d34 displaySteady
+c 5f5a copyRows                 ; DX bytes a row, CX rows, to a mask
+c 69fc nothing
+
+# --- variables the rules use
+d 45b6 score
+d 3399 bonus
+d 33e2 modeRunning              ; ff while a timed mode's count-down owns the display
+d 33e3 playersMayJoin
+d 33e0 ballUntouched            ; ff until the served ball scores
+d 33de scoredThisBall
+d 33ce betweenBalls
+d 33cf flippersLive
+d 338a ballOnPlunger
+d 3316 inTrigger
+d 3318 lastTrigger
+d 3389 musicPriority
+d 230a musicNext
+d 230b musicKept
+d 230c musicAfter
+d 230d musicRepeats
+d 3591 lightStates
+d 371a player
+d 3716 players
+d 33dc ball
+d 33dd balls
+d 3383 lookAt                   ; a row for the screen to go to, or ffff
+d 3385 lookAtSoft
+d 33e5 nextStep
+d 33e7 task
+d 33e9 taskState
+d 36fa drawRoutine
+d 3398 awardQuiet
+d 33f8 scriptDone
+d 3714 startKey
+d 3713 attract
