@@ -28,7 +28,10 @@ def kind(ins):
     for m in num.finditer(ins):
         if re.match(r'^(j\w+|call|loop\w*)\b', ins) and '[' not in ins: kinds.append('code')
         elif '[' in ins[:m.start()] and ']' in ins[m.end():] and ins.rfind('[', 0, m.start()) > ins.rfind(']', 0, m.start()):
-            kinds.append('csdata' if ins[ins.rfind('[', 0, m.start()):m.start()].startswith('[cs:') else 'data')
+            inside = ins[ins.rfind('[', 0, m.start()) + 1:ins.index(']', m.end())]
+            # a place by itself, or a place among the code, or an offset from a register (which
+            # may as well be a field of a record as a table's address: kept apart)
+            kinds.append('csdata' if inside.startswith('cs:') else 'data' if inside == m.group(0) else 'idx')
         else: kinds.append('imm')
     return kinds
 
@@ -38,7 +41,7 @@ def main(a, b):
     nb = [num.sub('#', i) for _, i in B]
     sm = difflib.SequenceMatcher(None, na, nb, autojunk=False)
     votes = {'code': collections.defaultdict(collections.Counter), 'data': collections.defaultdict(collections.Counter),
-             'csdata': collections.defaultdict(collections.Counter),
+             'csdata': collections.defaultdict(collections.Counter), 'idx': collections.defaultdict(collections.Counter),
              'imm': collections.defaultdict(collections.Counter)}
     addr = {}
     small = []
@@ -54,7 +57,12 @@ def main(a, b):
             # the same routine doing something else in this table (another light, another count)
             for kd, x, y in zip(kind(ia), num.findall(ia), num.findall(ib)):
                 if kd == 'imm' and x != y and int(x, 16) < 0x100: small.append((aa, ab, ia, ib))
-            for kd, x, y in zip(kind(ia), num.findall(ia), num.findall(ib)):
+            pairs = list(zip(kind(ia), num.findall(ia), num.findall(ib)))
+            # an instruction that also carries another small number here is as likely another
+            # instruction altogether, matched by its shape: its addresses are not believed
+            odd = any(kd == 'imm' and x != y and int(x, 16) < 0x100 for kd, x, y in pairs)
+            for kd, x, y in pairs:
+                if odd and kd in ('data', 'idx', 'csdata'): continue
                 votes[kd][int(x, 16)][int(y, 16)] += 1
     with open(here / f'map_{a}_{b}.txt', 'w') as o:
         o.write(f'# TABLE{a} -> TABLE{b}: {matched} of {len(A)} instructions lined up\n')
@@ -74,7 +82,7 @@ def main(a, b):
             o.write(f'target {x:04x} {c[0][0]:04x} {c[0][1]}\n')
         o.write('# small: a matched instruction with another small number in B (where in A, where in B, both)\n')
         for aa, ab, ia, ib in small: o.write(f'small {aa:04x} {ab:04x} | {ia} | {ib}\n')
-        for kd in ('data', 'csdata', 'imm'):
+        for kd in ('data', 'idx', 'csdata', 'imm'):
             o.write(f'# {kd}: number in A, number in B, how often (other candidates)\n')
             for x in sorted(votes[kd]):
                 c = votes[kd][x].most_common()

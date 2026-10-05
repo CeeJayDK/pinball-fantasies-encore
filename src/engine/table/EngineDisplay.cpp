@@ -156,9 +156,12 @@ void Engine::drawScore(u16 digits, u16 at) {
     ++digits;
     if (--count == 1) break;
   }
-  W(0x45e8) = count;
-  W(0x45ea) = at;
-  W(0x45ec) = digits;
+  // (that segment's own notes of these three, and its two tables of where each digit's
+  // picture is, are where its own code says)
+  auto its = [code](std::size_t at) { return static_cast<u16>(code[at] | (code[at + 1] << 8)); };
+  nativeW(its(0x81)) = count;
+  nativeW(its(0x85)) = at;
+  nativeW(its(0x89)) = digits;
   for (int plane = 0; plane < 2; ++plane) {
     u16 place = at;
     for (u16 i = 0; i < count; ++i, place = static_cast<u16>(place + 4)) {
@@ -167,7 +170,8 @@ void Engine::drawScore(u16 digits, u16 at) {
       if (plane == 1) B(0x45da, i) = d;
       if (d == before) continue;
       const u16 entry = static_cast<u16>(((d + 0x30) & 0xff) * 2);
-      const u16 start = plane == 0 ? static_cast<u16>(W(0x5a00, entry) + 0x1a0) : static_cast<u16>(W(0x5c00, entry) + 0xc40);
+      const u16 start = plane == 0 ? static_cast<u16>(nativeW(static_cast<u16>(its(0xc8) + entry)) + its(0xd4))
+                                   : static_cast<u16>(nativeW(static_cast<u16>(its(0x119) + entry)) + its(0x125));
       compiledPicture(code, 0x1480, start, place, plane, code[0x8c], code[0x8d]);
     }
   }

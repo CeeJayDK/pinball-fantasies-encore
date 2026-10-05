@@ -356,9 +356,8 @@ void Engine::pickGravity() {
     }
     if (solid != 0) continue;
     if (slope >= cs_[static_cast<u16>(F(0x5a15) + 2)]) return;  // more than the table has
-    const u16 pull = static_cast<u16>((high() ? 0x72 : 0x5e) + slope * 4);
-    W(at::gravityX) = W(pull);
-    W(at::gravityY) = W(pull, 2);
+    W(at::gravityX) = nativeW(static_cast<u16>(koffset(high() ? 0x5a39 : 0x5a2a) + slope * 4));
+    W(at::gravityY) = nativeW(static_cast<u16>(koffset(high() ? 0x5a40 : 0x5a31) + slope * 4));
     return;
   }
 }

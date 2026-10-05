@@ -64,6 +64,10 @@ class Program {
   u8& nativeB(u16 a) { return ds_[a]; }
   Word nativeW(u16 a) { return Word(&ds_[a]); }
 
+  /// And the variables among the code, by this table's own address.
+  u8& nativeCB(u16 a) { return cs_[a]; }
+  Word nativeCW(u16 a) { return Word(&cs_[a]); }
+
   /// The program's other segments (pictures of the display's animations, the score's digits),
   /// by this table's own segment value: the byte at an offset in one.
   u8& farB(u16 nativeSegment, u16 offset) {
@@ -82,6 +86,12 @@ class Program {
   /// is one for the four tables, but each was built with its own numbers in places: how many
   /// lights, which colours the display's dots are, where its best scores are kept.
   u8 kb(u16 instruction, int offset) const { return cs_[static_cast<u16>(F(instruction) + offset)]; }
+  /// The offset an instruction of the form "[register + offset]" carries (a table's address),
+  /// as this table's instruction has it, whether it wrote it in one byte or two.
+  u16 koffset(u16 instruction) const {
+    const u8 modrm = kb(instruction, 1);
+    return (modrm >> 6) == 1 ? static_cast<u16>(static_cast<i8>(kb(instruction, 2))) : kw(instruction, 2);
+  }
   u16 kw(u16 instruction, int offset) const { return static_cast<u16>(kb(instruction, offset) | (kb(instruction, offset + 1) << 8)); }
 
   /// Party Land's address of some data, as this table has it: to keep as a pointer.

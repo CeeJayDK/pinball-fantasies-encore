@@ -19,7 +19,7 @@ dest.mkdir(parents=True, exist_ok=True)
 
 tables = {}
 for t in (2, 3, 4):
-    m = {'code': [], 'data': {}, 'imm': {}, 'csdata': {}, 'target': {}}
+    m = {'code': [], 'data': {}, 'idx': {}, 'imm': {}, 'csdata': {}, 'target': {}}
     for line in (here / 'fantasy' / f'map_1_{t}.txt').read_text().splitlines():
         f = line.split()
         if not f or f[0].startswith('#'): continue
@@ -80,7 +80,7 @@ for t in (2, 3, 4):
             if len(hits) > 1: break   # shorter would only be less sure
 
 out = ['// Written by re/gensymbols.py from the line-up of the four table programs. Do not edit.', '']
-for kind, macro in (('data', 'ENCORE_MAP_DATA'), ('csdata', 'ENCORE_MAP_CODE_DATA'), ('imm', 'ENCORE_MAP_VALUE'), ('target', 'ENCORE_MAP_TARGET')):
+for kind, macro in (('data', 'ENCORE_MAP_DATA'), ('idx', 'ENCORE_MAP_INDEXED'), ('csdata', 'ENCORE_MAP_CODE_DATA'), ('imm', 'ENCORE_MAP_VALUE'), ('target', 'ENCORE_MAP_TARGET')):
     keys = sorted(set().union(*(tables[t][kind].keys() for t in (2, 3, 4))))
     for k in keys:
         # 0xffff: not found in that table
@@ -99,7 +99,7 @@ for t in (2, 3, 4):
             if to is None: to = tables[t]['target'].get(addr, tables[t]['imm'].get(addr))
         else:
             to = tables[t][kinds[kind]].get(addr)
-            if to is None and kind == 'd': to = tables[t]['imm'].get(addr)
+            if to is None and kind == 'd': to = tables[t]['idx'].get(addr, tables[t]['imm'].get(addr))
         if to is not None and kind != 'i': lines.append(f'{kind} {to:04x} {name}' + (f' ; {note}' if note else ''))
     (here / 'fantasy' / f'table{t}.txt').write_text('\n'.join(lines) + '\n')
 print(f'{len(names) - 3} names; {len(out) - 2} map lines; {found} routines placed by their first instructions')

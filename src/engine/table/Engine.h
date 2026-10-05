@@ -172,6 +172,8 @@ class Engine : public Program {
   /// cs:5b9f: an award: its music if nothing more important plays, its score and bonus, and
   /// its script on the display. True if the script was started.
   bool award(u16 nativeRecord);
+  /// cs:5b40: the same, whatever else is playing or showing.
+  bool awardAlways(u16 nativeRecord);
   /// cs:5c98: lights the next of a row of lights, one more each time; true when that was
   /// the last, and the row starts again.
   bool nextOfRow(u16 nativeRow);

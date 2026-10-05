@@ -104,8 +104,9 @@ void Engine::start(const Options& o, ByteView bestScores) {
     for (u16 i = 0; i < 0x528; ++i) W(0x248a, static_cast<u16>(i * 2)) = static_cast<u16>(i / 0x37);
     for (auto& plane : video_) std::fill(plane.begin(), plane.begin() + 0x0ad4, u8{0});
     const u16 plunger = S(0x8274);  // cs:3cd4: pictures of the plunger, kept there to draw from
+    const u16 each = static_cast<u16>(kw(0x3ce9, 1) >> 2), kept = kw(0x3cef, 1);
     for (std::size_t plane = 0; plane < 4; ++plane)
-      for (u16 i = 0; i < 0x1b5; ++i) video_[plane][static_cast<u16>(0xd4f4 + i)] = farB(plunger, static_cast<u16>(plane * 0x1b5 + i));
+      for (u16 i = 0; i < each; ++i) video_[plane][static_cast<u16>(kept + i)] = farB(plunger, static_cast<u16>(plane * each + i));
     const u16 first = A(0x6950);
     nativeW(static_cast<u16>(first + 0x3a)) = S(0x4c54);
     nativeW(static_cast<u16>(first + 0x76)) = S(0x4fc2);
@@ -155,9 +156,9 @@ void Engine::start(const Options& o, ByteView bestScores) {
   }
   {  // cs:65b1: the plunger's picture at rest, and a clean first row past the picture
     const u16 s = S(0x82e2);
-    u16 from = 0, to = 0xd4af;
-    for (u16 row = 0; row < 0x17; ++row, ++to)
-      for (u16 px = 0; px < 10; ++px) {
+    u16 from = 0, to = kw(0x65db, 1);
+    for (u16 row = 0, rows = kw(0x65e3, 1), width = kw(0x65e9, 1); row < rows; ++row, ++to)
+      for (u16 px = 0; px < width; ++px) {
         video_[px & 3][to] = farB(s, from++);
         if ((px & 3) == 3) ++to;
       }

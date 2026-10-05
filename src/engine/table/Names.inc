@@ -126,3 +126,5 @@ constexpr u16 awardQuiet = 0x3398;
 constexpr u16 scriptDone = 0x33f8;
 constexpr u16 startKey = 0x3714;
 constexpr u16 attract = 0x3713;
+constexpr u16 eachScoreBegin = 0x0735;
+constexpr u16 eachScoreNext = 0x0762;

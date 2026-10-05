@@ -8,7 +8,7 @@ namespace encore {
 namespace {
 
 struct Maps {
-  std::array<std::unordered_map<u16, u16>, 3> data, codeData, value, target;
+  std::array<std::unordered_map<u16, u16>, 3> data, indexed, codeData, value, target;
   struct Run {
     u16 first, last, to;
   };
@@ -25,12 +25,14 @@ const Maps& maps() {
     };
 #define ENCORE_MAP_DATA(a, b, c, d) put(m.data, a, b, c, d);
 #define ENCORE_MAP_CODE_DATA(a, b, c, d) put(m.codeData, a, b, c, d);
+#define ENCORE_MAP_INDEXED(a, b, c, d) put(m.indexed, a, b, c, d);
 #define ENCORE_MAP_VALUE(a, b, c, d) put(m.value, a, b, c, d);
 #define ENCORE_MAP_TARGET(a, b, c, d) put(m.target, a, b, c, d);
 #define ENCORE_MAP_CODE(t, a, b, to) m.code[t - 1].push_back({a, b, to});
 #include "engine/table/Maps.inc"
 #undef ENCORE_MAP_DATA
 #undef ENCORE_MAP_CODE_DATA
+#undef ENCORE_MAP_INDEXED
 #undef ENCORE_MAP_VALUE
 #undef ENCORE_MAP_TARGET
 #undef ENCORE_MAP_CODE
@@ -80,7 +82,9 @@ u16 Program::data(u16 a) const {
   if (table_ == 0) return a;
   const auto& m = maps();
   const std::size_t t = static_cast<std::size_t>(table_ - 1);
+  // as a place by itself, then as a table's address used with a register, then as a number
   if (auto it = m.data[t].find(a); it != m.data[t].end()) return it->second;
+  if (auto it = m.indexed[t].find(a); it != m.indexed[t].end()) return it->second;
   if (auto it = m.value[t].find(a); it != m.value[t].end()) return it->second;
   lost("data", a, table_);
 }

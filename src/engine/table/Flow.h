@@ -24,10 +24,32 @@ class Flow : public Engine {
   virtual bool extraBallOwed() { return B(0x35c4) == 0xff; }
   /// The match's pace: how many frames each digit stands (Party Land: cs:0883, cs:08ab).
   virtual void matchPace() { CW(0x089d) = high() ? 0x0b : 0x09; }
+  /// How many digits the match runs through before it stops.
+  virtual u16 matchLength() { return high() ? kw(0x087a, 1) : kw(0x0866, 1); }
+  /// The lights left on when a game is over (Party Land: cs:0ba5).
+  virtual void gameOverLights() {
+    setLight(kb(0x0ba5, 1));
+    setLight(kb(0x0baa, 1));
+    setLight(kb(0x0baf, 1));
+  }
+  /// The match never shows the same digit twice running (Party Land: cs:0902); not all do so.
+  virtual bool matchAvoidsRepeat() { return true; }
+  /// A player matched (Party Land: cs:0a58): one more ball, and its tune is not played again.
+  virtual void matchWon() {
+    B(0x00cd) = 0xff;
+    B(0x00d1) = 0xff;
+  }
+  /// Party Land brings the next player's things back as soon as the turn passes (cs:0b13),
+  /// as well as when the ball is served; not all do.
+  virtual bool restoresAtTurn() { return true; }
   virtual void ballShown() {}    ///< the ball's number was written for the display
   virtual void playerShown() {}  ///< and the player's
   virtual bool redrawNameWhileWaiting() { return true; }
-  virtual void beforeSameBallAgain() { --B(0x00ce); }  ///< Party Land: cs:0b36
+  /// The same player plays again, a ball owed being used up (Party Land: cs:0b36).
+  virtual void sameBallAgain() {
+    --B(0x00ce);
+    goTo(A(0x1790));
+  }
 
   void serve();           // cs:0bca
   void startBall();       // cs:0c79

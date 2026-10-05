@@ -24,6 +24,7 @@
 #include "core/File.h"
 #include "engine/table/Engine.h"
 #include "engine/table/PartyLand.h"
+#include "engine/table/SpeedDevils.h"
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -68,7 +69,10 @@ int main(int argc, char** argv) {
   }
   int frame = -1;
   try {
-    std::unique_ptr<encore::Engine> made = table == 0 ? std::make_unique<encore::PartyLand>(*prg) : std::make_unique<encore::Engine>(*prg, table);
+    std::unique_ptr<encore::Engine> made;
+    if (table == 0) made = std::make_unique<encore::PartyLand>(*prg);
+    else if (table == 1) made = std::make_unique<encore::SpeedDevils>(*prg);
+    else made = std::make_unique<encore::Engine>(*prg, table);
     encore::Engine& e = *made;
     oracle::Machine m(dir, table, config);
     m.setLoop(0x10, e.F(encore::at::mainLoop));

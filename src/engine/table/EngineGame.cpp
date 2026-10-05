@@ -131,6 +131,25 @@ bool Engine::award(u16 record) {
   return true;
 }
 
+bool Engine::awardAlways(u16 record) {
+  const u16 first = nativeW(record);
+  record = static_cast<u16>(record + 2);
+  if (first != 0) music(first);
+  else ++record;
+  W(0x36f6) = 0;
+  if (W(0x36f8) == 0xff) {
+    startScript(A(0x1acc));
+    W(0x36f8) = 0;
+  }
+  addScore(A(0x45b6), record);
+  B(0x33de) = 0xff;
+  addScore(A(0x3399), static_cast<u16>(record + 12));
+  const u16 script = nativeW(static_cast<u16>(record + 24));
+  if (script == 0) return false;
+  startScript(script);
+  return true;
+}
+
 bool Engine::nextOfRow(u16 row) {
   const u8 n = nativeB(row);
   setLight(nativeB(static_cast<u16>(row + 1 + n)));

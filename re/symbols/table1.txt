@@ -140,3 +140,7 @@ d 3398 awardQuiet
 d 33f8 scriptDone
 d 3714 startKey
 d 3713 attract
+
+# --- placed by hand in the tables where the line-up does not find them
+c 0735 eachScoreBegin @2:063d
+c 0762 eachScoreNext @2:066f

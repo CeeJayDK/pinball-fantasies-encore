@@ -93,17 +93,6 @@ void Flow::bindFlow() {
     W(0x3385) = 0xffff;
     endTimer();
   });
-  bind(0x02ba, [this] {
-    if (!countTo(A(0x35ca), 0x1e)) return;
-    B(0x00d0) = 0xff;
-    serve();
-  });
-  bind(0x02f1, [this] {
-    if (!countTo(A(0x35cc), 5)) return;
-    effect(0x0c31);
-    endTimer();
-  });
-
   // --- the bonus is counted into the score, a digit's worth at a time
   bind(0x0317, [this] {
     CW(0x0361) = 0;
@@ -277,12 +266,14 @@ void Flow::bindFlow() {
   bind(0x0735, [=, this] {
     CW(0x0733) = static_cast<u16>(-playerSize());
     B(0x2288) = 0x37;
+    playerShown();
     CB(0x0732) = static_cast<u8>(B(0x3716) + 1);
     wait1();
     nextStep(4);
   });
   bind(0x0762, [=, this] {
     ++B(0x2288);
+    playerShown();
     CW(0x0733) += playerSize();
     if (--CB(0x0732) == 0) {
       wait1();
@@ -321,7 +312,7 @@ void Flow::bindFlow() {
     }
     plain(3);
     drawText(A(0x1c16), 0xa8);
-    si = high() ? kw(0x087a, 1) : kw(0x0866, 1);
+    si = matchLength();
     W(0x33e9) = si;
     matchPace();
   });
@@ -331,7 +322,7 @@ void Flow::bindFlow() {
     plain(3);
     drawText(A(0x1c3c), static_cast<u16>(0x540 + (W(0x1c3e) << 3)));  // the last digit rubbed out
     u16 digit = W(at::loopCounter) % 10;
-    if (W(0x1c3e) == digit && ++digit >= 10) digit = 0;
+    if (matchAvoidsRepeat() && W(0x1c3e) == digit && ++digit >= 10) digit = 0;
     W(0x1c3e) = digit;
     B(0x1c3a) = static_cast<u8>(digit + 0x37);
     plain(3);
@@ -366,8 +357,7 @@ void Flow::bindFlow() {
       nativeW(mark) = 0x5858;
       if (W(0x1c3e) == digit) {
         B(0x2288) = static_cast<u8>(B(0x371a) + 0x37);
-        B(0x00cd) = 0xff;
-        B(0x00d1) = 0xff;
+        matchWon();
         return goTo(A(0x1790));
       }
       if (++B(0x371a) > B(0x3716)) return goTo(A(0x17b8));
@@ -377,8 +367,7 @@ void Flow::bindFlow() {
     if (B(0x00cd) == 0) return chain();
     savePlayer(currentPlayer());
     if (extraBallOwed()) {
-      beforeSameBallAgain();
-      return goTo(A(0x1790));
+      return sameBallAgain();
     }
     if (B(0x371a) == B(0x3716)) return goTo(A(0x17b8));
     ++B(0x371a);
@@ -391,8 +380,7 @@ void Flow::bindFlow() {
     holdBonus();
     savePlayer(currentPlayer());
     if (extraBallOwed()) {
-      beforeSameBallAgain();
-      return goTo(A(0x1790));
+      return sameBallAgain();
     }
     if (B(0x371a) != B(0x3716)) {
       ++B(0x371a);
@@ -407,7 +395,7 @@ void Flow::bindFlow() {
     }
     B(0x2288) = static_cast<u8>(B(0x371a) + 0x37);
     playerShown();
-    restorePlayer();
+    if (restoresAtTurn()) restorePlayer();
     const u16 step = bx;
     addTimer(F(0x0bb7));
     bx = step;
@@ -431,9 +419,7 @@ void Flow::bindFlow() {
     for (u16 i = 0; i < 12; ++i) B(0x45b6, i) = 0;
     lightsOut();
     B(0x33e3) = 0xff;
-    setLight(kb(0x0ba5, 1));
-    setLight(kb(0x0baa, 1));
-    setLight(kb(0x0baf, 1));
+    gameOverLights();
     endTimer();
   });
   bind(0x0bb7, [this] {
