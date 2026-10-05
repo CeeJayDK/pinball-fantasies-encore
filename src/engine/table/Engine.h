@@ -152,7 +152,10 @@ class Engine : public Program {
   void fillDisplay(u16 at, u16 width, u16 rows);  // cs:49eb
   void setFont(int which);          // 0 to 3: 13, 11, 8 and 5 dots high
   /// Runs one of the original's pictures that are code: a row of "store this register there".
-  void compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane);
+  void compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane, u8 litDot, u8 unlitDot);
+  /// The two values a dot of the display has in video memory, which differ from table to table.
+  u8 lit() const { return kb(0x4afa, 1); }
+  u8 unlit() const { return kb(0x4b01, 1); }
   u8& dot(int plane, u16 offset) { return video_[static_cast<std::size_t>(plane * 2)][offset]; }
 
   // --- a game's comings and goings (EngineGame.cpp)

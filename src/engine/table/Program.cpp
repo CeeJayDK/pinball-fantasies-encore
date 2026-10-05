@@ -96,6 +96,8 @@ u16 Program::codeData(u16 a) const {
   if (table_ == 0) return a;
   const auto& m = maps().codeData[static_cast<std::size_t>(table_ - 1)];
   if (auto it = m.find(a); it != m.end()) return it->second;
+  const auto& values = maps().value[static_cast<std::size_t>(table_ - 1)];
+  if (auto it = values.find(a); it != values.end()) return it->second;
   lost("code variable", a, table_);
 }
 

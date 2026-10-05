@@ -18,8 +18,10 @@ void Engine::start(const Options& o, ByteView bestScores) {
   B(0x3632) = o.highResolution;
   B(0x3633) = o.mono;
   B(at::highResolution) = o.highResolution ? 0xff : 0;
-  if (o.lowAngle)  // cs:30e9: the table lies flatter: less pull down it on every slope
-    for (u16 i = 0; i < 4; ++i) W(high() ? 0x72 : 0x5e, static_cast<u16>(i * 4 + 2)) -= 3;
+  if (o.lowAngle) {  // cs:30e9: the table lies flatter: less pull down it on every slope
+    const u16 slopes = high() ? kw(0x30f6, 1) : kw(0x30e9, 1);
+    for (u16 i = 0, n = kw(0x30f9, 1); i < n; ++i) nativeW(static_cast<u16>(slopes + i * 4 + 2)) -= 3;
+  }
   B(0x33dd) = o.fiveBalls ? 5 : 3;
   if (o.musicOff) musicKey();
   W(0x23ac) = o.scrolling < 1 ? 0x14 : o.scrolling == 1 ? 0x0b : 0x09;
@@ -65,14 +67,14 @@ void Engine::start(const Options& o, ByteView bestScores) {
     at = static_cast<u16>(at + 8);
     for (u16 i = 0; i < 0x300; ++i) {
       farB(picture, static_cast<u16>(at + i)) >>= 2;
-      CB(0x4f59 + i) = farB(picture, static_cast<u16>(at + i));  // the last strip's are the ones kept
+      CB(0x4f59, i) = farB(picture, static_cast<u16>(at + i));  // the last strip's are the ones kept
     }
   }
   scroll();
   W(0x2f00) = high() ? 0x13d : 0x19e;  // cs:66cd: the screen line the display begins at
 
   if (bestScores.size() >= 0x40)  // cs:635d
-    for (u16 i = 0; i < 0x40; ++i) B(0x0016, i) = bestScores[i];
+    for (u16 i = 0; i < 0x40; ++i) nativeB(static_cast<u16>(kw(0x6377, 1) + i)) = bestScores[i];
   W(0x3314) = A(0x2f2c);
 
   // cs:5841: the lights' colours: counts of colours become counts of bytes, and the colours
@@ -181,7 +183,7 @@ void Engine::start(const Options& o, ByteView bestScores) {
   W(0x36f6) = 0x2ce;
   B(0x44a4) = 0;
   stopBlinks();
-  for (u16 i = 0; i < 0x32; ++i) W(0x331b, static_cast<u16>(i * 2)) = F(0x69fc);
+  for (u16 i = 0, slots = kw(0x3873, 1); i < slots; ++i) W(0x331b, static_cast<u16>(i * 2)) = F(0x69fc);
   for (u16 i = 0; i < 0x32; ++i) W(0x35ca, static_cast<u16>(i * 2)) = 0;
   if (high()) W(0x36ec) = 0x47;
 
@@ -192,16 +194,16 @@ void Engine::start(const Options& o, ByteView bestScores) {
   call(F(0x01cd));  // the table's music while it waits
   scroll();
   // cs:58f5: in the picture's own colours the lights are out
-  for (u16 light = 1; light <= 0x38; ++light) {
+  for (u16 light = 1, lights = kw(0x5912, 1); light <= lights; ++light) {
     B(0x3591, light) = 0;
     u16 record = W(0x12bd, static_cast<u16>((light - 1) * 2));
     u16 colour = static_cast<u16>(nativeB(record++) * 3);
     const u8 count = nativeB(record++);
-    for (u8 i = 0; i < count; ++i) CB(static_cast<u16>(0x4f59 + colour++)) = nativeB(record++) >> 1;
+    for (u8 i = 0; i < count; ++i) CB(0x4f59, colour++) = nativeB(record++) >> 1;
   }
   if (o.mono) {
     // cs:6a2f, cs:69fd: every colour becomes the grey of its three parts
-    for (u16 at = A(0x1079), n = 0; n < 0x39; ++n) {
+    for (u16 at = A(0x1079), n = 0, records = kw(0x6a34, 1); n < records; ++n) {
       ++at;
       const u16 colours = static_cast<u16>(nativeB(at++) / 3);
       for (u16 i = 0; i < colours; ++i, at = static_cast<u16>(at + 3)) {
@@ -210,11 +212,11 @@ void Engine::start(const Options& o, ByteView bestScores) {
       }
     }
     for (u16 i = 0; i < 0x300; i = static_cast<u16>(i + 3)) {
-      const u8 grey = static_cast<u8>((CB(0x4f59 + i) + CB(0x4f59 + i + 1) + CB(0x4f59 + i + 2)) / 3);
-      CB(0x4f59 + i) = CB(0x4f59 + i + 1) = CB(0x4f59 + i + 2) = grey;
+      const u8 grey = static_cast<u8>((CB(0x4f59, i) + CB(0x4f59, static_cast<u16>(i + 1)) + CB(0x4f59, static_cast<u16>(i + 2))) / 3);
+      CB(0x4f59, i) = CB(0x4f59, static_cast<u16>(i + 1)) = CB(0x4f59, static_cast<u16>(i + 2)) = grey;
     }
   }
-  for (u16 i = 0; i < 0x300; ++i) dac_[i] = CB(0x4f59 + i) & 0x3f;  // cs:4f3c, at full brightness
+  for (u16 i = 0; i < 0x300; ++i) dac_[i] = CB(0x4f59, i) & 0x3f;  // cs:4f3c, at full brightness
   sound->start();
   B(0x2f2b) = 0xff;
   B(0x2f29) = 0xff;

@@ -23,6 +23,7 @@ for t in (2, 3, 4):
     for line in (here / 'fantasy' / f'map_1_{t}.txt').read_text().splitlines():
         f = line.split()
         if not f or f[0].startswith('#'): continue
+        if f[0] == 'small': continue
         if f[0] == 'code': m['code'].append((int(f[1], 16), int(f[2], 16), int(f[3], 16)))
         elif int(f[1], 16) <= 0xffff and int(f[2], 16) <= 0xffff: m[f[0]][int(f[1], 16)] = int(f[2], 16)
     tables[t] = m
@@ -40,6 +41,41 @@ for line in (here / 'symbols' / 'table1.txt').read_text().splitlines():
         else: tables[int(t)][kinds[kind]][addr] = int(a, 16)
 (dest / 'Names.inc').write_text('\n'.join(names) + '\n')
 
+# Routines the engine's source names that the line-up did not place (ones a table only has
+# in its scripts, say) are looked for by their first instructions, numbers left out: where
+# exactly one place in the other program begins the same way, that is it.
+num = re.compile(r'0x[0-9a-f]+')
+def listing(t):
+    out = []
+    for line in (here / 'fantasy' / f'TABLE{t}_seg0010.asm').read_text().splitlines():
+        try: a = int(line[:8], 16)
+        except ValueError: continue
+        ins = line[28:].strip()
+        if ins and line[10:28].strip(): out.append((a, num.sub('#', ins)))
+    return out
+first = listing(1)
+index = {a: i for i, (a, _) in enumerate(first)}
+wanted = set()
+for src in sorted(dest.glob('Engine*.cpp')) + sorted(dest.glob('Flow*.cpp')):
+    wanted |= {int(x, 16) for x in re.findall(r'0x([0-9a-f]{4})\b', src.read_text())}
+wanted = sorted(a for a in wanted if a in index and 0x0200 <= a < 0x9240)
+found = 0
+for t in (2, 3, 4):
+    other = listing(t)
+    text = [i for _, i in other]
+    placed = lambda a: any(x <= a <= y for x, y, _ in tables[t]['code']) or a in tables[t]['target']
+    for a in wanted:
+        if placed(a): continue
+        i = index[a]
+        for n in (12, 10, 8, 6, 5, 4):
+            want = [x for _, x in first[i:i + n]]
+            hits = [j for j in range(len(text) - n) if text[j] == want[0] and text[j:j + n] == want]
+            if len(hits) == 1:
+                tables[t]['target'][a] = other[hits[0]][0]
+                found += 1
+                break
+            if len(hits) > 1: break   # shorter would only be less sure
+
 out = ['// Written by re/gensymbols.py from the line-up of the four table programs. Do not edit.', '']
 for kind, macro in (('data', 'ENCORE_MAP_DATA'), ('csdata', 'ENCORE_MAP_CODE_DATA'), ('imm', 'ENCORE_MAP_VALUE'), ('target', 'ENCORE_MAP_TARGET')):
     keys = sorted(set().union(*(tables[t][kind].keys() for t in (2, 3, 4))))
@@ -51,4 +87,4 @@ for t in (2, 3, 4):
     for a, b, to in sorted(tables[t]['code']):
         out.append(f'ENCORE_MAP_CODE({t - 1}, 0x{a:04x}, 0x{b:04x}, 0x{to:04x})')
 (dest / 'Maps.inc').write_text('\n'.join(out) + '\n')
-print(f'{len(names) - 3} names; {len(out) - 2} map lines')
+print(f'{len(names) - 3} names; {len(out) - 2} map lines; {found} routines placed by their first instructions')

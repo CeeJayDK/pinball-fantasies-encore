@@ -57,7 +57,7 @@ class Program {
   u8& B(u16 a, u16 index = 0) { return ds_[static_cast<u16>(data(a) + index)]; }
   Word W(u16 a, u16 index = 0) { return Word(&ds_[static_cast<u16>(data(a) + index)]); }
   /// The same for the variables the program keeps among its code.
-  u8& CB(u16 a) { return cs_[codeData(a)]; }
+  u8& CB(u16 a, u16 index = 0) { return cs_[static_cast<u16>(codeData(a) + index)]; }
   Word CW(u16 a) { return Word(&cs_[codeData(a)]); }
 
   // --- by this table's own address: what a pointer read from memory points at
@@ -76,6 +76,13 @@ class Program {
   /// One of Party Land's segment values (as its listing has them), as this table has it in
   /// memory.
   u16 S(u16 segment) const;
+
+  /// A number an instruction of Party Land's carries, as this table's own instruction has it:
+  /// the byte or word `offset` bytes into the instruction at Party Land's address. The engine
+  /// is one for the four tables, but each was built with its own numbers in places: how many
+  /// lights, which colours the display's dots are, where its best scores are kept.
+  u8 kb(u16 instruction, int offset) const { return cs_[static_cast<u16>(F(instruction) + offset)]; }
+  u16 kw(u16 instruction, int offset) const { return static_cast<u16>(kb(instruction, offset) | (kb(instruction, offset + 1) << 8)); }
 
   /// Party Land's address of some data, as this table has it: to keep as a pointer.
   u16 A(u16 a) const { return data(a); }

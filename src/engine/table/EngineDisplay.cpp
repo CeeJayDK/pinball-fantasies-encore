@@ -6,19 +6,18 @@
 namespace encore {
 namespace {
 
-constexpr u8 kLit = 0xf2, kUnlit = 0x60;
 constexpr u16 kRow = 0xa8;  // bytes from one row of dots to the next
 
 }  // namespace
 
-void Engine::compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane) {
+void Engine::compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane, u8 litDot, u8 unlitDot) {
   // AL holds a lit dot and AH an unlit one; BX is where the picture goes.
   for (std::size_t at = start; at + 1 < size;) {
     const u8 op = code[at];
     if (op == 0xc3) return;
     if (op != 0x88) break;
     const u8 m = code[at + 1];
-    const u8 value = (m & 0x20) ? kUnlit : kLit;
+    const u8 value = (m & 0x20) ? unlitDot : litDot;
     u16 disp = 0;
     switch (m & 0xdf) {
       case 0x07: at += 2; break;
@@ -34,8 +33,8 @@ void Engine::compiledPicture(const u8* code, std::size_t size, u16 start, u16 ba
 void Engine::fillDisplay(u16 at, u16 width, u16 rows) {
   for (u16 r = 0; r < rows; ++r, at = static_cast<u16>(at + kRow))
     for (u16 x = 0; x < width; ++x) {
-      dot(0, static_cast<u16>(at + x)) = kUnlit;
-      dot(1, static_cast<u16>(at + x)) = kUnlit;
+      dot(0, static_cast<u16>(at + x)) = unlit();
+      dot(1, static_cast<u16>(at + x)) = unlit();
     }
 }
 
@@ -66,7 +65,7 @@ void Engine::drawChar(u8 c, u16& at) {
   for (u16 r = 0; r < rows; ++r, row = static_cast<u16>(row + kRow)) {
     const u8 bits = nativeB(static_cast<u16>(glyph + r));
     for (int d = 0; d < 8; ++d)
-      dot(d & 1, static_cast<u16>(row + d / 2)) = (bits & (0x80 >> d)) ? kLit : kUnlit;
+      dot(d & 1, static_cast<u16>(row + d / 2)) = (bits & (0x80 >> d)) ? lit() : unlit();
   }
   at = row;
 }
@@ -135,7 +134,7 @@ void Engine::drawCommas(u16 digits, u16 base) {
     if (same) return;
     u16 at = static_cast<u16>(base + 0xa1b - 0xc8);
     for (u16 n = groups; n > 0; --n, at = static_cast<u16>(at - 0x0c)) {
-      const u8 v = (n == 1 && erase) ? kUnlit : kLit;
+      const u8 v = (n == 1 && erase) ? unlit() : lit();
       dot(1, at) = v;
       dot(1, static_cast<u16>(at + kRow)) = v;
       dot(0, static_cast<u16>(at + 1)) = v;
@@ -169,7 +168,7 @@ void Engine::drawScore(u16 digits, u16 at) {
       if (d == before) continue;
       const u16 entry = static_cast<u16>(((d + 0x30) & 0xff) * 2);
       const u16 start = plane == 0 ? static_cast<u16>(W(0x5a00, entry) + 0x1a0) : static_cast<u16>(W(0x5c00, entry) + 0xc40);
-      compiledPicture(code, 0x1480, start, place, plane);
+      compiledPicture(code, 0x1480, start, place, plane, code[0x8c], code[0x8d]);
     }
   }
   // cs:0135 of that segment: the marks between the thousands
@@ -183,10 +182,10 @@ void Engine::drawScore(u16 digits, u16 at) {
     if (same) return;
     u16 mark = static_cast<u16>(scoreAt + 0xa1b - 0xc8);
     for (u16 n = groups; n > 0; --n, mark = static_cast<u16>(mark - 0x0c)) {
-      dot(1, mark) = kLit;
-      dot(1, static_cast<u16>(mark + kRow)) = kLit;
-      dot(0, static_cast<u16>(mark + 1)) = kLit;
-      dot(0, static_cast<u16>(mark + kRow)) = kLit;
+      dot(1, mark) = lit();
+      dot(1, static_cast<u16>(mark + kRow)) = lit();
+      dot(0, static_cast<u16>(mark + 1)) = lit();
+      dot(0, static_cast<u16>(mark + kRow)) = lit();
     }
     return;
   }
@@ -275,7 +274,7 @@ void Engine::bindDisplay() {
     // cs:5406: has the score passed the best on the table?
     if (B(0x33e0) != 0xff && B(0x33e2) != 0xff && B(0x33f1) != 0xff) {
       for (u16 i = 0; i < 12; ++i) {
-        const u8 best = B(0x0016, i), score = B(0x45b6, i);
+        const u8 best = nativeB(static_cast<u16>(kw(0x5425, 1) + i)), score = B(0x45b6, i);
         if (score < best) break;
         if (score > best) {
           B(0x33f1) = 0xff;
@@ -321,7 +320,7 @@ void Engine::bindDisplay() {
   bind(0x5456, [this] {  // has the score passed the table's best? then say so first
     if (B(0x33f1) != 0xff) {
       for (u16 i = 0; i < 12; ++i) {
-        const u8 best = B(0x0016, i), score = B(0x45b6, i);
+        const u8 best = nativeB(static_cast<u16>(kw(0x5425, 1) + i)), score = B(0x45b6, i);
         if (score < best) break;
         if (score > best) {
           B(0x33f1) = 0xff;
@@ -473,7 +472,8 @@ void Engine::bindDisplay() {
         u16 place = CW(pass.at);
         for (u16 i = 0; i < 0x15; ++i, place = static_cast<u16>(place + 4)) {
           const u8 c = nativeB(static_cast<u16>(si + i));
-          compiledPicture(cs_.data(), cs_.size(), static_cast<u16>(W(pass.table, static_cast<u16>(c * 2)) + A(pass.base)), place, plane);
+          compiledPicture(cs_.data(), cs_.size(), static_cast<u16>(W(pass.table, static_cast<u16>(c * 2)) + A(pass.base)), place, plane,
+                          kb(0x6eae, 1), kb(0x6eae, 2));
         }
       }
       CB(0x6faf) ^= 5;
@@ -528,8 +528,8 @@ void Engine::bindDisplay() {
       for (u16 i = 0; i < count; ++i) {
         const u8 b = farB(bank, frame++);
         place = static_cast<u16>(place + (b >> 1));
-        if (b & 1) dot(plane, place) = kLit;
-        else if ((b >> 1) != 0x7f) dot(plane, place) = kUnlit;
+        if (b & 1) dot(plane, place) = kb(0x7001, 1);
+        else if ((b >> 1) != 0x7f) dot(plane, place) = kb(0x7001, 2);
       }
     }
   });

@@ -41,6 +41,7 @@ def main(a, b):
              'csdata': collections.defaultdict(collections.Counter),
              'imm': collections.defaultdict(collections.Counter)}
     addr = {}
+    small = []
     follows = {A[i][0]: (A[i + 1][0],) for i in range(len(A) - 1)}
     matched = 0
     for i, j, n in sm.get_matching_blocks():
@@ -49,6 +50,10 @@ def main(a, b):
         for k in range(n):
             (aa, ia), (ab, ib) = A[i + k], B[j + k]
             addr[aa] = ab
+            # small numbers that differ between two matched instructions are not addresses:
+            # the same routine doing something else in this table (another light, another count)
+            for kd, x, y in zip(kind(ia), num.findall(ia), num.findall(ib)):
+                if kd == 'imm' and x != y and int(x, 16) < 0x100: small.append((aa, ab, ia, ib))
             for kd, x, y in zip(kind(ia), num.findall(ia), num.findall(ib)):
                 votes[kd][int(x, 16)][int(y, 16)] += 1
     with open(here / f'map_{a}_{b}.txt', 'w') as o:
@@ -67,6 +72,8 @@ def main(a, b):
         for x in sorted(votes['code']):
             c = votes['code'][x].most_common()
             o.write(f'target {x:04x} {c[0][0]:04x} {c[0][1]}\n')
+        o.write('# small: a matched instruction with another small number in B (where in A, where in B, both)\n')
+        for aa, ab, ia, ib in small: o.write(f'small {aa:04x} {ab:04x} | {ia} | {ib}\n')
         for kd in ('data', 'csdata', 'imm'):
             o.write(f'# {kd}: number in A, number in B, how often (other candidates)\n')
             for x in sorted(votes[kd]):

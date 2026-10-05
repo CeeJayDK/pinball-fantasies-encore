@@ -50,7 +50,7 @@ void Engine::stopBlink(u8 light) {
 }
 
 void Engine::stopBlinks() {
-  for (u16 i = 0; i < 0x3c; ++i) B(0x3555, i) = 0;
+  for (u16 i = 0, bytes = kw(0x57e1, 1); i < bytes; ++i) B(0x3555, i) = 0;
 }
 
 void Engine::runBlinks() {

@@ -39,7 +39,7 @@ void Engine::beginBall() {
   B(0x33f7) = 0;
   B(0x33f9) = 0xff;
   stopBlinks();
-  for (u16 i = 0; i < 0x32; ++i) W(0x331b, static_cast<u16>(i * 2)) = F(0x69fc);  // cs:3870
+  for (u16 i = 0, slots = kw(0x3873, 1); i < slots; ++i) W(0x331b, static_cast<u16>(i * 2)) = F(0x69fc);  // cs:3870
   for (u16 i = 0; i < 0x32; ++i) W(0x35ca, static_cast<u16>(i * 2)) = 0;          // cs:37dd
   if (B(0x00d0) == 0xff) return;
   B(0x3396) = 0;
@@ -62,7 +62,7 @@ void Engine::toAttract() {
 /// cs:5867: every light out, at once and not through the queue.
 void Engine::lightsOut() {
   if (B(0x2f2b) != 0xff) return;
-  for (u16 light = 1; light <= 0x38; ++light) {
+  for (u16 light = 1, lights = kw(0x588e, 1); light <= lights; ++light) {
     B(0x3591, light) = 0;
     u16 record = W(0x12bd, static_cast<u16>((light - 1) * 2));
     B(0x354e) = 0;
@@ -84,7 +84,7 @@ bool Engine::music(u16 record) {
   B(0x338e) = 0;
   B(0x338f) = 0;
   if (static_cast<i8>(before) > 0) return true;
-  if (answer == 0x3e) return true;
+  if (answer == kb(0x5c87, 1)) return true;
   B(0x230a) = answer;
   return true;
 }

@@ -111,9 +111,9 @@ void Engine::frameCallback() {
   B(0x2f0a) = 0;
   B(0x2f0b) = 0;
   const u16 ballY = W(at::ballY);
-  if (ballY >= 0xd2 && ballY <= 0x118) {
+  if (ballY >= kw(0x4283, 4) && ballY <= kw(0x428e, 4)) {
     B(0x2f0a) = 0xff;
-  } else if (W(0x2f02) >= (high() ? 0x4e : 0x85)) {
+  } else if (W(0x2f02) >= (high() ? kw(0x42ae, 1) : kw(0x42a1, 1))) {
     B(0x2f0b) = 0xff;
   }
   if (ballY >= static_cast<u16>(W(0x2f02) + (high() ? 0x9e : 0x67))) {
@@ -412,14 +412,15 @@ void Engine::musicKey() {
   B(0x231a) ^= 0xff;
   if (B(0x231a) == 0) {
     B(0xc6f) = 0;
-    B(0xc72) = 1;
-    B(0x230a) = 1;
+    B(0xc72) = kb(0x34f2, 1);
+    B(0x230a) = kb(0x34f7, 4);
     if (B(0x33e0) == 0xff) B(0x230a) = 0;
     if (static_cast<i8>(B(0x230d)) < 1) B(0x230d) = 1;
   } else {
-    B(0xc6f) = 0x3e;
-    B(0xc72) = 0x3e;
-    if (B(0x230a) != 0x3e) addTimer(F(0x353b));
+    const u8 silence = kb(0x3522, 1);  // the place in the table's music where nothing plays
+    B(0xc6f) = silence;
+    B(0xc72) = silence;
+    if (B(0x230a) != silence) addTimer(F(0x353b));
   }
 }
 
@@ -495,7 +496,7 @@ void Engine::saveDisplay() {
     for (u16 row = 0; row < 0x10; ++row) {
       nativeB(to) = 0;
       for (u16 x = 0; x < 0x50; ++x) {
-        if (dot(plane, static_cast<u16>(0xa8 + row * 0xa8 + x)) == 0xf2) nativeB(to) |= B(0x33fc);
+        if (dot(plane, static_cast<u16>(0xa8 + row * 0xa8 + x)) == lit()) nativeB(to) |= B(0x33fc);
         const bool wrapped = B(0x33fc) & 1;
         B(0x33fc) = static_cast<u8>((B(0x33fc) >> 1) | (wrapped ? 0x80 : 0));
         if (wrapped) nativeB(++to) = 0;
@@ -515,7 +516,7 @@ void Engine::restoreDisplay() {
   for (int plane = 0; plane < 2; ++plane)
     for (u16 row = 0; row < 0x10; ++row)
       for (u16 x = 0; x < 0x50; ++x) {
-        dot(plane, static_cast<u16>(0xa8 + row * 0xa8 + x)) = (nativeB(from) & B(0x33fc)) ? 0xf2 : 0x60;
+        dot(plane, static_cast<u16>(0xa8 + row * 0xa8 + x)) = (nativeB(from) & B(0x33fc)) ? lit() : unlit();
         const bool wrapped = B(0x33fc) & 1;
         B(0x33fc) = static_cast<u8>((B(0x33fc) >> 1) | (wrapped ? 0x80 : 0));
         if (wrapped) ++from;
@@ -536,7 +537,7 @@ u8 Engine::musicCallback(u8 al) {
   } else if (left == 0xff || left == 0x7f) {  // below zero, as the original's signed test has it
     B(0x230d) = 0;
   }
-  if (B(0x231a) != 0 && al <= 5) al = 0x3e;
+  if (B(0x231a) != 0 && al <= kb(0x3aac, 1)) al = kb(0x3ab3, 1);
   return al;
 }
 
@@ -558,7 +559,7 @@ void Engine::addTimer(u16 native) {
 
 void Engine::runTimers() {
   u16 slot = A(0x331b);
-  for (int i = 0; i < 0x32; ++i, slot = static_cast<u16>(slot + 2)) {
+  for (int i = 0, slots = kw(0x5b2a, 1); i < slots; ++i, slot = static_cast<u16>(slot + 2)) {
     W(0x3381) = slot;
     bx = slot;  // as the original has it, which matters to a routine that takes BX for its place in a script
     call(nativeW(slot));
