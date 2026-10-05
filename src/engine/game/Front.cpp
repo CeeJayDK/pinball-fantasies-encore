@@ -53,6 +53,8 @@ u8 scancode(Key k) {
                                       0x31, 0x18, 0x19, 0x10, 0x13, 0x1f, 0x14, 0x16, 0x2f, 0x11, 0x2d, 0x15, 0x2c};
   if (k >= Key::A && k <= Key::Z) return kLetters[static_cast<int>(k) - static_cast<int>(Key::A)];
   if (k >= Key::F1 && k <= Key::F8) return static_cast<u8>(0x3b + static_cast<int>(k) - static_cast<int>(Key::F1));
+  // (this version takes 1 to 5 for F1 to F5 as well)
+  if (k >= Key::Digit1 && k <= Key::Digit5) return static_cast<u8>(0x3b + static_cast<int>(k) - static_cast<int>(Key::Digit1));
   switch (k) {
     case Key::Space: return 0x39;
     case Key::Enter: return 0x1c;
@@ -463,7 +465,10 @@ Front::Task Front::fade(int frames, u16 fromSegment, u16 from, u16 toSegment, u1
 Front::Task Front::waitTicks(u32 ticks) {
   for (;;) {
     if (music_.ticks() > ticks) break;
-    if (takeKey() == 0x39) {  // space: no more slides
+    // Space: no more slides. (The original lets go of any other key pressed here; this version
+    // keeps it, so that a table asked for early is opened as soon as the menu is there.)
+    if (key_ == 0x39) {
+      takeKey();
       skip_ = true;
       break;
     }
@@ -871,10 +876,7 @@ Front::Task Front::menu() {
   for (int n = 0; n < 4; ++n) co_await nextFrame();
   slideAt_ = 0x10;
   slideIn_ = true;
-  for (int n = 0; n < 0x14; ++n) {
-    co_await nextFrame();
-    takeKey();
-  }
+  for (int n = 0; n < 0x14; ++n) co_await nextFrame();  // (the original lets go of keys here; see waitTicks)
   openWidth_ = 0x140;
   writeMode(1);
   // (cs:15fa to cs:1a23 asks a question out of the manual: not here)
@@ -885,7 +887,10 @@ Front::Task Front::menu() {
   for (;;) {  // cs:1a55
     for (int n = 0; n < 0x14; ++n) {
       co_await nextFrame();
-      if (takeKey() == 0x39) break;
+      if (key_ == 0x39) {
+        takeKey();
+        break;
+      }
     }
     if (!(dsw(0x588e) & 2)) {
       sendColours(0x10, 6);

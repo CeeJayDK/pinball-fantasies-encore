@@ -172,3 +172,38 @@ TEST(the_menu_starts_a_table) {
   }
   CHECK(opened);
 }
+
+// Leaving a table from the pause is not a cut: its picture fades away over 128 frames, as
+// the original's does, and only then is the table left.
+TEST(a_table_left_fades_out) {
+  if (!haveData()) return;
+  TableGame game(read("TABLE1.PRG"), read("TABLE1.MOD"), 0, {});
+  std::vector<u8> pixels(320 * 350);
+  std::vector<Rgb> colours(256);
+  auto brightness = [&] {
+    game.draw(pixels.data(), colours.data());
+    long sum = 0;
+    for (const Rgb& c : colours) sum += c.r + c.g + c.b;
+    return sum;
+  };
+  auto tap = [&](Key k) { game.key(k, true), game.key(k, false); };
+  auto run = [&](int frames) {
+    for (int f = 0; f < frames; ++f) game.frame(), game.noSound();
+  };
+  tap(Key::Enter);
+  run(200);
+  const long full = brightness();
+  tap(Key::P);
+  run(5);
+  tap(Key::Escape);
+  run(5);
+  tap(Key::Y);
+  run(5);
+  CHECK(!game.left());
+  run(60);
+  const long half = brightness();
+  CHECK(!game.left());
+  CHECK(half < full * 3 / 4 && half > full / 8);
+  run(70);
+  CHECK(game.left());
+}

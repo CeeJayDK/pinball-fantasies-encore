@@ -267,6 +267,12 @@ void TableGame::frame() {
   ++frames_;
   recording_.frames = frames_;
   music_.advance(1.0 / 60);
+  if (engine_->exited()) {
+    // cs:3a11: the table is left: its picture and its music fade away, in 128 frames
+    leaving_ -= 2;
+    if (leaving_ >= 0 && (leaving_ & 0x0f) == 0) music_.volume(static_cast<u16>(leaving_));
+    return;
+  }
   if (asking_) return;  // the table waits for the answer
   try {
     engine_->frame();
@@ -337,6 +343,15 @@ void TableGame::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
   view.ballTrail = ballTrail;
   screen_->draw(*engine_, frame, view, hd);
   screen_->colours(*engine_, colours, lamps_);
+  if (engine_->exited()) {  // cs:4f3c: every colour by how bright the table still is
+    const int level = std::max(leaving_, 0);
+    for (std::size_t i = 0; i < 256; ++i)
+      colours[i] = Rgb{static_cast<u8>(colours[i].r * level >> 8), static_cast<u8>(colours[i].g * level >> 8), static_cast<u8>(colours[i].b * level >> 8)};
+    if (hd) {
+      hd->fade.fill(static_cast<float>(level) / 256.0f);
+      hd->spriteTint = static_cast<float>(level) / 256.0f;
+    }
+  }
 }
 
 void TableGame::sound(float* out, int frames) {

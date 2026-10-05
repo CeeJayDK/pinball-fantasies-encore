@@ -49,7 +49,7 @@ class TableGame {
   bool startsGame(Key key) const;
   bool paused() const { return engine_->isPaused(); }
   /// The table was left: back to the menu.
-  bool left() const { return engine_->exited() || !failure_.empty(); }
+  bool left() const { return (engine_->exited() && leaving_ <= 0) || !failure_.empty(); }
   /// What went wrong, if the table stopped because something did.
   const std::string& failure() const { return failure_; }
   int players() const { return engine_->B(0x3716); }
@@ -118,6 +118,7 @@ class TableGame {
   bool optionsChanged_ = false, scoresChanged_ = false;
   bool asking_ = false, sendOnline_ = false;
   u16 lastWait_ = 0;          ///< the display's wait a frame ago, to see the initials' end come
+  int leaving_ = 0x100;       ///< the table being left: how bright it still is, of 256 (cs:3a11)
   int lamps_ = 0;             ///< 0 as the game has them, 1 all lit, 2 all out
   int manual_ = 0;            ///< rows the screen was moved by hand while paused
   bool up_ = false, down_ = false;
