@@ -55,3 +55,28 @@ Drawing is the exception: the original draws through the video card's registers,
 draws from what the table knows instead (which lights are lit, where the ball and flippers
 are, the display's dots), as the HD pictures need anyway. The ball's physics (`src/engine/sim`)
 is also written on its own, and checked against the referee ball for ball.
+
+## Where it stands
+
+All four tables' rules are written (`src/engine/table`: `PartyLand`, `SpeedDevils`, `Gameshow`,
+`StonesNBones`, on the `Flow` they share and the `Engine` under it) and are the same as the
+original, frame for frame, from the engine's own start-up:
+
+```bash
+build/encore-oracle-table <the game's folder> <table 1-4> 100000 --all --start --wild --rough --flip <seed>
+```
+
+`--flip` plays a game at random; `--wild` adds nudges, pause, typed letters and more players;
+`--rough` throws the ball into the table's own trigger zones, shakes the table until it tilts,
+switches lights the rules remember, and starts the best scores at nought so that initials are
+asked for. All of it is done alike to the original and to ours. `ENCORE_COVER=1` lists the
+routines of ours a run never reached.
+
+One thing the original does is not followed past the point where it goes wrong: while more
+players may still join, the start keys also let the number of players be put *below* the player
+whose turn it is. The original then counts players on past the eighth and reads and writes past
+their records, and what follows is whatever was in that memory. The test stops there. The
+game will refuse that key instead.
+
+Still to do: sound against a real driver's answers, the intro and menu, drawing from the
+engine's state, and putting the game on the new engine in place of the old.
