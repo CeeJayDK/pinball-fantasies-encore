@@ -1,6 +1,7 @@
 // The ball: its sub-steps (probe, bounce, flippers and nudge, move), and what follows them
 // each frame. All of it works on the program's own variables and collision masks.
 #include <cstdio>
+#include <utility>
 
 #include "engine/table/Engine.h"
 

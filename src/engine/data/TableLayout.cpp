@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <numbers>
 
 #include "core/Log.h"
 
@@ -24,7 +25,7 @@ std::size_t findBytes(ByteView haystack, const Bytes& needle, std::size_t stride
 std::size_t findSineTable(ByteView data) {
   Bytes probe;
   for (int i = 0; i < 64; ++i) {
-    const int v = static_cast<int>(std::lround(std::sin(i * 2.0 * M_PI / 2048.0) * 16384.0));
+    const int v = static_cast<int>(std::lround(std::sin(i * 2.0 * std::numbers::pi / 2048.0) * 16384.0));
     probe.push_back(static_cast<u8>((v >> 8) & 0xff));
     probe.push_back(static_cast<u8>(v & 0xff));
   }

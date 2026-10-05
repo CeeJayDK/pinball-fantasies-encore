@@ -32,7 +32,7 @@ class MzImage {
   /// Bytes of a segment, addressed by its segment value. Throws DataError if unknown.
   ByteView segment(u16 value) const;
   /// Bytes starting at seg:offset (any 16-bit far pointer), to the end of the image.
-  ByteView far(u16 seg, u16 offset) const;
+  ByteView farBytes(u16 seg, u16 offset) const;
 
  private:
   std::string name_;

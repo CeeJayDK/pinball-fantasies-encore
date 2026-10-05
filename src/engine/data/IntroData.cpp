@@ -52,7 +52,7 @@ IntroData IntroData::load(const std::filesystem::path& introPrg) {
   }
   if (d.pictures.empty()) throw DataError(introPrg.string() + ": no pictures found");
 
-  const ByteView ds = d.image.far(kIntroDataSegment, 0);
+  const ByteView ds = d.image.farBytes(kIntroDataSegment, 0);
   for (int i = 0; i < kMaxMenuBands; ++i) {
     const u16 segment = static_cast<u16>(rd16le(ds, kMenuSegmentTable + static_cast<std::size_t>(i) * 2));
     const i16 row = static_cast<i16>(rd16le(ds, kMenuRowTable + static_cast<std::size_t>(i) * 2));

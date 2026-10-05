@@ -207,8 +207,8 @@ void Front::clearVideo() {
 /// cs:4998: where in a picture a part of it begins, past its four letters.
 u16 Front::find(u16 segment, const char* tag) {
   for (u32 at = 0; at < 0xc350; ++at)
-    if (far(segment, at) == static_cast<u8>(tag[0]) && far(segment, at + 1) == static_cast<u8>(tag[1]) &&
-        far(segment, at + 2) == static_cast<u8>(tag[2]) && far(segment, at + 3) == static_cast<u8>(tag[3]))
+    if (farByte(segment, at) == static_cast<u8>(tag[0]) && farByte(segment, at + 1) == static_cast<u8>(tag[1]) &&
+        farByte(segment, at + 2) == static_cast<u8>(tag[2]) && farByte(segment, at + 3) == static_cast<u8>(tag[3]))
       return static_cast<u16>(at + 4);
   throw DataError(std::string("a picture of the menu's has no ") + tag);
 }
@@ -217,13 +217,13 @@ u16 Front::find(u16 segment, const char* tag) {
 /// memory from a row on. Answers where its colours are, which it leaves as the card takes them.
 u16 Front::unpackPlanar(u16 segment, u16 row, bool setColours, HdPicture is) {
   const u16 cmap = find(segment, "CMAP");
-  const u16 colours = static_cast<u16>((far(segment, cmap + 2u) << 8) | far(segment, cmap + 3u));
+  const u16 colours = static_cast<u16>((farByte(segment, cmap + 2u) << 8) | farByte(segment, cmap + 3u));
   const u16 palette = static_cast<u16>(cmap + 4);
-  for (u16 i = 0; i < colours; ++i) far(segment, static_cast<u32>(palette + i)) >>= 2;
-  if (setColours) setDac(0, &far(segment, palette), colours);
+  for (u16 i = 0; i < colours; ++i) farByte(segment, static_cast<u32>(palette + i)) >>= 2;
+  if (setColours) setDac(0, &farByte(segment, palette), colours);
   const u16 header = find(segment, "BMHD");
-  const u16 width = static_cast<u16>(((far(segment, header + 4u) << 8) | far(segment, header + 5u)) >> 3);
-  const u16 height = static_cast<u16>((far(segment, header + 6u) << 8) | far(segment, header + 7u));
+  const u16 width = static_cast<u16>(((farByte(segment, header + 4u) << 8) | farByte(segment, header + 5u)) >> 3);
+  const u16 height = static_cast<u16>((farByte(segment, header + 6u) << 8) | farByte(segment, header + 7u));
   const u16 end = static_cast<u16>((row + height) * 80);
   u32 from = find(segment, "BODY") + 4u;
   u16 line = static_cast<u16>(row * 80 - 80);
@@ -238,12 +238,12 @@ u16 Front::unpackPlanar(u16 segment, u16 row, bool setColours, HdPicture is) {
     if (at >= end) break;
     mask = static_cast<u8>((mask << 1) | (mask >> 7));
     for (bool rowDone = false; !rowDone;) {
-      const u8 n = far(segment, from++);
+      const u8 n = farByte(segment, from++);
       if (n == 0x80) continue;
       if (n < 0x80) {
-        for (int i = 0; i <= n; ++i) planes_[plane][at++] = far(segment, from++);
+        for (int i = 0; i <= n; ++i) planes_[plane][at++] = farByte(segment, from++);
       } else {
-        const u8 v = far(segment, from++);
+        const u8 v = farByte(segment, from++);
         for (int i = 0; i <= 256 - n; ++i) planes_[plane][at++] = v;
       }
       rowDone = width != 0 && at % width == 0;
@@ -263,13 +263,13 @@ u16 Front::unpackPlanar(u16 segment, u16 row, bool setColours, HdPicture is) {
 u16 Front::unpackChunky(u16 segment, u16 row, u16 bytes) {
   find(segment, "PBM ");
   const u16 cmap = find(segment, "CMAP");
-  const u16 colours = static_cast<u16>((far(segment, cmap + 2u) << 8) | far(segment, cmap + 3u));
+  const u16 colours = static_cast<u16>((farByte(segment, cmap + 2u) << 8) | farByte(segment, cmap + 3u));
   const u16 palette = static_cast<u16>(cmap + 4);
   // (colours 32 to 63 are made here, the first 32 at half their strength: by the one routine
   // only, cs:4aa2, which is the one that takes 151 rows)
   if (bytes == 0x2f40)
-    for (u16 i = 0; i < 0x60; ++i) far(segment, static_cast<u32>(palette + 0x60 + i)) = far(segment, static_cast<u32>(palette + i)) >> 1;
-  for (u16 i = 0; i < colours; ++i) far(segment, static_cast<u32>(palette + i)) >>= 2;
+    for (u16 i = 0; i < 0x60; ++i) farByte(segment, static_cast<u32>(palette + 0x60 + i)) = farByte(segment, static_cast<u32>(palette + i)) >> 1;
+  for (u16 i = 0; i < colours; ++i) farByte(segment, static_cast<u32>(palette + i)) >>= 2;
   u32 from = find(segment, "BODY") + 4u;
   u16 at = static_cast<u16>(row * 80);
   const u16 end = static_cast<u16>(at + bytes);
@@ -280,12 +280,12 @@ u16 Front::unpackChunky(u16 segment, u16 row, u16 bytes) {
     if (mask & 8) ++at;
   };
   for (;;) {
-    const u8 n = far(segment, from++);
+    const u8 n = farByte(segment, from++);
     if (n == 0x80) continue;
     if (n < 0x80) {
-      for (int i = 0; i <= n; ++i) dot(far(segment, from++));
+      for (int i = 0; i <= n; ++i) dot(farByte(segment, from++));
     } else {
-      const u8 v = far(segment, from++);
+      const u8 v = farByte(segment, from++);
       for (int i = 0; i <= 256 - n; ++i) dot(v);
     }
     if (at >= end) break;
@@ -294,7 +294,7 @@ u16 Front::unpackChunky(u16 segment, u16 row, u16 bytes) {
 }
 
 void Front::sendColours(u8 first, u16 picture) {
-  setDac(first, &far(dsw(static_cast<u16>(0x589e + picture)), dsw(static_cast<u16>(0x58ac + picture))), 0x30);
+  setDac(first, &farByte(dsw(static_cast<u16>(0x589e + picture)), dsw(static_cast<u16>(0x58ac + picture))), 0x30);
   level_ = 1.0f;
 }
 
@@ -459,8 +459,8 @@ Front::Task Front::fade(int frames, u16 fromSegment, u16 from, u16 toSegment, u1
   // cs:200e, cs:209a: each colour part way between the two, by how many frames are left
   for (int left = frames; left > 0; --left) {
     for (int i = 0; i < bytes; ++i) {
-      const unsigned a = far(fromSegment, static_cast<u32>(from + i)) * static_cast<unsigned>((frames - left) & 0xff);
-      const unsigned b = far(toSegment, static_cast<u32>(to + i)) * static_cast<unsigned>(left);
+      const unsigned a = farByte(fromSegment, static_cast<u32>(from + i)) * static_cast<unsigned>((frames - left) & 0xff);
+      const unsigned b = farByte(toSegment, static_cast<u32>(to + i)) * static_cast<unsigned>(left);
       fadeBuffer_[static_cast<std::size_t>(i)] = static_cast<u8>(((a + b) & 0xffff) / static_cast<unsigned>(frames));
     }
     co_await nextFrame();
@@ -890,8 +890,8 @@ Front::Task Front::menu() {
   co_await fade(3, 0x80, 0x527d, 0x80, 0x527d, 0xc0);
   auto keepColours = [this](u16 top, u16 bottom) {  // for the fade when the menu is left
     for (u16 i = 0; i < 0x30; ++i) {
-      ds(static_cast<u16>(0x58ea + i)) = far(dsw(static_cast<u16>(0x589e + top)), static_cast<u32>(dsw(static_cast<u16>(0x58ac + top)) + i));
-      ds(static_cast<u16>(0x58ba + i)) = far(dsw(static_cast<u16>(0x589e + bottom)), static_cast<u32>(dsw(static_cast<u16>(0x58ac + bottom)) + i));
+      ds(static_cast<u16>(0x58ea + i)) = farByte(dsw(static_cast<u16>(0x589e + top)), static_cast<u32>(dsw(static_cast<u16>(0x58ac + top)) + i));
+      ds(static_cast<u16>(0x58ba + i)) = farByte(dsw(static_cast<u16>(0x589e + bottom)), static_cast<u32>(dsw(static_cast<u16>(0x58ac + bottom)) + i));
     }
   };
   sendColours(0x10, 0x0a);
@@ -984,10 +984,10 @@ Front::Task Front::menu() {
 Front::Task Front::main() {
   // cs:23df: the first three slides, two pictures each, into one tall screen
   setw(0x5271, unpackChunky(0x3b41, 0x000, 0x2f40));
-  for (u16 i = 0; i < 0x300; ++i) ds(i) = far(0x3b41, static_cast<u32>(dsw(0x5271) + i));
+  for (u16 i = 0; i < 0x300; ++i) ds(i) = farByte(0x3b41, static_cast<u32>(dsw(0x5271) + i));
   unpackChunky(0x4285, 0x08b, 0x2f40);
   setw(0x5273, unpackChunky(0x4d6a, 0x0f0, 0x3e80));
-  for (u16 i = 0; i < 0x300; ++i) ds(static_cast<u16>(0x300 + i)) = far(0x4d6a, static_cast<u32>(dsw(0x5273) + i));
+  for (u16 i = 0; i < 0x300; ++i) ds(static_cast<u16>(0x300 + i)) = farByte(0x4d6a, static_cast<u32>(dsw(0x5273) + i));
   unpackChunky(0x4653, 0x16d, 0x2f40);
   setw(0x5279, unpackChunky(0x11c2, 0x1ec, 0x3e80));
   unpackChunky(0x17b2, 0x25a, 0x2f40);
@@ -1037,7 +1037,7 @@ void Front::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
       const u16 at = const_cast<Front*>(this)->dsw(static_cast<u16>(0x58ac + picture));
       for (std::size_t i = 0; i < 16; ++i) {
         auto part = [&](std::size_t n) {
-          const u8 v = const_cast<Front*>(this)->far(segment, static_cast<u32>(at + i * 3 + n)) & 0x3f;
+          const u8 v = const_cast<Front*>(this)->farByte(segment, static_cast<u32>(at + i * 3 + n)) & 0x3f;
           return static_cast<u8>(static_cast<float>(wide(v)) * level_);
         };
         colours[0x40 + t * 16 + i] = Rgb{part(0), part(1), part(2)};

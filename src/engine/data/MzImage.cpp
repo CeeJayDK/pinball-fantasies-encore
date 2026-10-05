@@ -63,7 +63,7 @@ ByteView MzImage::segment(u16 value) const {
   throw DataError(name_ + ": unknown segment");
 }
 
-ByteView MzImage::far(u16 seg, u16 offset) const {
+ByteView MzImage::farBytes(u16 seg, u16 offset) const {
   const std::size_t at = seg * 16u + offset;
   if (at > image_.size()) throw DataError(name_ + ": far pointer outside image");
   return image_.subspan(at);

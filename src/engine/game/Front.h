@@ -113,7 +113,7 @@ class Front {
     ds(at) = static_cast<u8>(v);
     ds(static_cast<u16>(at + 1)) = static_cast<u8>(v >> 8);
   }
-  u8& far(u16 segment, u32 offset) { return image_[(std::size_t{segment} * 16 + offset) % image_.size()]; }
+  u8& farByte(u16 segment, u32 offset) { return image_[(std::size_t{segment} * 16 + offset) % image_.size()]; }
   u8 cs(u16 at) const { return image_[std::size_t{0x364c} * 16 + at]; }
 
   // --- the video card
