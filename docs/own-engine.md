@@ -78,5 +78,25 @@ whose turn it is. The original then counts players on past the eighth and reads 
 their records, and what follows is whatever was in that memory. The test stops there. The
 game will refuse that key instead.
 
-Still to do: sound against a real driver's answers, the intro and menu, drawing from the
-engine's state, and putting the game on the new engine in place of the old.
+The game now plays its tables on it. `TableGame` (`src/engine/game`) joins a table with the
+sound driver written from SB16.SDR (`src/engine/audio/MusicDriver`) and with its picture
+(`src/engine/view/TableScreen`, the same as the original's dot for dot), takes keys, and adds
+what this version has that the original has not: the options changed while paused, the steeper
+angle, the whole table on one screen, what the high-resolution pictures need, and the question
+whether a best score goes online. A game is recorded as its start and its keys
+(`Recording`, format 4) and plays again to the same end:
+
+```bash
+build/encore-play <the game's folder> <table 1-4> 60000 <seed>     # games by keys at random, twice, and from their recording
+build/encore-play <the game's folder> --verify <file.RPL>          # as the server checks one
+```
+
+Two things are not as the original has them, on purpose. Its source of chance is a count of
+the turns of its own loop, which depends on the machine: here it goes on evenly, eight turns a
+frame, from a number each game is given. And the screen mode a table is started in decides its
+speeds, as in the original, but the picture can be changed to another size while it plays: the
+speeds then stay as they were until the next game.
+
+Still to do: the intro and the menu, which are still the old engine's (from INTRO.PRG:
+`re/fantasy/INTRO_seg364c.lst`); recordings made before this engine (format 3), which it
+cannot play; and then taking the old engine out, with every mention of it.
