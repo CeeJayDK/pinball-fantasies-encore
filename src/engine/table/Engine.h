@@ -116,6 +116,22 @@ class Engine : public Program {
   void compiledPicture(const u8* code, std::size_t size, u16 start, u16 base, int plane);
   u8& dot(int plane, u16 offset) { return vram_[plane][offset & 0x3fff]; }
 
+  // --- a game's comings and goings (EngineGame.cpp)
+  void bindGame();
+  void newGame();              // cs:3881
+  void beginBall();            // cs:37ea
+  void toAttract();            // cs:5fff
+  void lightsOut();            // cs:5867
+  /// cs:5c3f: asks for a piece of the music (place, repeats, priority); false if something
+  /// more important is playing.
+  bool music(u16 nativeRecord);
+  void addScore(u16 nativeTo, u16 nativeAmount);  // cs:6a5e: twelve digits, one to a byte
+  void placeBall(u16 x, u16 y);
+  /// Copies a shape into a collision mask (cs:5f5a): `width` bytes a row for `rows` rows.
+  void patchMask(u16 partyLandSegment, u16 at, u16 nativeShape, u16 width, u16 rows);
+  /// Called when a collision mask changes, for whoever keeps a copy.
+  virtual void maskChanged(u16 nativeSegment, u16 offset, u8 value) { (void)nativeSegment, (void)offset, (void)value; }
+
   /// A routine not written yet: says so, with its place.
   void todo(u16 partyLandAddress) { call(F(partyLandAddress)); }
   void effect(u16 record);  ///< plays the four-byte effect record at Party Land's address

@@ -6,6 +6,7 @@ namespace encore {
 Engine::Engine(ByteView prg, int table) : Program(prg, table) {
   bind(0x69fc, [] {});  // the original's "nothing": a lone ret, which empty slots point at
   bindDisplay();
+  bindGame();
 }
 
 void Engine::effect(u16 record) {
@@ -210,7 +211,7 @@ void Engine::attractMidFrame() {
     effect(0xc65);
     W(0x3383) = 0xffff;
     B(0x3713) = 0;  // cs:5ff9
-    todo(0x3881);
+    newGame();
     todo(0x000b);
     todo(0x0202);
     todo(0x0bca);

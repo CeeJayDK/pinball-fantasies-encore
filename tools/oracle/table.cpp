@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -18,6 +19,7 @@
 #include "Machine.h"
 #include "core/File.h"
 #include "engine/table/Engine.h"
+#include "engine/table/PartyLand.h"
 
 int main(int argc, char** argv) {
   if (argc < 4) {
@@ -49,7 +51,8 @@ int main(int argc, char** argv) {
   }
   int frame = -1;
   try {
-    encore::Engine e(*prg, table);
+    std::unique_ptr<encore::Engine> made = table == 0 ? std::make_unique<encore::PartyLand>(*prg) : std::make_unique<encore::Engine>(*prg, table);
+    encore::Engine& e = *made;
     oracle::Machine m(dir, table, {});
     m.setLoop(0x10, e.F(encore::at::mainLoop));
     m.loopsPerFrame = e.loopsPerFrame;

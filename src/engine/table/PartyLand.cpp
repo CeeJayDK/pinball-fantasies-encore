@@ -1,0 +1,164 @@
+#include "engine/table/PartyLand.h"
+
+namespace encore {
+namespace {
+
+/// The lights each player keeps from ball to ball, in the order they are kept (cs:0d58).
+constexpr u8 kKeptLights[] = {0x01, 0x02, 0x04, 0x05, 0x06, 0x08, 0x09, 0x29, 0x26, 0x22, 0x1f, 0x1c, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e};
+
+}  // namespace
+
+PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
+  bind(0x000b, [this] { newGameTable(); });
+  bind(0x0202, [this] {  // the music a game opens with
+    music(0x0c87);
+    B(0x230c) = B(0x0c71);
+    B(0x230a) = 0;
+  });
+  bind(0x0bca, [this] { serve(); });
+  bind(0x6200, [this] {
+    if (!countTo(0x3618, 0x1e)) return;
+    startBall();
+    endTimer();
+  });
+  bind(0x0ca4, [this] {
+    if (!countTo(0x35d0, 5)) return;
+    effect(0x0c1d);
+    endTimer();
+  });
+  bind(0x0cca, [this] {
+    if (!countTo(0x35d2, 0x32)) return;
+    effect(0x0c35);
+    endTimer();
+  });
+  bind(0x0cf0, [this] {  // the ball appears at the top of the lane, rolling right
+    if (!countTo(0x35d4, 0x50)) return;
+    placeBall(0x129, 0x212);
+    W(at::ballVx) = 0x0a;
+    B(at::ballHidden) = 0;
+    W(0x3385) = 0xffff;
+    endTimer();
+  });
+}
+
+void PartyLand::newGameTable() {
+  B(0x06ce) = 0;
+  lightsOut();
+  stopBlinks();
+  for (u16 i = 0; i < 12; ++i) B(0x010c, i) = B(0x0124, i);
+  clearScores();
+  clearBall();
+  for (u16 player = 0; player < 8; ++player) savePlayer(static_cast<u16>(player * 0x74));
+  B(0x00ce) = 0;
+  B(0x00cd) = 0;
+  B(0x00d1) = 0;
+  for (u16 i = 0; i < 0x10; ++i) B(0x1c16, i) = 0x20;
+  for (u16 i = 0; i < 0x10; ++i) B(0x1c28, i) = 0x20;
+}
+
+void PartyLand::clearScores() {
+  for (u16 at : {u16{0x45b6}, u16{0x3399}, u16{0x00b0}, u16{0x00bc}, u16{0x00dc}, u16{0x00e8}})
+    for (u16 i = 0; i < 12; ++i) B(at, i) = 0;
+  W(0x00ae) = 0;
+  for (u16 i = 0; i < 0x10; ++i) B(0x1c16, i) = 0x20;
+}
+
+void PartyLand::clearBall() {
+  B(0x2238) = 0x38;
+  for (u16 i = 0; i < 12; ++i) B(0x00f4, i) = 0;
+  for (u16 i = 0; i < 12; ++i) B(0x0100, i) = 0;
+  B(at::layer) = 0;
+  for (u16 a : {u16{0x86}, u16{0x9b}, u16{0xa4}, u16{0xa5}, u16{0x8a}, u16{0x87}, u16{0x88}, u16{0x89}, u16{0x8e}, u16{0x97}}) B(a) = 0;
+  W(0x33b1) = 1;
+  for (u16 a : {u16{0x98}, u16{0x99}, u16{0x9a}, u16{0xa0}, u16{0xa1}, u16{0xa2}, u16{0xa3}, u16{0x8b}, u16{0x8c}, u16{0x8d}, u16{0x94},
+                u16{0x95}, u16{0xc9}, u16{0xca}})
+    B(a) = 0;
+  W(0x05a9) = 0;
+  B(0x00cf) = 0;
+  B(0x00d4) = 0;
+  W(0x00a8) = 0;
+  W(0x05ad) = 0;
+  W(0x05ab) = 0;
+  B(0x0096) = 0;
+  W(0x009c) = 0;
+  W(0x009e) = 0;
+  B(0x00c8) = 0;
+  B(0x05b1) = 0;
+  B(0x05b2) = 0;
+  B(0x05b3) = 0;
+  B(0x33f8) = 0xff;
+  stopBlinks();
+  lightsOut();
+  setLight(0x34);
+  setLight(0x35);
+  setLight(0x36);
+  blink(0x0e, 0, 8);
+  blink(0x1a, 0, 9);
+  flushColours();
+  // the three drop targets stand
+  patchMask(0x3b74, 0x2b5a, 0x68b0, 2, 0x0f);
+  patchMask(0x3b74, 0x2e2b, 0x68f0, 2, 0x0f);
+  patchMask(0x3b74, 0x30fc, 0x6940, 1, 0x0f);
+  B(0x01fc) = 1;
+}
+
+void PartyLand::savePlayer(u16 player) {
+  u16 i = 0;
+  for (u8 light : kKeptLights) nativeB(static_cast<u16>(player + 0x209 + i++)) = B(0x3591, light) == 0xff ? 0xff : 0;
+  flushColours();
+  nativeW(static_cast<u16>(player + 0x27a)) = W(0x00ae);
+  nativeB(static_cast<u16>(player + 0x27c)) = B(0x06ce);
+  struct Kept { u16 at, from; };
+  for (const Kept k : {Kept{0x21a, 0x45b6}, {0x226, 0x3399}, {0x232, 0x00dc}, {0x23e, 0x00e8}, {0x262, 0x00b0}, {0x26e, 0x00bc}})
+    for (u16 b = 0; b < 12; ++b) nativeB(static_cast<u16>(player + k.at + b)) = B(k.from, b);
+}
+
+void PartyLand::restorePlayer() {
+  const u16 player = static_cast<u16>((B(0x371a) - 1) * 0x74);
+  u16 i = 0;
+  for (u8 light : kKeptLights) {
+    if (nativeB(static_cast<u16>(player + 0x209 + i++)) == 0xff) setLight(light);
+    else clearLight(light);
+  }
+  flushColours();
+  W(0x00ae) = nativeW(static_cast<u16>(player + 0x27a));
+  B(0x06ce) = nativeB(static_cast<u16>(player + 0x27c));
+  struct Kept { u16 at, to; };
+  for (const Kept k : {Kept{0x21a, 0x45b6}, {0x226, 0x3399}, {0x232, 0x00dc}, {0x23e, 0x00e8}, {0x262, 0x00b0}, {0x26e, 0x00bc}})
+    for (u16 b = 0; b < 12; ++b) B(k.to, b) = nativeB(static_cast<u16>(player + k.at + b));
+}
+
+void PartyLand::serve() {
+  B(0x33ce) = 0;
+  B(at::ballLost) = 0;
+  B(0x33e0) = 0xff;
+  beginBall();
+  lightsOut();  // cs:009d
+  stopBlinks();
+  clearBall();
+  restorePlayer();
+  if (B(0x00ce) != 0) setLight(0x33);
+  B(at::ballHidden) = 0xff;
+  placeBall(0x11a, 0x212);
+  W(0x3385) = 0xffff;
+  if (B(0x33e3) != 0xff && B(0x00d1) != 0xff) {
+    music(0x0c6f);
+    B(0x00d1) = 0;
+  }
+  B(0x230a) = 0;
+  B(0x33de) = 0;
+  if (B(0x33e3) != 0xff) startBall();
+  else addTimer(0x6200);
+}
+
+void PartyLand::startBall() {
+  addTimer(0x0cca);
+  addTimer(0x0cf0);
+  addTimer(0x0ca4);
+  B(0x33cf) = 0xff;
+  B(at::tilted) = 0;
+  W(at::tiltCounter) = 0;
+  B(0x33de) = 0;
+}
+
+}  // namespace encore
