@@ -8,7 +8,7 @@ constexpr u8 kKeptLights[] = {0x01, 0x02, 0x04, 0x05, 0x06, 0x08, 0x09, 0x29, 0x
 
 }  // namespace
 
-PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
+PartyLand::PartyLand(ByteView prg) : Flow(prg, 0) {
   bind(0x000b, [this] { newGameTable(); });
   bind(0x0202, [this] {  // the music a game opens with
     music(0x0c87);
@@ -17,7 +17,6 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
   });
   bindRules();
   bindSteps();
-  bindGameSteps();
   bind(0x0004, [this] {  // at start-up: the top of the left ramp's mask is kept, for putting back
     u16 to = 0x1356;
     for (u16 row = 0; row < 0x12; ++row)
@@ -33,7 +32,6 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
     }
     B(0x3712) = 0;
   });
-  bind(0x0bca, [this] { serve(); });
   bind(0x0fa0, [this] {  // tilt
     B(0x33cf) = 0;
     music(0x0c7b);
@@ -63,39 +61,6 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
       startScript(0x1acc);
       W(0x36f8) = 0;
     }
-  });
-  bind(0x02ba, [this] {
-    if (!countTo(0x35ca, 0x1e)) return;
-    B(0x00d0) = 0xff;
-    serve();
-  });
-  bind(0x02f1, [this] {
-    if (!countTo(0x35cc, 5)) return;
-    effect(0x0c31);
-    endTimer();
-  });
-  bind(0x6200, [this] {
-    if (!countTo(0x3618, 0x1e)) return;
-    startBall();
-    endTimer();
-  });
-  bind(0x0ca4, [this] {
-    if (!countTo(0x35d0, 5)) return;
-    effect(0x0c1d);
-    endTimer();
-  });
-  bind(0x0cca, [this] {
-    if (!countTo(0x35d2, 0x32)) return;
-    effect(0x0c35);
-    endTimer();
-  });
-  bind(0x0cf0, [this] {  // the ball appears at the top of the lane, rolling right
-    if (!countTo(0x35d4, 0x50)) return;
-    placeBall(0x129, 0x212);
-    W(at::ballVx) = 0x0a;
-    B(at::ballHidden) = 0;
-    W(0x3385) = 0xffff;
-    endTimer();
   });
 }
 
@@ -184,39 +149,6 @@ void PartyLand::restorePlayer() {
   struct Kept { u16 at, to; };
   for (const Kept k : {Kept{0x21a, 0x45b6}, {0x226, 0x3399}, {0x232, 0x00dc}, {0x23e, 0x00e8}, {0x262, 0x00b0}, {0x26e, 0x00bc}})
     for (u16 b = 0; b < 12; ++b) B(k.to, b) = nativeB(static_cast<u16>(player + k.at + b));
-}
-
-void PartyLand::serve() {
-  B(0x33ce) = 0;
-  B(at::ballLost) = 0;
-  B(0x33e0) = 0xff;
-  beginBall();
-  lightsOut();  // cs:009d
-  stopBlinks();
-  clearBall();
-  restorePlayer();
-  if (B(0x00ce) != 0) setLight(0x33);
-  B(at::ballHidden) = 0xff;
-  placeBall(0x11a, 0x212);
-  W(0x3385) = 0xffff;
-  if (B(0x33e3) != 0xff && B(0x00d1) != 0xff) {
-    music(0x0c6f);
-    B(0x00d1) = 0;
-  }
-  B(0x230a) = 0;
-  B(0x33de) = 0;
-  if (B(0x33e3) != 0xff) startBall();
-  else addTimer(0x6200);
-}
-
-void PartyLand::startBall() {
-  addTimer(0x0cca);
-  addTimer(0x0cf0);
-  addTimer(0x0ca4);
-  B(0x33cf) = 0xff;
-  B(at::tilted) = 0;
-  W(at::tiltCounter) = 0;
-  B(0x33de) = 0;
 }
 
 void PartyLand::everyFrame() {

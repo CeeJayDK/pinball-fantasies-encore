@@ -1,29 +1,24 @@
 #pragma once
 // Party Land's own rules (TABLE1.PRG, cs:0000 to cs:2f9a), on the engine the tables share.
-#include "engine/table/Engine.h"
+#include "engine/table/Flow.h"
 
 namespace encore {
 
-class PartyLand : public Engine {
+class PartyLand : public Flow {
  public:
   explicit PartyLand(ByteView prg);
 
  private:
   void newGameTable();    // cs:000b
   void clearScores();     // cs:0054
-  void clearBall();       // cs:00aa
-  void savePlayer(u16 player);     // cs:0e83: `player` is its place in the players' table
-  void restorePlayer();   // cs:0d48
-  void serve();           // cs:0bca
-  void startBall();       // cs:0c79
+  void savePlayer(u16 player) override;   // cs:0e83
+  void restorePlayer() override;          // cs:0d48
+  void clearBall() override;              // cs:00aa
   void everyFrame();      // cs:2ab1
   void drained();         // cs:0215
   void bindRules();       // PartyLandRules.cpp
   void bindSteps();
-  void bindGameSteps();   // PartyLandGame.cpp
-  /// The step after this one is run at once (cs:0b1d).
-  void chain();
-  void goTo(u16 script);  ///< go on from another script, at once
+
 
   // (named by where they are in the program until what they are is clearer)
   void hole() { placeBall(0x0f, 0x2f); }   ///< the ball put away, out of sight
