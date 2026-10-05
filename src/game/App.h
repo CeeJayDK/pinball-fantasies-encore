@@ -18,7 +18,7 @@
 #include "gfx/Framebuffer.h"
 #include "gfx/Palette.h"
 #include "gfx/Renderer.h"
-#include "intro/Intro.h"
+#include "engine/game/Front.h"
 #include "platform/AudioDevice.h"
 #include "platform/Window.h"
 #include "core/Keys.h"
@@ -68,7 +68,6 @@ class App {
  private:
   bool init();
   void update(double dt);
-  void playSilently(Player& player);
   void render(double now);
   bool askToDownload();
   bool askYesNo(std::span<const std::string_view> lines);
@@ -110,7 +109,7 @@ class App {
   HdFrame hd_;
   u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own
   bool ballTrail_ = true;      ///< the fading ghosts behind the ball
-  std::unique_ptr<Intro> intro_;
+  std::unique_ptr<encore::Front> intro_;
   std::unique_ptr<encore::TableGame> table_;
   int tableIndex_ = 0;  ///< which table is open
   struct Stats {
@@ -135,7 +134,6 @@ class App {
   std::vector<u8> clipFrame_;
   bool running_ = true;
   bool sound_ = false;            ///< a sound card is playing the music
-  std::vector<float> silence_;   ///< where the music goes without one
 };
 
 }  // namespace pfr

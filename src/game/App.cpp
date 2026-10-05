@@ -393,9 +393,9 @@ void App::openIntro(int returningFrom) {
   const auto prg = file::readAll(files_.intro);
   const auto mod = file::readAll(returningFrom < 0 ? files_.introMusic : files_.menuMusic);
   if (!prg || !mod) throw DataError("cannot read INTRO.PRG or its music");
-  intro_ = std::make_unique<Intro>(*prg, *mod, config_, returningFrom);
-  resizeFrame(intro_->width(), intro_->height(), 1.0);
-  audio_.setSource([p = &intro_->player()](float* out, int frames) { p->render(out, frames); });
+  intro_ = std::make_unique<encore::Front>(*prg, *mod, config_, returningFrom);
+  resizeFrame(encore::Front::kWidth, encore::Front::kHeight, 1.0);
+  audio_.setSource([f = intro_.get()](float* out, int frames) { f->sound(out, frames); });
 }
 
 /// A table to play on; with `recording`, the table that recording was played on, which then
@@ -603,15 +603,7 @@ void App::handleKey(const SDL_Event& e) {
   }
   if (table_ && down && table_->startsGame(k)) newGame();
   if (table_) table_->key(k, down);
-  else if (intro_) intro_->handleKey(k, down);
-}
-
-/// Without a sound card nothing would move the music on, and the game waits on it: a table's
-/// scripts for a jingle to end, the intro's pictures for the music to reach their moment. It
-/// is moved on here instead, a frame's worth at a time, and nobody hears it.
-void App::playSilently(Player& player) {
-  silence_.resize(800 * 2);  // 48000 a second, 60 frames
-  player.render(silence_.data(), 800);
+  else if (intro_) intro_->key(k, down);
 }
 
 void App::update(double dt) {
@@ -619,20 +611,21 @@ void App::update(double dt) {
   while (clock_ >= kFrame) {
     clock_ -= kFrame;
     if (intro_) {
-      const IntroAction a = intro_->runFrame();
-      if (!sound_) playSilently(intro_->player());
+      using Kind = encore::Front::Action::Kind;
+      const encore::Front::Action a = intro_->frame();
+      // (without a sound card nobody takes the music away; it is played by the game's time anyway)
+      if (!sound_) intro_->noSound();
       switch (a.kind) {
-        case IntroAction::Kind::OpenTable:
+        case Kind::OpenTable:
           config_.options = intro_->options();
           openTable(a.table);
           break;
-        case IntroAction::Kind::SaveOptions:
+        case Kind::SaveOptions:
           config_.options = intro_->options();
           Config::saveOptions(saveDir_, config_.options);
-          resizeFrame(intro_->width(), intro_->height(), 1.0);
           break;
-        case IntroAction::Kind::Quit: running_ = false; return;
-        case IntroAction::Kind::None: break;
+        case Kind::Quit: running_ = false; return;
+        case Kind::None: break;
       }
     } else if (table_) {
       if (replaying_) {
@@ -909,13 +902,13 @@ void App::render(double now) {
   if (table_)
     resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
   else if (intro_)
-    resizeFrame(intro_->width(), intro_->height(), 1.0);
+    resizeFrame(encore::Front::kWidth, encore::Front::kHeight, 1.0);
   if (table_) {
     table_->ballTrail = ballTrail_;
     table_->draw(frame_.data(), colors.data(), hd);
   }
   else if (intro_)
-    intro_->render(frame_.data(), colors.data(), hd);
+    intro_->draw(frame_.data(), colors.data(), hd);
   palette_.set(0, std::vector<Rgb>(colors.begin(), colors.end()));
   int w = 0, h = 0;
   window_.drawableSize(w, h);

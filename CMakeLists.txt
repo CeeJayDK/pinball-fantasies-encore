@@ -243,6 +243,9 @@ target_link_libraries(encore-oracle-physics PRIVATE encore_engine)
 add_executable(encore-front tools/front.cpp)
 target_link_libraries(encore-front PRIVATE encore_engine)
 
+add_executable(encore-front-compare tools/front_compare.cpp)
+target_link_libraries(encore-front-compare PRIVATE encore_engine)
+
 add_executable(encore-music tools/music.cpp)
 target_link_libraries(encore-music PRIVATE encore_engine)
 

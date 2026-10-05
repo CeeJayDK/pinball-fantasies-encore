@@ -136,13 +136,14 @@ class Front {
   void midFrameCallback();         ///< cs:2821
   void scroller();                 ///< cs:2987
   u16 find(u16 segment, const char* tag);
-  u16 unpackPlanar(u16 segment, u16 row, bool setColours);   ///< cs:4880
+  u16 unpackPlanar(u16 segment, u16 row, bool setColours, HdPicture is = HdPicture::None);   ///< cs:4880
   u16 unpackChunky(u16 segment, u16 row, u16 rows);          ///< cs:4a39, cs:4db0
   void sendColours(u8 first, u16 picture);                   ///< cs:1ed1
   void glyph(u16 y, u16 x, u8 letter);                       ///< cs:2c37
   void text(u16 y, u16 page);                                ///< cs:2cf2
   void string(u16 y, u16 x, u16 text);                       ///< cs:43cf
   void heading(u16 from, u16 to);                            ///< cs:13ea
+  void forget(u16 at, u8 dots = 0xff);                       ///< those dots are no longer a picture's
   void threeColours(int times, int of);                      ///< the letters' three colours, dimmed
   void rubOutText(bool both);                                ///< cs:2684, cs:26b1
   void optionText(int row, u16& text);                       ///< cs:41b2 and its like
@@ -170,6 +171,12 @@ class Front {
   bool selectBits_ = false;        ///< the upper colour bits come from the colour select
   u8 selectTop_ = 0, selectBottom_ = 0;
   std::array<u8, 768> fadeBuffer_{};  ///< cs:20df
+  /// For the pictures drawn again at high resolution: which picture each dot of the card's
+  /// memory is a dot of, and which dot (picture << 20 | across << 10 | down); 0 for none.
+  /// Copies within the memory take it along, and whatever is drawn over a dot takes it away.
+  std::vector<u32> from_;
+  int slide_ = 0;        ///< which of the five slides is on the screen, or 0
+  float level_ = 1.0f;   ///< how far the screen is faded in
 
   Task task_;
   std::coroutine_handle<> waiting_;

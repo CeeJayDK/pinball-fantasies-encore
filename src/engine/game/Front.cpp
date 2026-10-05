@@ -76,6 +76,7 @@ Front::Front(ByteView prg, ByteView module, const Config& config, int returningF
   if (prg.size() < 0x400 + 0x4daa0) throw DataError("INTRO.PRG is not the program it should be");
   image_.assign(prg.begin() + 0x400, prg.end());
   for (auto& plane : planes_) plane.assign(0x10000, 0);
+  from_.assign(0x10000 * 8, 0);
   if (!music_.load(module)) throw DataError("the menu's music is not a module");
   music_.setMono(options_.mono);
   music_.start();
@@ -153,14 +154,28 @@ void Front::poke(u16 at, u8 value) {
     else if (enableSetReset_ & (1 << p)) planes_[p][at] = (setReset_ & (1 << p)) ? 0xff : 0;
     else planes_[p][at] = value;
   }
+  if (writeMode_ != 1) forget(at);
+}
+
+void Front::forget(u16 at, u8 dots) {
+  for (int bit = 0; bit < 8; ++bit)
+    if (dots & (0x80 >> bit)) from_[std::size_t{at} * 8 + static_cast<std::size_t>(bit)] = 0;
 }
 
 void Front::copy(u16 to, u16 from, u16 count) {
-  for (u16 i = 0; i < count; ++i) poke(static_cast<u16>(to + i), peek(static_cast<u16>(from + i)));
+  for (u16 i = 0; i < count; ++i) {
+    poke(static_cast<u16>(to + i), peek(static_cast<u16>(from + i)));
+    if (writeMode_ == 1)
+      for (std::size_t bit = 0; bit < 8; ++bit)
+        from_[std::size_t{static_cast<u16>(to + i)} * 8 + bit] = from_[std::size_t{static_cast<u16>(from + i)} * 8 + bit];
+  }
 }
 
 void Front::fill(u16 to, u16 count, u8 value) {
-  for (u16 i = 0; i < count; ++i) poke(static_cast<u16>(to + i), value);
+  for (u16 i = 0; i < count; ++i) {
+    poke(static_cast<u16>(to + i), value);
+    forget(static_cast<u16>(to + i));
+  }
 }
 
 void Front::writeMode(int mode) {
@@ -174,6 +189,7 @@ void Front::setDac(int first, const u8* values, int bytes) {
 
 void Front::clearVideo() {
   for (auto& plane : planes_) std::fill(plane.begin(), plane.end(), u8{0});
+  std::fill(from_.begin(), from_.end(), u32{0});
 }
 
 /// cs:4998: where in a picture a part of it begins, past its four letters.
@@ -187,7 +203,7 @@ u16 Front::find(u16 segment, const char* tag) {
 
 /// cs:4880: a picture of sixteen colours, a row of each plane at a time, into the card's
 /// memory from a row on. Answers where its colours are, which it leaves as the card takes them.
-u16 Front::unpackPlanar(u16 segment, u16 row, bool setColours) {
+u16 Front::unpackPlanar(u16 segment, u16 row, bool setColours, HdPicture is) {
   const u16 cmap = find(segment, "CMAP");
   const u16 colours = static_cast<u16>((far(segment, cmap + 2u) << 8) | far(segment, cmap + 3u));
   const u16 palette = static_cast<u16>(cmap + 4);
@@ -221,6 +237,12 @@ u16 Front::unpackPlanar(u16 segment, u16 row, bool setColours) {
       rowDone = width != 0 && at % width == 0;
     }
   }
+  // which picture's dots these now are (of the menu's own picture, only the panel on its left)
+  const u32 acrossTo = is == HdPicture::Left ? 130 : is == HdPicture::None ? 0 : static_cast<u32>(width * 8);
+  for (u32 y = 0; y < height; ++y)
+    for (u32 x = 0; x < static_cast<u32>(width * 8); ++x)
+      from_[(std::size_t{static_cast<u16>((row + y) * 80)} * 8 + x) % from_.size()] =
+          x < acrossTo ? (static_cast<u32>(is) << 20) | (x << 10) | y : 0;
   return palette;
 }
 
@@ -259,6 +281,7 @@ u16 Front::unpackChunky(u16 segment, u16 row, u16 bytes) {
 
 void Front::sendColours(u8 first, u16 picture) {
   setDac(first, &far(dsw(static_cast<u16>(0x589e + picture)), dsw(static_cast<u16>(0x58ac + picture))), 0x30);
+  level_ = 1.0f;
 }
 
 /// cs:2c37: a letter of the menu's own, 24 dots by 14, from where the letters are kept in
@@ -276,6 +299,7 @@ void Front::glyph(u16 y, u16 x, u8 letter) {
       for (u16 b = 0; b < 3; ++b) {
         const u8 v = plane[static_cast<u16>(s + b)];
         plane[static_cast<u16>(d + b)] |= static_cast<u8>((v >> shift) | carry);
+        forget(static_cast<u16>(d + b), static_cast<u8>((v >> shift) | carry));
         carry = shift ? static_cast<u8>(v << (8 - shift)) : 0;
       }
     }
@@ -307,6 +331,9 @@ void Front::heading(u16 from, u16 to) {
     for (int row = 0; row < 40; ++row, at = static_cast<u16>(at + 0x1e))
       for (int b = 0; b < 50; ++b) plane[at++] = ds(from++);
   }
+  for (u32 y = 0; y < 40; ++y)
+    for (u32 x = 0; x < 400; ++x)
+      from_[std::size_t{static_cast<u16>(to + y * 80)} * 8 + x] = (static_cast<u32>(HdPicture::HiScores) << 20) | (x << 10) | y;
   writeMode_ = 0;
 }
 
@@ -423,6 +450,11 @@ Front::Task Front::fade(int frames, u16 fromSegment, u16 from, u16 toSegment, u1
     }
     co_await nextFrame();
     setDac(0, fadeBuffer_.data(), bytes);
+    // (0x527d and 0x557d are the black the slides fade from and to)
+    const bool toBlack = fromSegment == 0x80 && (from == 0x527d || from == 0x557d);
+    const bool fromBlack = toSegment == 0x80 && (to == 0x527d || to == 0x557d);
+    level_ = toBlack && fromBlack ? 0.0f : toBlack ? static_cast<float>(left) / static_cast<float>(frames)
+                                         : static_cast<float>(frames - left) / static_cast<float>(frames);
   }
 }
 
@@ -448,6 +480,7 @@ Front::Task Front::leave(int table) {
     }
     co_await nextFrame();
     setDac(0, fadeBuffer_.data(), 0xc0);
+    level_ = static_cast<float>(left) / 80.0f;
     const u16 volume = static_cast<u16>((left << 8) / 0x50);
     if ((volume & 0xfff0) != lastVolume_) {
       lastVolume_ = volume & 0xfff0;
@@ -461,12 +494,15 @@ Front::Task Front::leave(int table) {
 
 Front::Task Front::slides() {
   setStart(0);
+  slide_ = 1;
+  level_ = 0;
   co_await waitTicks(1);
   co_await fade(0x14, 0x80, dsw(0x60b), 0x80, 0x527d, 0xc0);
   co_await waitTicks(0x12e);
   co_await fade(0x14, 0x80, 0x527d, 0x80, dsw(0x60b), 0xc0);
   if (!skip_) {
     setStart(0x4d30);
+    slide_ = 2;
     co_await fade(0x0a, 0x80, dsw(0x60d), 0x80, 0x557d, 0x300);
     co_await waitTicks(0x26c);
     co_await fade(0x14, 0x80, 0x527d, 0x80, dsw(0x60d), 0x300);
@@ -474,6 +510,7 @@ Front::Task Front::slides() {
   if (!skip_) {
     co_await fade(1, 0x80, 0x527d, 0x80, 0x527d, 0x300);
     setStart(0x99c0);
+    slide_ = 3;
     co_await fade(0x0a, 0x11c2, dsw(0x5279), 0x80, 0x557d, 0x300);
     co_await waitTicks(0x37b);
     co_await fade(0x14, 0x80, 0x527d, 0x11c2, dsw(0x5279), 0x300);
@@ -483,6 +520,7 @@ Front::Task Front::slides() {
     for (auto& plane : planes_) std::fill(plane.begin(), plane.begin() + 0x12c0, u8{0});
     fadeBuffer_.fill(0);
     setDac(0, fadeBuffer_.data(), 0x300);
+    slide_ = 4;
     const u16 colours = unpackChunky(0x10a6, 0, 0x2f40);
     setw(0x527b, colours);
     co_await fade(0x08, 0x10a6, colours, 0x80, 0x527d, 0xc0);
@@ -495,6 +533,7 @@ Front::Task Front::slides() {
     start_ = 0;
     selectBits_ = false;
     co_await fade(1, 0x80, 0x527d, 0x80, 0x527d, 0xc0);
+    slide_ = 5;
     const u16 colours = unpackPlanar(0x0a05, 0x96, false);
     setw(0x5275, colours);
     co_await fade(0x14, 0x0a05, colours, 0x80, 0x527d, 0xc0);
@@ -505,6 +544,7 @@ Front::Task Front::slides() {
     co_await fade(1, 0x80, 0x527d, 0x80, 0x527d, 0xc0);
     co_await fade(1, 0x80, 0x527d, 0x80, 0x527d, 0xc0);
   }
+  slide_ = 0;
   co_await nextFrame();
   mode_ = Mode::Planar240;
   co_await nextFrame();
@@ -701,7 +741,7 @@ Front::Task Front::chooseOptions() {
         u16 length = 0;
         for (u16 at = static_cast<u16>(0x4e51 + 0x0d + row * 0x18); ds(static_cast<u16>(words + length)) != 0; ++length)
           ds(static_cast<u16>(at + length)) = ds(static_cast<u16>(words + length));
-        const u16 x = static_cast<u16>(0x2d00 * row + 0x12 * 0x0d + 0xda);
+        const u16 x = 0x12 * 0x0d + 0xda;  // (cs:4155; its row times 0x2d00 is of a row already lost)
         const u16 width = static_cast<u16>(((length * 0x12) >> 3) + 2);
         const u16 y = static_cast<u16>(row * 0x12 + 0x32);
         writeMode(1);
@@ -800,7 +840,9 @@ Front::Task Front::menu() {
   openWidth_ = 0x82;
   co_await nextFrame();
   for (u16 i = 0; i < 14; i = static_cast<u16>(i + 2))  // cs:1449: the menu's picture, its letters, the four banners
-    setw(static_cast<u16>(0x58ac + i), unpackPlanar(dsw(static_cast<u16>(0x589e + i)), dsw(static_cast<u16>(0x5890 + i)), false));
+    setw(static_cast<u16>(0x58ac + i), unpackPlanar(dsw(static_cast<u16>(0x589e + i)), dsw(static_cast<u16>(0x5890 + i)), false,
+                                                    i == 0 ? HdPicture::Left : i >= 6 ? static_cast<HdPicture>(static_cast<int>(HdPicture::Table1) + (i - 6) / 2)
+                                                                                      : HdPicture::None));
   writeMode(1);
   {  // cs:2d3a: the banners' rows, 55 bytes of each, moved up against each other
     u16 from = 0x5cd0, to = 0x5cb7;
@@ -938,12 +980,26 @@ Front::Task Front::main() {
 // the screen
 // ---------------------------------------------------------------------------------------
 void Front::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
-  if (hd) hd->reset(kWidth, kHeight);
+  if (hd) {
+    hd->reset(kWidth, kHeight);
+    hd->fade.fill(level_);
+  }
+  auto mark = [&](int x, int y, HdPicture is, u32 across8, u32 down8, u16 halves, u16 width, u16 height) {
+    const auto id = static_cast<std::size_t>(is);
+    hd->map[static_cast<std::size_t>(y) * kWidth + static_cast<std::size_t>(x)] =
+        HdPixel{static_cast<u16>(across8), static_cast<u16>(down8), static_cast<u16>(id | halves), 0};
+    hd->used |= 1u << id;
+    hd->size[id] = {width, height};
+  };
   for (int y = 0; y < kHeight; ++y) {
     u8* out = frame + static_cast<std::size_t>(y) * kWidth;
     if (mode_ == Mode::Chunky320) {
       const u16 row = static_cast<u16>(start_ + (y / 2) * 80);
-      for (int x = 0; x < kWidth; ++x) out[x] = planes_[static_cast<std::size_t>((x / 2) & 3)][static_cast<u16>(row + x / 8)];
+      for (int x = 0; x < kWidth; ++x) {
+        out[x] = planes_[static_cast<std::size_t>((x / 2) & 3)][static_cast<u16>(row + x / 8)];
+        if (hd && slide_ >= 1 && slide_ <= 4)
+          mark(x, y, static_cast<HdPicture>(slide_), static_cast<u32>(x * 4), static_cast<u32>(y * 4), HdFrame::kHalfX | HdFrame::kHalfY, 320, 240);
+      }
       continue;
     }
     const u16 row = static_cast<u16>(start_ + (mode_ == Mode::Planar240 ? y / 2 : y) * 80);
@@ -959,6 +1015,17 @@ void Front::draw(u8* frame, Rgb* colours, HdFrame* hd) const {
       const int colour = ((planes_[0][at] >> bit) & 1) | (((planes_[1][at] >> bit) & 1) << 1) | (((planes_[2][at] >> bit) & 1) << 2) |
                          (((planes_[3][at] >> bit) & 1) << 3);
       out[x] = static_cast<u8>(upper | colour);
+      if (!hd) continue;
+      if (mode_ == Mode::Planar480) {
+        if (slide_ == 5) mark(x, y, HdPicture::Slide5, static_cast<u32>(x * 8), static_cast<u32>(y * 8), 0, 640, 480);
+        continue;
+      }
+      const u32 dot = from_[std::size_t{at} * 8 + static_cast<std::size_t>(x & 7)];
+      if (dot == 0) continue;
+      const auto is = static_cast<HdPicture>(dot >> 20);
+      const bool banner = is >= HdPicture::Table1 && is <= HdPicture::Table4;
+      mark(x, y, is, ((dot >> 10) & 0x3ff) * 8, (dot & 0x3ff) * 8 + static_cast<u32>(y & 1) * 4, HdFrame::kHalfY,
+           is == HdPicture::Left ? 130 : banner ? 440 : 400, is == HdPicture::Left ? 240 : banner ? 95 : 40);
     }
   }
   auto wide = [](u8 v) { return static_cast<u8>((v << 2) | (v >> 4)); };
