@@ -253,8 +253,10 @@ u16 Front::unpackChunky(u16 segment, u16 row, u16 bytes) {
   const u16 cmap = find(segment, "CMAP");
   const u16 colours = static_cast<u16>((far(segment, cmap + 2u) << 8) | far(segment, cmap + 3u));
   const u16 palette = static_cast<u16>(cmap + 4);
-  // (colours 32 to 63 are made here: the first 32 at half their strength)
-  for (u16 i = 0; i < 0x60; ++i) far(segment, static_cast<u32>(palette + 0x60 + i)) = far(segment, static_cast<u32>(palette + i)) >> 1;
+  // (colours 32 to 63 are made here, the first 32 at half their strength: by the one routine
+  // only, cs:4aa2, which is the one that takes 151 rows)
+  if (bytes == 0x2f40)
+    for (u16 i = 0; i < 0x60; ++i) far(segment, static_cast<u32>(palette + 0x60 + i)) = far(segment, static_cast<u32>(palette + i)) >> 1;
   for (u16 i = 0; i < colours; ++i) far(segment, static_cast<u32>(palette + i)) >>= 2;
   u32 from = find(segment, "BODY") + 4u;
   u16 at = static_cast<u16>(row * 80);
