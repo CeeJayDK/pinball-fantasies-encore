@@ -44,8 +44,8 @@ d 2eec ballVx
 d 2eee ballVy
 d 2ef0 contactX
 d 2ef2 contactY
-d 2ef4 gravityX
-d 2ef6 gravityY
+d 2ef4 gravityY                 ; added to the speed downwards each sub-step
+d 2ef6 gravityX
 d 2edc material
 d 331a layer                    ; 0 playfield, ff ramps
 d 2f2a ballHidden               ; ff: no ball in play, physics skipped

@@ -7,6 +7,7 @@ Engine::Engine(ByteView prg, int table) : Program(prg, table) {
   bind(0x69fc, [] {});  // the original's "nothing": a lone ret, which empty slots point at
   bindDisplay();
   bindGame();
+  bindPlunger();
 }
 
 void Engine::effect(u16 record) {

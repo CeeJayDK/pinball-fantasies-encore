@@ -71,8 +71,21 @@ class Engine : public Program {
 
   // --- the ball, and what follows its sub-steps (EnginePhysics.cpp)
   void physicsSteps();      // cs:87c0
+  bool probeBall();         // cs:8829
+  void bounce();            // cs:8e95
+  void nudgeAndFlippers();  // cs:9133
+  void integrate();         // cs:908f
+  void stampFlippers();     // cs:9106
   void afterSteps();        // cs:59aa
+  void bumperEvent();       // cs:5ace
+  void pickGravity();       // cs:59d9
+  void changeLayer();       // cs:5d24
   void runRules();          // cs:5989
+  void rollTriggers();      // cs:5d70
+  void hitTriggers();       // cs:5cb9
+  void bindPlunger();
+  /// One dot of a collision mask (a segment of the program's, 40 bytes a row).
+  bool maskBit(u16 partyLandSegment, int x, int y);
 
   // --- timers: up to 50 routines run once a frame (cs:5b0b, cs:5b2a, cs:576a)
   void addTimer(u16 native);

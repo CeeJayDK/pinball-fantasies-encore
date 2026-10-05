@@ -66,9 +66,15 @@ class Program {
 
   /// The program's other segments (pictures of the display's animations, the score's digits),
   /// by this table's own segment value: the byte at an offset in one.
-  u8& farB(u16 nativeSegment, u16 offset) { return image_[(std::size_t{nativeSegment} * 16 + offset) % image_.size()]; }
+  u8& farB(u16 nativeSegment, u16 offset) {
+    return image_[(std::size_t{static_cast<u16>(nativeSegment - kLoadSegment)} * 16 + offset) % image_.size()];
+  }
   Word farW(u16 nativeSegment, u16 offset) { return Word(&farB(nativeSegment, offset)); }
-  /// One of Party Land's segment values, as this table has it.
+  /// The segment the program counts as loaded at. Segment values it keeps in its memory are
+  /// as DOS would have made them there; the referee loads it at the same place.
+  static constexpr u16 kLoadSegment = 0x0810;
+  /// One of Party Land's segment values (as its listing has them), as this table has it in
+  /// memory.
   u16 S(u16 segment) const;
 
   /// Party Land's address of some data, as this table has it: to keep as a pointer.
