@@ -140,6 +140,9 @@ class Engine : public Program {
   bool music(u16 nativeRecord);
   void addScore(u16 nativeTo, u16 nativeAmount);  // cs:6a5e: twelve digits, one to a byte
   void placeBall(u16 x, u16 y);
+  /// cs:5b9f: an award: its music if nothing more important plays, its score and bonus, and
+  /// its script on the display. True if the script was started.
+  bool award(u16 nativeRecord);
   /// Copies a shape into a collision mask (cs:5f5a): `width` bytes a row for `rows` rows.
   void patchMask(u16 partyLandSegment, u16 at, u16 nativeShape, u16 width, u16 rows);
   /// Called when a collision mask changes, for whoever keeps a copy.

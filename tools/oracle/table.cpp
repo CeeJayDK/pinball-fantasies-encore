@@ -5,6 +5,7 @@
 // segment, the variables among its code and its colours are compared with the original's.
 //
 //   encore-oracle-table <game folder> <table 1-4> <frames> [--keys <frame>:<scancode>,...]
+//                       [--flip <seed>]  plays at random from frame 400 on
 //                       [--all]   goes on after a difference, taking the original's value for
 //                                 it, and says each place that ever differs once
 #include <cstdio>
@@ -31,8 +32,10 @@ int main(int argc, char** argv) {
   const int frames = std::atoi(argv[3]);
   std::vector<std::pair<int, int>> keys;
   bool all = false;
+  int flip = -1;
   for (int i = 4; i < argc; ++i) {
     if (!std::strcmp(argv[i], "--all")) all = true;
+    else if (!std::strcmp(argv[i], "--flip") && i + 1 < argc) flip = std::atoi(argv[++i]);
     else if (!std::strcmp(argv[i], "--keys") && i + 1 < argc) {
       for (const char* p = argv[++i]; *p;) {
         char* end = nullptr;
@@ -69,6 +72,8 @@ int main(int argc, char** argv) {
     // The data segment ends where the next begins; the code's variables are among its code.
     const unsigned dataEnd = 0x6c00, codeEnd = 0xac00;
     std::set<unsigned> seen;
+    unsigned rng = static_cast<unsigned>(flip) * 2654435761u + 1;
+    bool left = false, right = false;
     int reported = 0;
     for (frame = 0; frame < frames; ++frame) {
       for (const auto& [at, code] : keys)
@@ -76,10 +81,28 @@ int main(int argc, char** argv) {
           m.key(static_cast<oracle::u8>(code));
           e.key(static_cast<encore::u8>(code));
         }
+      if (flip >= 0 && frame > 400) {  // a game played at random, the same for both
+        auto random = [&] { rng = rng * 1664525u + 1013904223u; return rng >> 16; };
+        auto both = [&](int code) { m.key(static_cast<oracle::u8>(code)); e.key(static_cast<encore::u8>(code)); };
+        if (random() % 23 == 0) { left = !left; both(left ? 0x2a : 0xaa); }
+        if (random() % 23 == 0) { right = !right; both(right ? 0x36 : 0xb6); }
+        if (frame % 900 == 0) both(0x1c);
+        if (frame % 900 == 5) both(0x9c);
+        if (frame % 300 == 100) { both(0xe0); both(0x50); }
+        if (frame % 300 == 100 + static_cast<int>(random() % 60) + 20) { both(0xe0); both(0xd0); }
+      }
       m.frame();
       e.frame();
       bool differs = false;
+      // What only the original's drawing uses is not kept: where it last drew the ball, and
+      // the drawing routines' own variables among the code.
+      auto drawing = [&](const char* what, unsigned a) {
+        if (what[0] == 'd') return (a >= e.A(0x2ef8) && a < e.A(0x2ef8) + 4u) || a == e.A(0x2f08);
+        if (what[0] == 'c') return a >= e.F(0x9240) && a < e.F(0x9240) + 0x1a00u;
+        return false;
+      };
       auto report = [&](const char* what, unsigned a, unsigned ours, unsigned theirs) {
+        if (drawing(what, a)) return;
         differs = true;
         if (!seen.insert((static_cast<unsigned>(what[0] + what[9]) << 20) | a).second) return;
         ++reported;

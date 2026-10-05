@@ -103,6 +103,32 @@ void Engine::addScore(u16 to, u16 amount) {
   }
 }
 
+bool Engine::award(u16 record) {
+  bool refused = false;
+  const u16 first = nativeW(record);
+  record = static_cast<u16>(record + 2);
+  if (first != 0) {
+    if (static_cast<u8>(first) == B(0x0c84) || (B(0x3398) != 0xff && B(0x33e2) != 0xff)) refused = !music(first);
+  } else {
+    refused = nativeB(record++) < B(0x3389);
+  }
+  W(0x36f6) = 0;
+  if (W(0x36f8) == 0xff) {
+    startScript(A(0x1acc));
+    W(0x36f8) = 0;
+  }
+  addScore(A(0x45b6), record);
+  B(0x33de) = 0xff;
+  addScore(A(0x3399), static_cast<u16>(record + 12));
+  const u16 script = nativeW(static_cast<u16>(record + 24));
+  if (refused || script == 0 || B(0x3398) == 0xff || B(0x33e2) == 0xff) {
+    B(0x33f8) = 0xff;
+    return false;
+  }
+  startScript(script);
+  return true;
+}
+
 void Engine::placeBall(u16 x, u16 y) {
   W(at::ballX) = x;
   W(at::ballY) = y;

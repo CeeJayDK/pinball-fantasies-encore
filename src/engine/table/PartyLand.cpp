@@ -16,6 +16,39 @@ PartyLand::PartyLand(ByteView prg) : Engine(prg, 0) {
     B(0x230a) = 0;
   });
   bind(0x0bca, [this] { serve(); });
+  bind(0x2ab1, [this] { everyFrame(); });
+  bind(0x0215, [this] { drained(); });
+  bind(0x0fcc, [this] {  // a flipper pressed: the four lane lights move along one (cs:0fcc)
+    if (B(0x00cf) == 0xff || B(0x338b) != 0xff) return;
+    B(0x338b) = 0;
+    const u8 fourth = B(0x3596);
+    auto put = [this](u8 light, u8 state) { state == 0xff ? setLight(light) : clearLight(light); };
+    put(5, B(0x3593));
+    put(2, B(0x3592));
+    put(1, B(0x3595));
+    put(4, fourth);
+  });
+  bind(0x2bd1, [this] {  // after a bumper's score (cs:2bd1)
+    if (B(0x05b1) == 0xff) {
+      addScore(0x00f4, 0x016c);
+      B(0x33df) = 0xff;
+    }
+    W(0x36f6) = 0;
+    if (W(0x36f8) == 0xff) {
+      startScript(0x1acc);
+      W(0x36f8) = 0;
+    }
+  });
+  bind(0x02ba, [this] {
+    if (!countTo(0x35ca, 0x1e)) return;
+    B(0x00d0) = 0xff;
+    serve();
+  });
+  bind(0x02f1, [this] {
+    if (!countTo(0x35cc, 5)) return;
+    effect(0x0c31);
+    endTimer();
+  });
   bind(0x6200, [this] {
     if (!countTo(0x3618, 0x1e)) return;
     startBall();
@@ -159,6 +192,53 @@ void PartyLand::startBall() {
   B(at::tilted) = 0;
   W(at::tiltCounter) = 0;
   B(0x33de) = 0;
+}
+
+void PartyLand::everyFrame() {
+  if (B(0x33ce) == 0xff) return;
+  ++B(0x0093);
+  for (u16 a : {u16{0x00aa}, u16{0x05ad}, u16{0x05ab}, u16{0x05a9}})
+    if (W(a) != 0) --W(a);
+  struct Wheel { u16 at; u8 size; };
+  for (const Wheel w : {Wheel{0x86, 0x10}, {0x9b, 0x18}, {0xa4, 0x04}, {0xa5, 0x1c}})
+    if (++B(w.at) == w.size) B(w.at) = 0;
+  if (W(0x00a8) == 0) return;
+  --W(0x00a8);
+  if (W(0x00a8) == 0x2d0) {
+    stopBlink(0x0a);
+    lightOff(0x0a);
+    B(0x359d) = 0;
+    blink(0x0c, 0, 8);
+  } else if (W(0x00a8) == 0) {
+    stopBlink(0x0c);
+    lightOff(0x0c);
+    B(0x359f) = 0;
+    blink(0x0e, 0, 8);
+  }
+}
+
+void PartyLand::drained() {
+  B(at::ballHidden) = 0xff;
+  W(0x3385) = high() ? 0x103 : 0x171;
+  placeBall(0x0f, 0x2f);
+  B(0x33cf) = 0;
+  B(0x33e2) = 0;
+  B(0x05b1) = 0;
+  B(0x05b2) = 0;
+  if (B(0x00d2) == 0xff) return;
+  B(0x33ce) = 0xff;
+  B(0x3389) = 0;
+  if (B(0x33de) == 0) {  // nothing was scored: the ball is given again
+    startScript(0x1477);
+    music(0x0c6f);
+    B(0x00d1) = 0xff;
+    addTimer(0x02ba);
+    return;
+  }
+  award(0x06d5);
+  B(0x3389) = 0;
+  B(0x230a) = 0x3e;
+  addTimer(0x02f1);
 }
 
 }  // namespace encore

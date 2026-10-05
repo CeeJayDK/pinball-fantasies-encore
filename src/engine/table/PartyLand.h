@@ -16,6 +16,8 @@ class PartyLand : public Engine {
   void restorePlayer();   // cs:0d48
   void serve();           // cs:0bca
   void startBall();       // cs:0c79
+  void everyFrame();      // cs:2ab1
+  void drained();         // cs:0215
 };
 
 }  // namespace encore
