@@ -48,7 +48,7 @@ Machine::Machine(const std::filesystem::path& gameDir, int table, const Config& 
     mem_[stub + 1] = n;
     mem_[stub + 2] = 0xcf;
     mem_[n * 4u] = static_cast<u8>(n * 4u);
-    mem_[n * 4u + 1] = 0;
+    mem_[n * 4u + 1] = static_cast<u8>((n * 4u) >> 8);
     mem_[n * 4u + 2] = 0x00;
     mem_[n * 4u + 3] = 0xf0;
   }
