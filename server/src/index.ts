@@ -215,13 +215,19 @@ async function sendRun(env: Env, req: Request, ctx: ExecutionContext): Promise<R
   const player = await playerOf(env, req);
   if (!player) return fail(401, "a player token is needed");
   const data = new Uint8Array(await req.arrayBuffer());
-  if (data.length < 8 || data.length > MAX_RECORDING) return fail(413, "not a recording, or too big");
+  if (data.length < 15 || data.length > MAX_RECORDING) return fail(413, "not a recording, or too big");
   if (String.fromCharCode(...data.slice(0, 4)) !== "PFRP") return fail(400, "not a recording");
   const format = data[4] | (data[5] << 8);
   if (!FORMATS.includes(format)) return fail(400, "a recording from a version this server cannot check");
   const hash = await sha256(data);
-  const existing = await env.DB.prepare("SELECT id, player_id, status FROM runs WHERE replay_sha256 = ?")
-    .bind(hash)
+  // The same file again, or another file with the same seed: the second is the first game
+  // changed where the score does not depend on it (the initials, say), which only the player who
+  // first sent the seed may send.
+  const seed = [...data.slice(7, 15)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const existing = await env.DB.prepare(
+    "SELECT id, player_id, status FROM runs WHERE replay_sha256 = ?1 OR seed = ?2 ORDER BY id LIMIT 1",
+  )
+    .bind(hash, seed)
     .first<{ id: number; player_id: number; status: string }>();
   if (existing) {
     if (existing.player_id !== player.id) return fail(409, "already sent by someone else");
@@ -236,9 +242,9 @@ async function sendRun(env: Env, req: Request, ctx: ExecutionContext): Promise<R
     return fail(429, "too many games waiting; try again later");
   const version = (req.headers.get("X-Encore-Version") ?? "").slice(0, 32) || null;
   const run = await env.DB.prepare(
-    `INSERT INTO runs (player_id, replay_sha256, format, client_version, submitted_at) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    `INSERT INTO runs (player_id, replay_sha256, seed, format, client_version, submitted_at) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
   )
-    .bind(player.id, hash, format, version, now())
+    .bind(player.id, hash, seed, format, version, now())
     .first<{ id: number }>();
   await env.DB.prepare("INSERT INTO replays (run_id, data) VALUES (?, ?)").bind(run!.id, data).run();
   // After the answer, so the game is not kept waiting on GitHub.
@@ -316,6 +322,8 @@ interface Verdict {
   angle?: string;
   frames?: number;
   games?: { endFrame: number; abandoned: boolean; initials?: string; scores: number[] }[];
+  /** Whether the games and keys the recording itself says it has came out of playing it. */
+  claimsMatch?: boolean;
 }
 
 async function report(env: Env, req: Request, id: number): Promise<Response> {
@@ -328,6 +336,7 @@ async function report(env: Env, req: Request, id: number): Promise<Response> {
   else if (v.games?.length !== 1) reason = "not one whole game";
   else if (v.games[0].scores.length !== 1) reason = "more than one player";
   else if (!INITIALS.test(v.games[0].initials ?? "")) reason = "no initials typed for it";
+  else if (v.claimsMatch !== true) reason = "it does not play to what it says";
   else if (!(v.table! >= 1 && v.table! <= 4) || !ANGLES.includes(v.angle!) || !(v.balls! >= 1 && v.balls! <= 9))
     reason = "a verdict that makes no sense";
   if (reason) {
