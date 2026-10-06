@@ -950,9 +950,12 @@ int App::run() {
         if (e.type == SDL_EVENT_QUIT) running_ = false;
         if (windowEvent(e)) continue;
         // Nothing in the game is played with the mouse, so the pointer keeps out of the way
-        // while it is over the window, and comes back when it leaves or the window does.
-        if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_WINDOW_FOCUS_GAINED) SDL_HideCursor();
-        if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) SDL_ShowCursor();
+        // while it is over the window, and comes back when it leaves or the window does. Moving
+        // over the window hides it too, for when it was already there at the start.
+        if (e.type == SDL_EVENT_WINDOW_MOUSE_ENTER || e.type == SDL_EVENT_MOUSE_MOTION ||
+            (e.type == SDL_EVENT_WINDOW_FOCUS_GAINED && SDL_GetMouseFocus() == window_.handle()))
+          window_.hidePointer(true);
+        if (e.type == SDL_EVENT_WINDOW_MOUSE_LEAVE || e.type == SDL_EVENT_WINDOW_FOCUS_LOST) window_.hidePointer(false);
         if (e.type == SDL_EVENT_DROP_FILE && e.drop.data) openReplay(e.drop.data);
         handleKey(e);
       }

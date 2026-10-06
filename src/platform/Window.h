@@ -17,6 +17,8 @@ class Window {
   void swap();
   void setFullscreen(bool on);
   bool fullscreen() const { return fullscreen_; }
+  /// The pointer out of the way over the game (nothing in it is played with the mouse), or back.
+  void hidePointer(bool hide);
   void drawableSize(int& w, int& h) const;
   SDL_Window* handle() const { return window_; }
 

@@ -4,6 +4,7 @@
 #include "platform/AppIcon.h"
 #ifdef __APPLE__
 #include "platform/MacMenu.h"
+#include "platform/MacPointer.h"
 #endif
 
 namespace encore {
@@ -56,7 +57,18 @@ void Window::setFullscreen(bool on) {
   // and in a window the system keeps its shortcuts, where the player expects them.
   SDL_SetWindowKeyboardGrab(window_, on);
   // Fullscreen there is nothing else on the screen for the pointer to do.
-  if (on) SDL_HideCursor();
+  if (on) hidePointer(true);
+}
+
+void Window::hidePointer(bool hide) {
+#ifdef __APPLE__
+  macHidePointer(hide);
+#else
+  if (hide)
+    SDL_HideCursor();
+  else
+    SDL_ShowCursor();
+#endif
 }
 
 void Window::drawableSize(int& w, int& h) const { SDL_GetWindowSizeInPixels(window_, &w, &h); }

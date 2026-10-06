@@ -88,8 +88,8 @@ add_executable(pinball-fantasies WIN32 MACOSX_BUNDLE
 # On macOS, a few lines that have to speak to AppKit itself, in Objective-C++.
 if(APPLE)
   enable_language(OBJCXX)
-  target_sources(pinball-fantasies PRIVATE src/platform/MacMenu.mm)
-  set_source_files_properties(src/platform/MacMenu.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  target_sources(pinball-fantasies PRIVATE src/platform/MacMenu.mm src/platform/MacPointer.mm)
+  set_source_files_properties(src/platform/MacMenu.mm src/platform/MacPointer.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(pinball-fantasies PRIVATE "-framework AppKit")
 endif()
 if(WIN32)
