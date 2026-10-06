@@ -6,7 +6,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 struct GameFiles {
   std::filesystem::path directory;
@@ -20,4 +20,4 @@ struct GameFiles {
   static GameFiles fromDirectory(const std::filesystem::path& dir);
 };
 
-}  // namespace pfr
+}  // namespace encore

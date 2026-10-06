@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace pfr {
+namespace encore {
 
 /// SDL3 window with an OpenGL 4.1 core context.
 class Window {
@@ -17,6 +17,8 @@ class Window {
   void swap();
   void setFullscreen(bool on);
   bool fullscreen() const { return fullscreen_; }
+  /// The pointer out of the way over the game (nothing in it is played with the mouse), or back.
+  void hidePointer(bool hide);
   void drawableSize(int& w, int& h) const;
   SDL_Window* handle() const { return window_; }
 
@@ -26,4 +28,4 @@ class Window {
   bool fullscreen_ = false;
 };
 
-}  // namespace pfr
+}  // namespace encore

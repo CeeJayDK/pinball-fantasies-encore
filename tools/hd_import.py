@@ -15,7 +15,7 @@ smaller than that. The results go to assets/hd/<name>.png in this repository, wh
 build puts into the application.
 
 A picture in the preferences folder takes the place of the application's own, which is
-handy for trying one out (--out "~/Library/Application Support/pfr/Pinball Fantasies/hd").
+handy for trying one out (--out "~/Library/Application Support/Encore/Pinball Fantasies/hd").
 
 Needs Pillow, from the tools virtual environment, which the script switches to by itself.
 """

@@ -46,7 +46,7 @@ void usage() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  pfr::AppOptions options;
+  encore::AppOptions options;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
@@ -65,13 +65,13 @@ int main(int argc, char** argv) {
     else if (a == "--hd-dir") options.hdDir = next();
     else if (a == "--res") {
       const std::string m = next();
-      options.resolution = m == "normal" ? pfr::Resolution::Normal : m == "full" ? pfr::Resolution::Full : pfr::Resolution::High;
+      options.resolution = m == "normal" ? encore::Resolution::Normal : m == "full" ? encore::Resolution::Full : encore::Resolution::High;
     }
     else if (a == "--scale") options.windowScale = std::max(1, std::atoi(next()));
     else if (a == "--screenshot") options.screenshot = next();
     else if (a == "--screenshot-frame") options.screenshotFrame = std::max(1, std::atoi(next()));
     else if (a == "--stats") options.stats = true;
-    else if (a == "--verbose") pfr::log::setMinimumLevel(pfr::log::Level::Debug);
+    else if (a == "--verbose") encore::log::setMinimumLevel(encore::log::Level::Debug);
     else if (a == "--help" || a == "-h") { usage(); return 0; }
     else if (a.rfind("-psn", 0) == 0) { /* macOS launch services */ }
     else if (a == "--video") options.video = next();
@@ -80,5 +80,5 @@ int main(int argc, char** argv) {
     else if (std::error_code ec; a[0] != '-' && std::filesystem::is_regular_file(a, ec)) options.replays.push_back(a);
     else { usage(); return 2; }
   }
-  return pfr::App(std::move(options)).run();
+  return encore::App(std::move(options)).run();
 }

@@ -65,7 +65,7 @@ export interface Env {
   GITHUB_REPO: string;
 }
 
-/** Recording formats a verifier can play (Replay::kFormat in the game). */
+/** Recording formats a verifier can play (Recording::kFormat in the game). */
 const FORMATS = [3];
 const MAX_RECORDING = 512 * 1024;
 const MAX_PENDING_PER_PLAYER = 50;

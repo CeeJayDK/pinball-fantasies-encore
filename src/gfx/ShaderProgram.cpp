@@ -8,7 +8,7 @@
 
 #include "core/Log.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 std::string readText(const std::filesystem::path& p) {
@@ -93,4 +93,4 @@ void ShaderProgram::use() const { glUseProgram(program_); }
 
 GLint ShaderProgram::uniform(const char* name) const { return glGetUniformLocation(program_, name); }
 
-}  // namespace pfr
+}  // namespace encore

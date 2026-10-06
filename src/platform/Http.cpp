@@ -7,7 +7,7 @@
 #include <dlfcn.h>
 #endif
 
-namespace pfr {
+namespace encore {
 
 #ifdef _WIN32
 namespace {
@@ -268,4 +268,4 @@ std::optional<HttpReply> httpPost(const std::string& url, ByteView data, const s
 
 #endif
 
-}  // namespace pfr
+}  // namespace encore

@@ -5,7 +5,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 struct ColorRange {  // CRNG chunk: Deluxe Paint colour cycling
   u16 rate = 0;      ///< 16384 = 60 steps per second
@@ -37,4 +37,4 @@ struct IffLocation {
 };
 std::vector<IffLocation> findIffForms(ByteView blob);
 
-}  // namespace pfr
+}  // namespace encore

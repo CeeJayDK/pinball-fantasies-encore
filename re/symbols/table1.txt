@@ -1,0 +1,147 @@
+# Names for places in TABLE1.PRG (the supported release), as they are worked out.
+# "c" lines name code in segment 0010, "d" lines name data in segment 19b5, "v" lines name
+# variables the program keeps among its code, "i" lines name values the code carries, such as
+# the segments themselves. "@2:1234" after a name gives its address in another table by hand.
+# python3 re/disasm.py puts them into re/fantasy/TABLE1_seg0010.lst.
+
+# --- segments
+i 19b5 dataSegment
+i 0c0f flipperPictures
+i 2056 spriteBank
+i 3b74 wallsGround
+i 4114 marksGround
+i 46b4 wallsRamps
+
+# --- the frame
+c 2f9b entry
+c 35fd mainLoop                 ; reads keys, counts loops, polls the driver
+c 41c6 frameCallback            ; driver callback at the start of the frame
+c 55db midFrameCallback         ; driver callback part way down the frame
+c 3e44 keyboardInterrupt
+c 87c0 physicsOnce              ; guard against re-entry round physicsSteps
+c 87db physicsSteps             ; two sub-steps, or one in the mid-frame callback in high resolution
+c 8829 probeBall                ; carry clear when the ball touches something
+c 8e95 bounce
+c 9133 nudgeAndFlippers
+c 908f integrate
+c 9106 stampFlippers
+c 59aa afterSteps               ; tilt decay, bumper events, gravity, layer
+c 59d9 pickGravity
+c 5d24 changeLayer
+c 5989 runRules                 ; roll triggers, hit triggers, the table's own per-frame code, timers
+c 5d70 rollTriggers
+c 5cb9 hitTriggers
+c 5ace bumperEvent
+c 4018 scroll
+
+# --- the ball
+d 2ede spin
+d 2ee0 ballX
+d 2ee2 ballY
+d 2ee4 ballXFixed
+d 2ee8 ballYFixed
+d 2eec ballVx
+d 2eee ballVy
+d 2ef0 contactX
+d 2ef2 contactY
+d 2ef4 gravityY                 ; added to the speed downwards each sub-step
+d 2ef6 gravityX
+d 2edc material
+d 331a layer                    ; 0 playfield, ff ramps
+d 2f2a ballHidden               ; ff: no ball in play, physics skipped
+d 239c ballLost
+d 6890 contactAngle
+d 6892 contactProbes
+d 6894 flipperVx
+d 6896 flipperVy
+d 2314 nudgeAccumulator
+d 2316 nudgeLift
+d 2318 tableVelocity
+d 2311 tilted
+d 2312 tiltCounter
+d 239b bumperPending
+d 239d bumperRecord
+
+# --- the machine and options
+d 2f28 keys                     ; bit 0 right flipper, bit 1 left, bit 2 one step in the mid-frame callback
+d 3554 highResolution
+d 33ed loopCounter              ; the program's source of chance
+d 23a7 plungerRoutine
+d 23a9 inMidFrame
+d 36e9 lastKey
+
+# --- routines the tables' rules call
+c 5788 setLight                 ; BL: lit, and remembered as lit
+c 5795 clearLight
+c 5728 lightOn                  ; BL: its colours, without remembering
+c 5747 lightOff
+c 57a2 blink                    ; DL light, DH half period, AL where in the period to begin
+c 57c7 stopBlink                ; DL
+c 57e1 stopBlinks
+c 57f0 runBlinks
+c 5867 lightsOut
+c 5918 flushColours
+c 5b0b addTimer                 ; DX: a routine to run every frame
+c 576a endTimer
+c 5777 countTo                  ; BX counter, DX limit: carry when reached
+c 5b2a runTimers
+c 5c3f music                    ; SI: place, repeats, priority
+c 5b9f award                    ; SI: music, score, bonus, script
+c 5c98 nextOfRow
+c 44b0 startScript              ; BX
+c 44c3 runStep
+c 6a5e addScore                 ; DI += SI, twelve digits
+c 6ad4 restoreLight
+c 6ae8 saveLight
+c 5344 next4                    ; the script moves on four bytes
+c 4c57 next6
+c 4c6a next8
+c 4da6 next2
+c 5285 waitTask
+c 49eb fillDisplay
+c 6ca5 drawText
+c 6c0f drawNumber
+c 37ea beginBall
+c 3881 newGame
+c 5fff toAttract
+c 4d34 displaySteady
+c 5f5a copyRows                 ; DX bytes a row, CX rows, to a mask
+c 69fc nothing
+
+# --- variables the rules use
+d 45b6 score
+d 3399 bonus
+d 33e2 modeRunning              ; ff while a timed mode's count-down owns the display
+d 33e3 playersMayJoin
+d 33e0 ballUntouched            ; ff until the served ball scores
+d 33de scoredThisBall
+d 33ce betweenBalls
+d 33cf flippersLive
+d 338a ballOnPlunger
+d 3316 inTrigger
+d 3318 lastTrigger
+d 3389 musicPriority
+d 230a musicNext
+d 230b musicKept
+d 230c musicAfter
+d 230d musicRepeats
+d 3591 lightStates
+d 371a player
+d 3716 players
+d 33dc ball
+d 33dd balls
+d 3383 lookAt                   ; a row for the screen to go to, or ffff
+d 3385 lookAtSoft
+d 33e5 nextStep
+d 33e7 task
+d 33e9 taskState
+d 36fa drawRoutine
+d 3398 awardQuiet
+d 33f8 scriptDone
+d 3714 startKey
+d 3713 attract
+
+# --- placed by hand in the tables where the line-up does not find them
+c 0735 eachScoreBegin @2:063d @3:05c8
+c 0762 eachScoreNext @2:066f @4:06d8
+c 089f matchDigit @4:08a4 ; the match: its digit changes (a jump mistaken for it in Stones 'n Bones)

@@ -8,7 +8,7 @@
 #include "game/Online.h"
 #include "platform/Http.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 constexpr const char* kOfferedFile = "release-offered.txt";
@@ -71,4 +71,4 @@ void rememberOffered(const std::filesystem::path& saveDir, const std::string& ve
   file::writeAll(saveDir / kOfferedFile, ByteView(reinterpret_cast<const u8*>(version.data()), version.size()));
 }
 
-}  // namespace pfr
+}  // namespace encore

@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace pfr {
+namespace encore {
 
 Palette::Palette() = default;
 
@@ -36,4 +36,4 @@ void Palette::cycle(const std::vector<ColorRange>& ranges, double dtSeconds) {
   }
 }
 
-}  // namespace pfr
+}  // namespace encore

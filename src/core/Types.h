@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace pfr {
+namespace encore {
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
@@ -48,4 +48,4 @@ struct Rgb {
   u8 r = 0, g = 0, b = 0;
 };
 
-}  // namespace pfr
+}  // namespace encore

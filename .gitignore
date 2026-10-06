@@ -15,7 +15,14 @@ __pycache__/
 # Reverse-engineering scratch (disassembly, dumps of the original binaries) stays local:
 # it is derived from the game's files, which are never redistributed.
 re/*
-!re/legacy-engine/
+# ...but not the tools that make it
+!re/disasm.py
+!re/annot.py
+!re/unexepack.py
+!re/align.py
+!re/gensymbols.py
+!re/show.py
+!re/symbols/
 # The server's tools and its local database
 server/node_modules/
 server/.wrangler/

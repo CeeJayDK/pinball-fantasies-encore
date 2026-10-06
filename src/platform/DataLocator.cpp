@@ -9,7 +9,7 @@
 #include "core/Log.h"
 #include "data/GameVersion.h"
 
-namespace pfr {
+namespace encore {
 namespace {
 
 bool holdsGameFiles(const std::filesystem::path& dir) {
@@ -46,20 +46,6 @@ std::filesystem::path preferencesDir() {
   if (!base) return {};
   std::filesystem::path path(base);
   SDL_free(base);
-  // Settings and high scores kept under the old name are taken over once, the first time the
-  // new folder is used. The old folder is left as it was.
-  std::error_code ec;
-  if (std::filesystem::is_empty(path, ec) && !ec) {
-    char* old = SDL_GetPrefPath("pfr", "Pinball Fantasies");
-    if (old) {
-      const std::filesystem::path from(old);
-      SDL_free(old);
-      if (from != path && std::filesystem::is_directory(from, ec)) {
-        std::filesystem::copy(from, path, std::filesystem::copy_options::recursive, ec);
-        if (!ec) log::info("settings and high scores taken over from " + from.string());
-      }
-    }
-  }
   return path;
 }
 
@@ -76,4 +62,4 @@ void reportError(const std::string& message) {
   SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Pinball Fantasies: Encore!", message.c_str(), nullptr);
 }
 
-}  // namespace pfr
+}  // namespace encore

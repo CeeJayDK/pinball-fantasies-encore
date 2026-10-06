@@ -13,7 +13,7 @@
 
 #include "core/Types.h"
 
-namespace pfr {
+namespace encore {
 
 /// What this game understands of a set. A set of a higher format needs code this game does
 /// not have, and is left alone; raise it with the pictures that need it (server/README.md).
@@ -66,4 +66,4 @@ struct ArtProgress {
 bool fetchArt(const std::filesystem::path& saveDir, const ArtSet& set, const std::optional<InstalledArt>& have,
               ArtProgress& progress, std::string* error = nullptr);
 
-}  // namespace pfr
+}  // namespace encore

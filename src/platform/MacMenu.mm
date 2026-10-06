@@ -2,7 +2,7 @@
 
 #import <AppKit/AppKit.h>
 
-namespace pfr {
+namespace encore {
 
 // Every key pressed is first offered to the menu bar, in case it is one of its shortcuts, and
 // macOS brings the menus up to date before it looks. The one SDL names the Window menu is
@@ -23,4 +23,4 @@ void plainWindowMenu() {
   }
 }
 
-}  // namespace pfr
+}  // namespace encore

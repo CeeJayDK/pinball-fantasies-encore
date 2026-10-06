@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace pfr {
+namespace encore {
 
 /// Thrown for unrecoverable data problems (missing or corrupt game files).
 class DataError : public std::runtime_error {
@@ -10,4 +10,4 @@ class DataError : public std::runtime_error {
   explicit DataError(const std::string& what) : std::runtime_error(what) {}
 };
 
-}  // namespace pfr
+}  // namespace encore

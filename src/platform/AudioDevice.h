@@ -5,7 +5,7 @@
 #include <mutex>
 #include <vector>
 
-namespace pfr {
+namespace encore {
 
 /// Pulls stereo float audio from whichever source is current into an SDL3 audio stream.
 class AudioDevice {
@@ -32,4 +32,4 @@ class AudioDevice {
   std::vector<float> scratch_;
 };
 
-}  // namespace pfr
+}  // namespace encore

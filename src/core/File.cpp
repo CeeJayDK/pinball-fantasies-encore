@@ -6,7 +6,7 @@
 #include <optional>
 #include <system_error>
 
-namespace pfr::file {
+namespace encore::file {
 
 std::optional<Bytes> readAll(const std::filesystem::path& path) {
   // Streams take the path as it is; stdio would need it narrowed, which loses names on Windows.
@@ -57,4 +57,4 @@ std::optional<std::filesystem::path> findCaseInsensitive(const std::filesystem::
   return std::nullopt;
 }
 
-}  // namespace pfr::file
+}  // namespace encore::file

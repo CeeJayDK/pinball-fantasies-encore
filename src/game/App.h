@@ -18,14 +18,15 @@
 #include "gfx/Framebuffer.h"
 #include "gfx/Palette.h"
 #include "gfx/Renderer.h"
-#include "intro/Intro.h"
+#include "engine/game/Front.h"
 #include "platform/AudioDevice.h"
 #include "platform/Window.h"
-#include "table/Table.h"
+#include "core/Keys.h"
+#include "engine/game/TableGame.h"
 
 union SDL_Event;
 
-namespace pfr {
+namespace encore {
 
 struct AppOptions {
   std::optional<std::filesystem::path> dataDir;
@@ -67,7 +68,6 @@ class App {
  private:
   bool init();
   void update(double dt);
-  void playSilently(Player& player);
   void render(double now);
   bool askToDownload();
   bool askYesNo(std::span<const std::string_view> lines);
@@ -76,7 +76,7 @@ class App {
   bool offerArt();
   bool offerRelease();
   void openIntro(int returningFrom);
-  void openTable(int index, const Replay* recording = nullptr);
+  void openTable(int index, const encore::Recording* recording = nullptr);
   bool openReplay(const std::filesystem::path& path);
   bool recordingOver();
   void captureFrame(int width, int height);
@@ -107,10 +107,12 @@ class App {
   AskFont askFont_;  ///< the letters for the screens shown before the game
   Palette palette_;
   HdFrame hd_;
+  std::array<int, 2> panelStrip_{};  ///< the size of the picture repeated down the tall menu's panel, if there is one
   u8 ownFlipperPictures_ = 0;  ///< bit per flipper with a picture of its own
   bool ballTrail_ = true;      ///< the fading ghosts behind the ball
-  std::unique_ptr<Intro> intro_;
-  std::unique_ptr<Table> table_;
+  std::unique_ptr<encore::Front> intro_;
+  std::unique_ptr<encore::TableGame> table_;
+  int tableIndex_ = 0;  ///< which table is open
   struct Stats {
     double update = 0, draw = 0, wait = 0, worst = 0, seconds = 0;
     int frames = 0;
@@ -121,7 +123,7 @@ class App {
   bool recordingSaved_ = false;  ///< the open table's game has been kept
   std::unique_ptr<ScoreSender> sender_;
   // A recording being played: the table's keys come from it until its last frame.
-  std::optional<Replay> replay_;
+  std::optional<encore::Recording> replay_;
   std::size_t replayNext_ = 0;  ///< its next event
   u32 replayFrame_ = 0;         ///< frames of it played
   bool replaying_ = false;
@@ -133,7 +135,6 @@ class App {
   std::vector<u8> clipFrame_;
   bool running_ = true;
   bool sound_ = false;            ///< a sound card is playing the music
-  std::vector<float> silence_;   ///< where the music goes without one
 };
 
-}  // namespace pfr
+}  // namespace encore

@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <string>
 
-namespace pfr {
+namespace encore {
 
 /// A vertex+fragment program loaded from files, with source-change hot reloading.
 class ShaderProgram {
@@ -30,4 +30,4 @@ class ShaderProgram {
   std::string error_;
 };
 
-}  // namespace pfr
+}  // namespace encore

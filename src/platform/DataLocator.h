@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-namespace pfr {
+namespace encore {
 
 /// The folder the game files are read from: FANTASY, inside this version's own folder
 /// (see preferencesDir), and nowhere else -- or the folder given with --data, when there
@@ -24,4 +24,4 @@ void reportMissingGameData();
 /// Says what went wrong, for a failure that would otherwise end the program in silence.
 void reportError(const std::string& message);
 
-}  // namespace pfr
+}  // namespace encore

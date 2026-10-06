@@ -291,7 +291,7 @@ and Stones 'n Bones has none.
 
 ## Observed behaviour of the implementation
 
-`pfr-simulate` runs a table headlessly and prints the ball's path. With a full plunger stroke:
+`encore-simulate` runs a table headlessly and prints the ball's path. With a full plunger stroke:
 
 | Table | Highest point reached | Outcome |
 | --- | --- | --- |
@@ -393,5 +393,5 @@ offset into the 40-byte-pitch plane, so `x = (addr % 40) * 8`, `y = addr / 40`),
 bytes, height in rows. Each shape stores its rows as three interleaved planes; only the second
 (solid) plane is written into the map. Stones 'n Bones: Kickback `0x1265`, TowerEntry `0x123d`,
 RampTower `0x1233` (playfield layer), RampLeft0/1/2 `0x1247`/`0x1251`/`0x125b` (ramp layer).
-A new game raises TowerEntry and Kickback. The engine's complete patch list, for all
-tables, is in `src/assets/TableAssets.cpp`.
+A new game raises TowerEntry and Kickback. The engine applies each patch where the table's
+own rules do, in `src/engine/table`.

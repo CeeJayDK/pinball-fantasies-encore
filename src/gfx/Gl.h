@@ -10,12 +10,12 @@
 // own library, and `SDL_opengl.h` brings the types and the constants for all of them.
 #include <SDL3/SDL_opengl.h>
 
-namespace pfr {
+namespace encore {
 
 /// Fetches every pointer below; false, with the name logged, if the driver lacks one.
 bool loadGlFunctions();
 
-#define PFR_GL_FUNCTIONS(X)                                     \
+#define ENCORE_GL_FUNCTIONS(X)                                     \
   X(PFNGLACTIVETEXTUREPROC, glActiveTexture)                    \
   X(PFNGLATTACHSHADERPROC, glAttachShader)                      \
   X(PFNGLBINDFRAMEBUFFERPROC, glBindFramebuffer)                \
@@ -46,8 +46,8 @@ bool loadGlFunctions();
   X(PFNGLUNIFORM3FPROC, glUniform3f)                            \
   X(PFNGLUSEPROGRAMPROC, glUseProgram)
 
-#define PFR_GL_DECLARE(type, name) extern type name;
-PFR_GL_FUNCTIONS(PFR_GL_DECLARE)
-#undef PFR_GL_DECLARE
+#define ENCORE_GL_DECLARE(type, name) extern type name;
+ENCORE_GL_FUNCTIONS(ENCORE_GL_DECLARE)
+#undef ENCORE_GL_DECLARE
 
-}  // namespace pfr
+}  // namespace encore

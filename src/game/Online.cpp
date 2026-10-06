@@ -12,7 +12,7 @@
 #include "core/Log.h"
 #include "platform/Http.h"
 
-namespace pfr {
+namespace encore {
 
 std::string onlineApi() {
   if (const char* a = std::getenv("ENCORE_API")) return a;
@@ -120,4 +120,4 @@ void ScoreSender::send() {
   });
 }
 
-}  // namespace pfr
+}  // namespace encore

@@ -58,7 +58,7 @@ jobs:
           test -f "$app/Resources/icon.icns"
           test -f "$app/Resources/shaders/post.frag"
           test -f "$app/Resources/font.png"
-          test -x build/encore-play && test -x build/encore-assets && test -x build/encore-extract
+          test -x build/encore-play && test -x build/encore-extract
           lipo -archs "$app/MacOS/Pinball Fantasies" | tee /dev/stderr | grep -q x86_64
           lipo -archs "$app/MacOS/Pinball Fantasies" | grep -q arm64
 

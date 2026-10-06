@@ -12,7 +12,7 @@
 #include <string>
 #include <thread>
 
-namespace pfr {
+namespace encore {
 
 /// The server; ENCORE_API points the game at another, to try one locally.
 std::string onlineApi();
@@ -35,4 +35,4 @@ class ScoreSender {
   std::shared_ptr<std::atomic<bool>> busy_ = std::make_shared<std::atomic<bool>>(false);
 };
 
-}  // namespace pfr
+}  // namespace encore
