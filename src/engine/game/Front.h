@@ -46,7 +46,7 @@ class Front {
   /// that one, two of the usual: the slides stand in the middle of it, and the menu is laid
   /// out down it, with all four tables on one page and all four lists of best scores on one.
   void draw(u8* frame, Rgb* colours, HdFrame* hd = nullptr) const;
-  bool tall() const { return options_.resolution == Resolution::Full; }
+  bool tall() const { return options_.resolution == Resolution::Full || options_.resolution == Resolution::Tall; }
   /// There is a picture of the panel's plain part to repeat down the tall menu
   /// (HdPicture::LeftRepeat), this many dots across and down; without one, a line of the
   /// panel's own picture is drawn out instead.

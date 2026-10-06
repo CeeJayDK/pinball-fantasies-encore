@@ -31,7 +31,8 @@ void usage() {
             "  --hd, --no-hd    high-resolution pictures in the intro and menu, or the originals (F10); remembered\n"
             "  --trail, --no-trail  the fading ghosts behind the ball (F8 while paused); remembered\n"
             "  --hd-dir <dir>   HD pictures to use instead of the ones fetched from the server (assets/hd, say)\n"
-            "  --res <mode>     screen mode: normal (320x240), high (320x350) or full (whole table)\n"
+            "  --res <mode>     screen mode: normal (320x240), high (320x350), full (whole table) or tall\n"
+            "                   (whole table with square pixels, for a screen turned on its side)\n"
             "  --scale <n>      window scale factor (default 3)\n"
             "  --screenshot <f> render a frame to a PNG file and quit\n"
             "  --screenshot-frame <n>  which frame to capture (default 30)\n"
@@ -65,7 +66,10 @@ int main(int argc, char** argv) {
     else if (a == "--hd-dir") options.hdDir = next();
     else if (a == "--res") {
       const std::string m = next();
-      options.resolution = m == "normal" ? encore::Resolution::Normal : m == "full" ? encore::Resolution::Full : encore::Resolution::High;
+      options.resolution = m == "normal" ? encore::Resolution::Normal
+                           : m == "full"   ? encore::Resolution::Full
+                           : m == "tall"   ? encore::Resolution::Tall
+                                           : encore::Resolution::High;
     }
     else if (a == "--scale") options.windowScale = std::max(1, std::atoi(next()));
     else if (a == "--screenshot") options.screenshot = next();

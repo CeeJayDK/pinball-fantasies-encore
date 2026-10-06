@@ -29,9 +29,11 @@ namespace {
 constexpr double kFrame = 1.0 / 60.0;  ///< the menu and the tables both run 60 frames a second
 
 /// The table's 240- and 350-line screens fill a 4:3 display, so their pixels are not
-/// square. The full-height mode keeps the 350-line pixel shape and shows the whole table.
-double tablePixelAspect(int height) {
-  const int shaped = height > 350 ? 350 : height;
+/// square. The full-height mode keeps the 350-line pixel shape and shows the whole table; the
+/// tall one shows it with square pixels, as the 240-line screen has them.
+double tablePixelAspect(const encore::TableGame& table) {
+  if (table.options().resolution == Resolution::Tall) return 1.0;
+  const int shaped = std::min(table.screenHeight(), 350);
   return (4.0 / 3.0) / (320.0 / shaped);
 }
 
@@ -430,7 +432,7 @@ void App::openTable(int index, const encore::Recording* recording) {
   replaying_ = fromReplay_ = recording != nullptr;
   replayNext_ = 0;
   replayFrame_ = 0;
-  resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+  resizeFrame(320, table_->screenHeight(), tablePixelAspect(*table_));
   audio_.setSource([t = table_.get()](float* out, int frames) { t->sound(out, frames); });
   loadFlipperPictures(index);
   log::info("opened table " + std::to_string(index + 1));
@@ -664,7 +666,7 @@ void App::update(double dt) {
         openIntro(index);
         return;
       }
-      if (table_) resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+      if (table_) resizeFrame(320, table_->screenHeight(), tablePixelAspect(*table_));
     }
   }
 }
@@ -904,7 +906,7 @@ void App::render(double now) {
   // of the game: a resolution changed in the pause menu takes effect at once, and with the
   // display faster than the game the screen is drawn again before another frame has run.
   if (table_)
-    resizeFrame(320, table_->screenHeight(), tablePixelAspect(table_->screenHeight()));
+    resizeFrame(320, table_->screenHeight(), tablePixelAspect(*table_));
   else if (intro_)
     resizeFrame(encore::Front::kWidth, intro_->height(), 1.0);
   if (table_) {

@@ -127,7 +127,7 @@ std::optional<Recording> Recording::load(ByteView data) {
   p.carry.scrollPos = static_cast<u16>(r.le(2));
   p.carry.scrollAt = static_cast<u16>(r.le(2));
   if (p.table > 3 || static_cast<u8>(p.options.angle) > 2 || static_cast<u8>(p.options.scrollSpeed) > 2 ||
-      static_cast<u8>(p.options.resolution) > 2)
+      static_cast<u8>(p.options.resolution) > 3)
     return std::nullopt;
   for (HighScore& h : p.highScores) {
     h.score = r.bcd();

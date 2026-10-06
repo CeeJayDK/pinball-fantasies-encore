@@ -216,6 +216,27 @@ TEST(the_tall_menu_shows_four_tables) {
   }
 }
 
+// The tall screen shows the whole table, with the dot matrix under it, and never scrolls; and
+// it is kept as the other sizes are, in PINBALL.CFG and in the recordings.
+TEST(the_tall_screen_shows_the_whole_table) {
+  if (!haveData()) return;
+  TableGame::Setup setup;
+  setup.options.resolution = Resolution::Tall;
+  TableGame game(read("TABLE1.PRG"), read("TABLE1.MOD"), 0, setup);
+  CHECK(game.screenHeight() == 576 + 33);
+  for (int f = 0; f < 600; ++f) {  // the ball served and played up the table, unshaken
+    game.frame();
+    CHECK(game.viewTop() == 0);
+  }
+  const auto again = Recording::load(game.recording().save());
+  CHECK(again && again->options.resolution == Resolution::Tall);
+  const auto dir = std::filesystem::temp_directory_path() / "encore-tall-test";
+  std::filesystem::create_directories(dir);
+  Config::saveOptions(dir, setup.options);
+  CHECK(Config::load(dir).options.resolution == Resolution::Tall);
+  std::filesystem::remove_all(dir);
+}
+
 // Leaving a table from the pause is not a cut: its picture fades away over 128 frames, as
 // the original's does, and only then is the table left.
 TEST(a_table_left_fades_out) {
