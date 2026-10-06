@@ -62,6 +62,7 @@ struct Recording {
   int table = 0;
   u64 seed = 0;  ///< what the table's chance is begun from
   Options options;  ///< as the table opened; changed in the pause menu by keys, which are here
+                    ///< (all but the size of screen, which is the viewer's: Normal here)
   HighScores highScores;  ///< the table's, which decide whether a game ends asking for a name
   Carry carry;
   u32 frames = 0;

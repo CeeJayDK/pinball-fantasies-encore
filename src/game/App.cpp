@@ -416,7 +416,9 @@ void App::openTable(int index, const encore::Recording* recording) {
   tableIndex_ = index;
   encore::TableGame::Setup setup;
   if (recording) {
+    // played as it was, and seen as this player sees every table
     setup.options = recording->options;
+    setup.options.resolution = config_.options.resolution;
     setup.highScores = recording->highScores;
     setup.seed = recording->seed;
     setup.carry = recording->carry;

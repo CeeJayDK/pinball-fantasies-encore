@@ -216,8 +216,8 @@ TEST(the_tall_menu_shows_four_tables) {
   }
 }
 
-// The tall screen shows the whole table, with the dot matrix under it, and never scrolls; and
-// it is kept as the other sizes are, in PINBALL.CFG and in the recordings.
+// The tall screen shows the whole table, with the dot matrix under it, and never scrolls; it is
+// kept in PINBALL.CFG, and left out of the recordings, which every viewer sees in their own size.
 TEST(the_tall_screen_shows_the_whole_table) {
   if (!haveData()) return;
   TableGame::Setup setup;
@@ -229,7 +229,7 @@ TEST(the_tall_screen_shows_the_whole_table) {
     CHECK(game.viewTop() == 0);
   }
   const auto again = Recording::load(game.recording().save());
-  CHECK(again && again->options.resolution == Resolution::Tall);
+  CHECK(again && again->options.resolution == Resolution::Normal);
   const auto dir = std::filesystem::temp_directory_path() / "encore-tall-test";
   std::filesystem::create_directories(dir);
   Config::saveOptions(dir, setup.options);

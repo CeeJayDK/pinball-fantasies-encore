@@ -74,7 +74,9 @@ Bytes Recording::save() const {
   w.u8_(options.balls);
   w.u8_(static_cast<u8>(options.angle));
   w.u8_(static_cast<u8>(options.scrollSpeed));
-  w.u8_(static_cast<u8>(options.resolution));
+  // The size of screen is the viewer's, never the recording's (it changes only what is drawn):
+  // its place is kept, as normal, for the versions that read one there.
+  w.u8_(static_cast<u8>(Resolution::Normal));
   w.u8_(options.noMusic);
   w.u8_(options.mono);
   w.u8_(carry.noTilt);
@@ -118,7 +120,7 @@ std::optional<Recording> Recording::load(ByteView data) {
   p.options.balls = r.u8_();
   p.options.angle = static_cast<Angle>(r.u8_());
   p.options.scrollSpeed = static_cast<ScrollSpeed>(r.u8_());
-  p.options.resolution = static_cast<Resolution>(r.u8_());
+  r.u8_();  // the size of screen, which a recording does not decide (see save)
   p.options.noMusic = r.u8_() != 0;
   p.options.mono = r.u8_() != 0;
   p.carry.noTilt = r.u8_() != 0;
@@ -126,8 +128,7 @@ std::optional<Recording> Recording::load(ByteView data) {
   p.carry.balls = r.u8_();
   p.carry.scrollPos = static_cast<u16>(r.le(2));
   p.carry.scrollAt = static_cast<u16>(r.le(2));
-  if (p.table > 3 || static_cast<u8>(p.options.angle) > 2 || static_cast<u8>(p.options.scrollSpeed) > 2 ||
-      static_cast<u8>(p.options.resolution) > 3)
+  if (p.table > 3 || static_cast<u8>(p.options.angle) > 2 || static_cast<u8>(p.options.scrollSpeed) > 2)
     return std::nullopt;
   for (HighScore& h : p.highScores) {
     h.score = r.bcd();
