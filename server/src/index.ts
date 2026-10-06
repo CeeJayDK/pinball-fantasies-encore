@@ -7,7 +7,7 @@
 //
 //   GET  /                                         the project's page, from ../site (wrangler.toml)
 //   GET  /media/<file>                             its videos, a part of one when asked (Range)
-//   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player and initials
+//   GET  /v1/scores?table=1&balls=3&angle=high   best verified score per player and initials, and their games
 //   GET  /v1/players/<tag>                         a player's verified games
 //   POST /v1/runs               <recording>        send a game                  (player token)
 //   GET  /v1/runs/<id>                             a game, and its rank once verified
@@ -152,7 +152,9 @@ function blob(value: unknown): Uint8Array {
 // ---- the boards ----------------------------------------------------------------------------
 
 /** The best verified score of each player and initials on a table (so everyone who plays on one
- *  installation has a place of their own), optionally for one ball count and angle. */
+ *  installation has a place of their own), optionally for one ball count and angle; with how many
+ *  verified games those initials have from that installation, on any table, which the site shows
+ *  as stars. */
 async function scores(env: Env, url: URL): Promise<Response> {
   const table = Number(url.searchParams.get("table"));
   if (!(table >= 1 && table <= 4)) return fail(400, "table must be 1 to 4");
@@ -163,12 +165,15 @@ async function scores(env: Env, url: URL): Promise<Response> {
   if (angle !== null && !ANGLES.includes(angle)) return fail(400, "angle must be low, high or higher");
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50) || 50, 1), 200);
   const { results } = await env.DB.prepare(
-    `SELECT initials, tag, score, balls, angle, run, at FROM (
-       SELECT r.initials, p.tag, r.score, r.balls, r.angle, r.id AS run, r.verified_at AS at,
+    `SELECT initials, tag, score, balls, angle, run, at,
+            (SELECT COUNT(*) FROM runs c WHERE c.status = 'verified' AND c.player_id = best.player_id
+               AND c.initials = best.initials) AS games
+     FROM (
+       SELECT r.player_id, r.initials, p.tag, r.score, r.balls, r.angle, r.id AS run, r.verified_at AS at,
               ROW_NUMBER() OVER (PARTITION BY r.player_id, r.initials ORDER BY r.score DESC, r.verified_at ASC) AS n
        FROM runs r JOIN players p ON p.id = r.player_id
-       WHERE r.status = 'verified' AND r.table_no = ?1 AND (?2 IS NULL OR r.balls = ?2) AND (?3 IS NULL OR r.angle = ?3))
-     WHERE n = 1 ORDER BY score DESC, at ASC LIMIT ?4`,
+       WHERE r.status = 'verified' AND r.table_no = ?1 AND (?2 IS NULL OR r.balls = ?2) AND (?3 IS NULL OR r.angle = ?3)
+     ) best WHERE n = 1 ORDER BY score DESC, at ASC LIMIT ?4`,
   )
     .bind(table, balls, angle, limit)
     .all();

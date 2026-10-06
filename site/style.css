@@ -408,6 +408,25 @@ code, .kbd {
 }
 .board .rank { color: var(--amber-dim); text-shadow: none; }
 .board .tag { font-size: 15px; color: var(--amber-dim); text-shadow: none; margin-left: 6px; }
+/* The stars go under the name when the row has no room for them beside it. */
+.board .who { display: flex; flex-wrap: wrap; align-items: baseline; }
+/* Stars of five by four dots, lit like the board's lettering (the glow is the group's: a mask
+   would cut each star's own away). */
+.board .played {
+  --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 8'%3E%3Ccircle cx='5' cy='1' r='0.8'/%3E%3Ccircle cx='1' cy='3' r='0.8'/%3E%3Ccircle cx='3' cy='3' r='0.8'/%3E%3Ccircle cx='5' cy='3' r='0.8'/%3E%3Ccircle cx='7' cy='3' r='0.8'/%3E%3Ccircle cx='9' cy='3' r='0.8'/%3E%3Ccircle cx='3' cy='5' r='0.8'/%3E%3Ccircle cx='5' cy='5' r='0.8'/%3E%3Ccircle cx='7' cy='5' r='0.8'/%3E%3Ccircle cx='3' cy='7' r='0.8'/%3E%3Ccircle cx='7' cy='7' r='0.8'/%3E%3C/svg%3E");
+  margin-left: 6px;
+  white-space: nowrap;
+  filter: drop-shadow(0 0 3px rgba(255, 140, 30, 0.55));
+}
+.board .played i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 2px;
+  background: var(--amber);
+  -webkit-mask: var(--star) center / contain no-repeat;
+  mask: var(--star) center / contain no-repeat;
+}
 .board .score { text-align: right; font-variant-numeric: tabular-nums; }
 .board .meta {
   grid-column: 2 / 4;

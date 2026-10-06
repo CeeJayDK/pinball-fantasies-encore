@@ -130,12 +130,20 @@ function filters() {
 
 const day = (seconds) => new Date(seconds * 1000).toISOString().slice(0, 10);
 
+// Stars for the games a player's initials have had verified, on any table: 4, 16 and 64.
+const STARS = [4, 16, 64];
+function stars(games) {
+  const n = STARS.filter((g) => games >= g).length;
+  return n ? el("span", { className: "played", title: `${games} scores submitted` },
+    ...Array.from({ length: n }, () => el("i"))) : "";
+}
+
 function row(table, s) {
   const name = ["FANTASY", table.code, s.initials.replace(/ /g, "_"), s.tag, s.score, day(s.at).replace(/-/g, "")]
     .join("-") + ".RPL";
   return el("li", {},
     el("span", { className: "rank" }, String(s.rank)),
-    el("span", { className: "who" }, s.initials, el("span", { className: "tag" }, s.tag)),
+    el("span", { className: "who" }, s.initials, el("span", { className: "tag" }, s.tag), stars(s.games)),
     el("span", { className: "score" }, Number(s.score).toLocaleString("en-US")),
     // Each part kept whole on a line; the line breaks between them, if it must.
     el("span", { className: "meta" },
