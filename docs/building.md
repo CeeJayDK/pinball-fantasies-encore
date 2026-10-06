@@ -44,7 +44,7 @@ in the folder SDL keeps for the platform (`~/Library/Application Support`, `~/.l
 | `--data <dir>` | folder with the game files |
 | `--table <1-4>` | open a table directly |
 | `--skip-intro` | go straight to the table menu |
-| `--res normal\|high\|full` | screen mode: 320x240, 320x350, or the whole table at once |
+| `--res normal\|high\|full\|tall` | screen mode: 320x240, 320x350, or the whole table at once, with 320x350's pixels (full) or square ones for a screen turned on its side (tall) |
 | `--crt`, `--no-crt` | CRT look (scanlines, shadow mask, glow); remembered |
 | `--hd`, `--no-hd` | the remastered pictures, or the originals; remembered |
 | `--trail`, `--no-trail` | the fading ghosts behind the ball; remembered |

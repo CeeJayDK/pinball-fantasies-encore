@@ -68,8 +68,9 @@ u8 scancode(Key k) {
 }
 
 constexpr u16 kPage1 = 0xae24;   ///< where the menu's second page is in the card's memory
-constexpr u16 kHigher = 0x49b5;  ///< this version's two words among the options, kept where the
-constexpr u16 kFull = 0x49c0;    ///< original has a question this version does not ask
+constexpr u16 kHigher = 0x49b5;  ///< this version's words among the options, kept where the
+constexpr u16 kFull = 0x49c0;    ///< original has a question this version does not ask (and
+constexpr u16 kTall = 0x49c8;    ///< the answer's place after it)
 
 }  // namespace
 
@@ -91,6 +92,7 @@ Front::Front(ByteView prg, ByteView module, const Config& config, int returningF
   ds(0x49a8) = options_.mono;
   std::memcpy(&ds(kHigher), "HIGHER", 7);
   std::memcpy(&ds(kFull), "FULL  ", 7);
+  std::memcpy(&ds(kTall), "TALL  ", 7);
 
   // cs:371f: the best scores, written into the two pages that show them
   static constexpr u16 kRows[4] = {0x4f31, 0x4fc1, 0x5051, 0x50e1};
@@ -693,7 +695,7 @@ void Front::optionText(int row, u16& words) {
     case 1: words = ds(0x49a4) == 1 ? 0x4e08 : ds(0x49a4) == 2 ? kHigher : 0x4e01; break;
     case 2: words = dsw(static_cast<u16>(0x4e24 + ds(0x49a5) * 2)); break;
     case 3: words = ds(0x49a6) ? 0x4e2e : 0x4e2a; break;
-    case 4: words = ds(0x49a7) == 1 ? 0x4e01 : ds(0x49a7) == 2 ? kFull : 0x4dfa; break;
+    case 4: words = ds(0x49a7) == 1 ? 0x4e01 : ds(0x49a7) == 2 ? kFull : ds(0x49a7) == 3 ? kTall : 0x4dfa; break;
     default: words = ds(0x49a8) ? 0x4e38 : 0x4e32; break;
   }
 }
@@ -705,8 +707,8 @@ void Front::changeOption(int row) {
     case 1: ds(0x49a4) = ds(0x49a4) == 0 ? 2 : ds(0x49a4) == 2 ? 1 : 0; break;
     case 2: ds(0x49a5) = ds(0x49a5) >= 2 ? 0 : static_cast<u8>(ds(0x49a5) + 1); break;
     case 3: ds(0x49a6) ^= 1; break;
-    // (and after the original's two sizes of screen, this version's whole table)
-    case 4: ds(0x49a7) = ds(0x49a7) >= 2 ? 0 : static_cast<u8>(ds(0x49a7) + 1); break;
+    // (and after the original's two sizes of screen, this version's whole table, twice)
+    case 4: ds(0x49a7) = ds(0x49a7) >= 3 ? 0 : static_cast<u8>(ds(0x49a7) + 1); break;
     case 5: ds(0x49a8) ^= 1; break;
     default: optionsDone_ = true; break;
   }

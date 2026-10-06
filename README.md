@@ -131,7 +131,7 @@ While paused, the original's own options, and two of this version's for looking 
 | --- | --- |
 | A | angle: low, high, or higher — a steeper table with stronger flippers |
 | S | scrolling: hard, medium or soft |
-| M, R | music on or off; resolution |
+| M, R | music on or off; resolution: normal, high, full (the whole table) or tall (the whole table, for a screen turned on its side) |
 | F7 | every lamp on, then every lamp off, then as the game has them |
 | F8 | the ball's trail on or off |
 | Up and down arrows | scroll the table by hand |

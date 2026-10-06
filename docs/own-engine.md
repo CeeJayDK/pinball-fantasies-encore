@@ -77,7 +77,7 @@ it: it draws into a model of the video card's memory and is left wherever the or
 for the next frame. The question out of the manual that the original asks is not asked.
 `encore-front` writes frames of it as pictures.
 
-With the whole table on one screen chosen in the options, the menu's screen is as tall as that
+With the whole table on one screen chosen in the options (full or tall), the menu's screen is as tall as that
 one (640 by 960): the slides stand in the middle of it, the panel on the left is drawn out to
 its length with its picture and its text both there, and beside it are all four tables'
 banners on one page and all four lists of best scores on one (`Front::drawTallMenu`). The

@@ -244,10 +244,13 @@ void TableGame::pausedKey(Key key) {
       engine_->write(engine_->musicIsOff() ? "MUSIC OFF" : "MUSIC ON");
       break;
     case Key::R:
-      options_.resolution = static_cast<Resolution>((static_cast<int>(options_.resolution) + 1) % 3);
-      // the new size of screen looks where it is told to, or where the ball is
-      camera_.pos = static_cast<u16>(std::clamp(camera_.said ? *camera_.said : engine_->W(at::ballY).s() - cameraLead(), 0, cameraTop()));
-      camera_.raw = static_cast<i16>(camera_.pos << 4);
+      // (a recording played back keeps to the viewer's size of screen, whatever its player chose)
+      if (!playback_) {
+        options_.resolution = static_cast<Resolution>((static_cast<int>(options_.resolution) + 1) % 4);
+        // the new size of screen looks where it is told to, or where the ball is
+        camera_.pos = static_cast<u16>(std::clamp(camera_.said ? *camera_.said : engine_->W(at::ballY).s() - cameraLead(), 0, cameraTop()));
+        camera_.raw = static_cast<i16>(camera_.pos << 4);
+      }
       engine_->write("RESOLUTION CHANGED");
       break;
     case Key::F7:
@@ -260,8 +263,8 @@ void TableGame::pausedKey(Key key) {
 }
 
 int TableGame::screenHeight() const {
-  return options_.resolution == Resolution::Full ? TableData::kHeight + TableScreen::kDisplayRows
-                                                 : TableScreen::height(options_.resolution == Resolution::High);
+  return wholeTable() ? TableData::kHeight + TableScreen::kDisplayRows
+                      : TableScreen::height(options_.resolution == Resolution::High);
 }
 
 int TableGame::viewRows() const { return screenHeight() - TableScreen::kDisplayRows; }
@@ -269,7 +272,7 @@ int TableGame::viewRows() const { return screenHeight() - TableScreen::kDisplayR
 int TableGame::viewTop() const {
   // (the whole table on the screen still jumps when the table is shaken)
   const int lift = engine_->W(at::nudgeLift).s();
-  if (options_.resolution == Resolution::Full) return lift;
+  if (wholeTable()) return lift;
   return std::min<int>(camera_.pos, cameraTop()) + lift;
 }
 

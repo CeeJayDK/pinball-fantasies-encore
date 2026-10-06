@@ -37,7 +37,7 @@ Config Config::load(const std::filesystem::path& dir, const std::filesystem::pat
     c.options.angle = b[1] == 1 ? Angle::Low : b[1] == 2 ? Angle::Higher : Angle::High;
     c.options.scrollSpeed = b[2] == 0 ? ScrollSpeed::Hard : b[2] == 2 ? ScrollSpeed::Soft : ScrollSpeed::Medium;
     c.options.noMusic = b[3] == 1;
-    c.options.resolution = b[4] == 1 ? Resolution::High : b[4] == 2 ? Resolution::Full : Resolution::Normal;
+    c.options.resolution = b[4] >= 1 && b[4] <= 3 ? static_cast<Resolution>(b[4]) : Resolution::Normal;
     c.options.mono = b[5] == 1;
   }
   for (int t = 0; t < 4; ++t) {

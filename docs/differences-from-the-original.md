@@ -121,7 +121,8 @@ online high-score list at the time of writing (17) was played again the same way
 
 | This version | The original |
 |---|---|
-| Every table runs at the speeds of the screen shown 60 times a second; the size of the picture (normal, high, full) changes only what is drawn. | The 350-row screen is shown 70 times a second and has its own set of speeds. |
+| Every table runs at the speeds of the screen shown 60 times a second; the size of the picture (normal, high, full, tall) changes only what is drawn. | The 350-row screen is shown 70 times a second and has its own set of speeds. |
+| Two more sizes show the whole table and the dot matrix at once, and never scroll: full, with the 350-row screen's pixels, wider than tall; and tall, with square pixels, as the 240-row screen has them, which nearly fills a wide screen turned on its side. | Two sizes of screen, both following the ball up and down the table. |
 | The screen follows the ball by a rule of this version's own, the same for every size of screen: towards the ball as fast as the scrolling option says, held where the table says (the Gameshow's wheel, the bottom of the table when a ball is lost), taken up from where it is after Party Land's holes, and drifting up and down the table while nobody plays, starting upwards. A game takes over where the screen was on the table it was started from. | The program's own following, made for its one size of screen, from which the larger screens can only be scaled. |
 
 ## Known small differences from the legacy engine

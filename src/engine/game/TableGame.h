@@ -80,6 +80,8 @@ class TableGame {
 
   /// The screen: 320 across and this many rows, each dot one of 256 colours.
   int screenHeight() const;
+  /// The whole table on the screen at once, which then never scrolls (Full and Tall).
+  bool wholeTable() const { return options_.resolution == Resolution::Full || options_.resolution == Resolution::Tall; }
   /// The rows of the table on it: how many, and the first.
   int viewRows() const;
   int viewTop() const;

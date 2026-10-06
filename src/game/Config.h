@@ -11,7 +11,9 @@ namespace encore {
 enum class ScrollSpeed : u8 { Hard, Medium, Soft };
 inline i16 rawScrollSpeed(ScrollSpeed s) { return s == ScrollSpeed::Hard ? 20 : s == ScrollSpeed::Medium ? 11 : 9; }
 
-enum class Resolution : u8 { Normal, High, Full };
+/// Normal and High are the original's screens; Full and Tall are this version's, the whole table
+/// at once: Full with High's pixels, Tall with square ones (for a screen turned on its side).
+enum class Resolution : u8 { Normal, High, Full, Tall };
 
 /// Table slope. Low and High are the original's. Higher is this remake's addition: the
 /// same step again beyond High, with stronger flippers and plunger to match.
