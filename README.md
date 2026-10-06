@@ -10,9 +10,13 @@ A native version of *Pinball Fantasies* (Digital Illusions / 21st Century Entert
 PC release) for macOS, Linux and Windows, in C++20 on SDL3 and OpenGL, with remastered artwork
 alongside the original look.
 
-The engine is written from the game's own data: it reads the original DOS files and runs the
-physics, the table rules and scripts, the dot matrix, the music and the menus itself. Nothing
-of the original is emulated, and nothing of it is included here.
+**An engine of its own.** Since 1.1.0 the game runs on an engine written from scratch from the
+DOS game's own code: the physics, the rules of all four tables, the dot matrix, the music, the
+slides and the menu. With its few deliberate adjustments set aside, it plays every table frame
+for frame as the 1994 game does, which is how it was checked; the adjustments, and why they
+were made, are in [differences from the original](docs/differences-from-the-original.md), and
+how the engine was built in [the own engine](docs/own-engine.md). It reads the original DOS
+files: nothing of the original is emulated, and nothing of it is included here.
 
 ## Download
 
@@ -92,7 +96,21 @@ You can also put the files there yourself, or start the game with `--data <dir>`
 another folder for that run.
 
 Options and high scores are kept beside it, in the DOS formats
-(`PINBALL.CFG`, `TABLEn.HI`).
+(`PINBALL.CFG`, `TABLEn.HI`), and every game played is kept as a recording in `replays/`.
+
+## Screen sizes and recordings
+
+The resolution option has the original's two sizes, which follow the ball up and down the
+table, and two that show the whole table at once:
+
+- **Normal** and **High**: 240 and 350 rows, as in 1994.
+- **Full**: the whole table and the dot matrix, with High's pixels, for an ordinary screen.
+- **Tall**: the whole table with square pixels, for a wide screen turned on its side, where it
+  nearly fills the height.
+
+A recording (`.RPL`) dropped on the game's window plays the game again, in your own screen
+size, whatever its player used; Escape stops it. The online scores' recordings can be
+downloaded from the website and watched the same way.
 
 ## A downloaded build on macOS
 
@@ -121,7 +139,7 @@ The original layout.
 | Down arrow | pull the plunger, release to shoot |
 | Space | nudge the table (too often tilts it) |
 | P | pause (see below) |
-| M | music on or off |
+| M | music on or off, kept as the music option for the next game too |
 | Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
 | F11 | fullscreen or back to a window, remembered for next time (on a Mac, Command+F too) |
 

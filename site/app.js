@@ -57,8 +57,9 @@ async function showDownloads() {
     const release = (await r.json()).find((x) => !x.draft);
     if (!release) throw new Error("no release");
     const version = release.tag_name.replace(/^v/, "");
+    const news = showNews(release.body ?? "");
     $("release").replaceChildren(
-      `Version ${version}${release.prerelease ? ", a first cut for testing" : ""} · `,
+      `${news ? "New in version" : "Version"} ${version}${release.prerelease ? ", a first cut for testing" : ""} · `,
       el("a", { href: release.html_url }, "release notes"));
     const buttons = [];
     for (const [pattern, platform, detail] of platforms) {
@@ -74,6 +75,24 @@ async function showDownloads() {
   } catch {
     $("release").textContent = "The releases are on GitHub.";
   }
+}
+
+// The game's lines are all capitals; here only their first letter is, and the names of things.
+const NAMES = { linux: "Linux", windows: "Windows", macos: "macOS", hd: "HD", crt: "CRT", dos: "DOS" };
+function sentence(line) {
+  const lower = line.toLowerCase().replace(/[a-z]+/g, (w) => NAMES[w] ?? w);
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+// The lines the game shows when it offers a release, from the notes' <!-- game ... --> block,
+// listed under the version; whether there were any.
+function showNews(body) {
+  const block = /<!--\s*game\s*\n([\s\S]*?)-->/.exec(body);
+  const lines = (block ? block[1].split("\n") : []).map((l) => l.trim()).filter(Boolean);
+  if (!lines.length) return false;
+  $("news").replaceChildren(el("ul", { className: "features" }, ...lines.map((l) => el("li", {}, sentence(l)))));
+  $("news").hidden = false;
+  return true;
 }
 
 // The repository's stars, in the footer; without an answer from GitHub, nothing is shown.
