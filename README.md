@@ -93,44 +93,48 @@ The original key layout.
 
 | Key | What it does |
 | --- | --- |
-| F1 – F4 | pick a table |
-| F5 | options |
-| Escape | quit |
+| <kbd>F1</kbd> – <kbd>F4</kbd>* | pick a table |
+| <kbd>F5</kbd>* | options |
+| <kbd>Esc</kbd> | quit |
+
+\* Or the number keys <kbd>1</kbd> – <kbd>5</kbd>.
 
 **Playing**
 
 | Key | What it does |
 | --- | --- |
-| Enter | start a game, press again before launching to add a player |
-| F1 – F8 or 1 – 8 | start a game for that many players |
-| Shift, Ctrl or Alt | flippers, left and right |
-| Down arrow | pull the plunger, let go to launch |
-| Space | nudge the table (too much and you tilt) |
-| M | music on or off (stays that way for the next games too) |
-| P | pause |
-| Escape | give up the game, with the ball still at the plunger. With no game on, leave the table (Y to confirm) |
+| <kbd>Enter</kbd> | start a game, press again before launching to add a player |
+| <kbd>F1</kbd> – <kbd>F8</kbd>* | start a game for that many players |
+| <kbd>Shift</kbd> <kbd>Ctrl</kbd> <kbd>Alt</kbd> | flippers, left and right (any of the three) |
+| <kbd>↓</kbd> | pull the plunger, let go to launch |
+| <kbd>Space</kbd> | nudge the table (too much and you tilt) |
+| <kbd>M</kbd> | music on or off (stays that way for the next games too) |
+| <kbd>P</kbd> | pause |
+| <kbd>Esc</kbd> | give up the game, with the ball still at the plunger. With no game on, leave the table (<kbd>Y</kbd> to confirm) |
+
+\* Or the number keys <kbd>1</kbd> – <kbd>8</kbd>.
 
 **Paused**
 
 | Key | What it does |
 | --- | --- |
-| A | angle: low, high or higher (steeper, with stronger flippers) |
-| S | scrolling: hard, medium or soft |
-| R | resolution: normal, high, full or tall |
-| M | music on or off |
-| Up / Down arrows | scroll the table by hand |
-| F7 | lamps: all on, all off, back to normal |
-| F8 | ball trail on or off |
-| P | back to the game |
-| Escape | give up the game (Y to confirm) |
+| <kbd>A</kbd> | angle: low, high or higher (steeper, with stronger flippers) |
+| <kbd>S</kbd> | scrolling: hard, medium or soft |
+| <kbd>R</kbd> | resolution: normal, high, full or tall |
+| <kbd>M</kbd> | music on or off |
+| <kbd>↑</kbd> <kbd>↓</kbd> | scroll the table by hand |
+| <kbd>F7</kbd> | lamps: all on, all off, back to normal |
+| <kbd>F8</kbd> | ball trail on or off |
+| <kbd>P</kbd> | back to the game |
+| <kbd>Esc</kbd> | give up the game (<kbd>Y</kbd> to confirm) |
 
 **Any time**
 
 | Key | What it does |
 | --- | --- |
-| F9 | CRT look on or off |
-| F10 | redrawn or original pictures |
-| F11 (or Cmd+F on a Mac) | full screen or window |
+| <kbd>F9</kbd> | CRT look on or off |
+| <kbd>F10</kbd> | redrawn or original pictures |
+| <kbd>F11</kbd> | full screen or window (on a Mac, <kbd>⌘</kbd> <kbd>F</kbd> too) |
 
 ## First run on macOS and Windows
 
