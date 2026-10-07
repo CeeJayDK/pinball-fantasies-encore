@@ -6,21 +6,11 @@
 [![Linux](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/linux.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/linux.yml)
 [![Windows](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/windows.yml/badge.svg)](https://github.com/pedrocatalao/pinball-fantasies-encore/actions/workflows/windows.yml)
 
-A native version of *Pinball Fantasies* (Digital Illusions / 21st Century Entertainment, 1994
-PC release) for macOS, Linux and Windows, in C++20 on SDL3 and OpenGL, with remastered artwork
-alongside the original look.
-
-**An engine of its own.** Since 1.1.0 the game runs on an engine written from scratch from the
-DOS game's own code: the physics, the rules of all four tables, the dot matrix, the music, the
-slides and the menu. With its few deliberate adjustments set aside, it plays every table frame
-for frame as the 1994 game does, which is how it was checked; the adjustments, and why they
-were made, are in [differences from the original](docs/differences-from-the-original.md), and
-how the engine was built in [the own engine](docs/own-engine.md). It reads the original DOS
-files: nothing of the original is emulated, and nothing of it is included here.
+*Pinball Fantasies*, the 1994 PC classic by Digital Illusions, running natively on macOS,
+Windows and Linux. All four tables, with the original rules and physics, and redrawn
+high-resolution artwork you can switch on and off at any time.
 
 ## Download
-
-Unpack and run, no installation. The newest version, whichever it is:
 
 <p align="center">
 <a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-macos-universal.zip"><img src="https://img.shields.io/badge/macOS-Universal-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=apple" alt="Download for macOS (Universal)"></a>
@@ -29,151 +19,144 @@ Unpack and run, no installation. The newest version, whichever it is:
 <a href="https://github.com/pedrocatalao/pinball-fantasies-encore/releases/latest/download/pinball-fantasies-encore-linux-arm64.tar.gz"><img src="https://img.shields.io/badge/Linux-arm64-66a8c2?style=for-the-badge&labelColor=14232b&color=66a8c2&logoColor=white&logo=linux" alt="Download for Linux (arm64)"></a>
 </p>
 
-Played on macOS, Windows and Linux. If something is wrong on yours, an
-[issue](https://github.com/pedrocatalao/pinball-fantasies-encore/issues) is the news I am after.
+Unzip it and run it, there's nothing to install.
 
-On macOS the application is not signed, so the system refuses it the first time — see
-[a downloaded build on macOS](#a-downloaded-build-on-macos) below. On Linux, `./install.sh`
-from the unpacked folder puts the game in your menu with its icon, all under `~/.local`;
-it's optional, and the game runs from the folder just the same. Every release is also on
-the [releases page](https://github.com/pedrocatalao/pinball-fantasies-encore/releases).
+- **macOS and Windows:** the game isn't signed, so the first time your system will warn you
+  before opening it. See [first run on macOS and Windows](#first-run-on-macos-and-windows) below.
+- **Linux:** `./install.sh` in the unpacked folder adds the game to your app menu with its icon
+  (everything goes under `~/.local`). It's optional, the game runs from the folder too.
+- Older versions are on the [releases page](https://github.com/pedrocatalao/pinball-fantasies-encore/releases).
 
-## The remaster
+Found a problem? Please [open an issue](https://github.com/pedrocatalao/pinball-fantasies-encore/issues).
 
-All four tables play exactly as the original does, and the picture on top of it can be either
-the 1994 one or a remastered one (F10 switches, at any time).
+## It needs the original game file
 
-**None of it is an upscale.** No filter was run over the original pictures, nothing was
-enlarged and smoothed, and no machine guessed at the missing detail. Every playfield, slide,
-banner, flipper and ball was made again at high resolution, drawn to the original's own
-shapes, colours, lamps and lettering, so that what is on screen keeps the feel of the table
-as it was rather than becoming a blurred blow-up of it. That is also why the two pictures sit
-on each other exactly, pixel area for pixel area, and why F10 can swap them mid-ball:
+Nothing from the original game is included here. The game reads everything from the 1994 DOS
+files: the pictures, the collision maps, the table scripts, the music and the sound effects.
 
-- **Redrawn playfields** at high resolution for every table, with the lamps still working: the
-  game records, per screen pixel, which original pixel it drew and how lit that spot is, and
-  the renderer blends between a lit and an unlit copy of the picture there. Lamps keep their
-  own shapes, labels and all.
-- **Flippers drawn once and turned in code** instead of the original's frames, each about the
-  axis its own artwork hinges on, so they follow the table's own angles exactly.
-- **A high-resolution ball** that goes behind ramps and rails as smoothly as the artwork covers
-  it, with a subtle trail that follows the physics steps rather than the frames (F8 while
-  paused turns the trail off).
-- **A CRT look** (scanlines, shadow mask, glow) on F9, and the original crisp pixels without it.
+It needs exactly the 1994 disk release, since it reads data from fixed places in those files.
+Every file is checked when the game starts, and other releases are refused.
+[docs/game-files.md](docs/game-files.md) lists the files and their checksums.
 
-The redrawn pictures live in `assets/hd`, but they are not in the downloads: the first time it
-starts, the game offers to fetch them (about 31 MB), and later offers each new version of
-them. Until then, or if you say no, it shows the original pictures. `--hd-dir` points it at a
-folder of pictures instead, such as `assets/hd` while drawing them.
+After you confirm you own a legal copy of the game, it will download the right files for you the first time it runs from a preservation website.
+They're kept in a `FANTASY` folder here:
 
-### The same screens, either way
+| System | Folder |
+| --- | --- |
+| macOS | `~/Library/Application Support/Encore/Pinball Fantasies/FANTASY` |
+| Linux | `~/.local/share/Encore/Pinball Fantasies/FANTASY` |
+| Windows | `%APPDATA%\Encore\Pinball Fantasies\FANTASY` |
 
-The same moment on Stones 'n' Bones, drawn twice, with the line sweeping across it: the 1994
-artwork on the left of the line, the remastered one on the right. Everything else -- the
-geometry, the lamps, the scrolling, the physics -- is the same on both sides. The right-hand
-side is not the left one enlarged: it is its own picture, drawn to sit over the original's
-shapes.
+## What's in it
+
+**It plays like the original.** Since 1.1.0 Encore runs on its own engine, written from
+scratch from the DOS game's code: physics, table rules, dot matrix, music, intro and menu.
+Nothing is emulated. While building it, every frame was checked against the original
+program running side by side, so the tables behave exactly as they did in 1994. There are a few
+small changes on purpose, all listed in [differences from the original](docs/differences-from-the-original.md),
+and [the engine notes](docs/own-engine.md) explain how it was made.
+
+**Remastered artwork, not an upscale.** Every playfield, flipper, ball, slide and banner was
+redrawn by hand at high resolution, following the original's shapes, colours and lamps. No
+filters, no AI. Because the new pictures line up exactly with the old ones, F10 swaps between
+them at any moment, even in the middle of a ball.
+
+The redrawn pictures aren't in the download. The first time you run the game it offers to
+fetch them (about 31 MB), and later it offers updates when there are new ones. Say no and you
+get the original pictures.
+
+**Four screen sizes,** under Resolution in the options or with R in the pause:
+
+| Size | What you see |
+| --- | --- |
+| Normal | 240 rows, as in 1994: the screen follows the ball |
+| High | 350 rows, as in 1994: more of the table, still following the ball |
+| Full | the whole table at once, flat pixels, for a normal screen |
+| Tall | the whole table with square pixels, for a widescreen monitor turned 90º |
+
+**Online high scores.** When you get a high score, the game asks if you want to send it. The
+server replays the game from its recording before it counts, so every score on
+[thebestpinball.com](https://thebestpinball.com) was really played.
+
+**Recordings.** Every game you play is saved in a `replays` folder next to your high scores.
+Drop a `.RPL` file on the game window to watch it, in your own screen size. Escape stops it.
+You can download the recordings of the online scores from the website and watch them too.
 
 <p align="center"><img src="docs/readme-compare.png" alt="Stones 'n' Bones, the 1994 picture and the remastered one, a line sweeping between them" width="720"></p>
+<p align="center"><em>Stones 'n' Bones: the 1994 artwork on the left of the line, the redrawn one on the right.</em></p>
 
-## Game files
+## Controls
 
-Nothing from the original is included here, apart from the redrawn pictures in `assets/hd`.
-The game reads the pictures, collision maps, scripts, music and effects from a copy of the
-DOS files, and it needs **exactly** the 1994 disk release, because it takes the data from
-fixed addresses. Every file is checked at start-up, and a folder holding any other release
-is refused; [docs/game-files.md](docs/game-files.md) lists the files and their checksums.
+The original key layout.
 
-> As long as you confirm you legally own a copy of the game, the correct files will be downloaded and unpacked automatically the first time you run it. 
+**In the menu**
 
-The files are then read from one place and one only: a `FANTASY` folder inside the folder this
-version keeps its own things in, which is the folder SDL gives it for the platform —
-`~/Library/Application Support/Encore/Pinball Fantasies/FANTASY` on macOS,
-`~/.local/share/Encore/Pinball Fantasies/FANTASY` on Linux,
-`%APPDATA%\Encore\Pinball Fantasies\FANTASY` on Windows.
+| Key | What it does |
+| --- | --- |
+| F1 – F4 | pick a table |
+| F5 | options |
+| Escape | quit |
 
-You can also put the files there yourself, or start the game with `--data <dir>` to read
-another folder for that run.
+**Playing**
 
-Options and high scores are kept beside it, in the DOS formats
-(`PINBALL.CFG`, `TABLEn.HI`), and every game played is kept as a recording in `replays/`.
+| Key | What it does |
+| --- | --- |
+| Enter | start a game, press again before launching to add a player |
+| F1 – F8 or 1 – 8 | start a game for that many players |
+| Shift, Ctrl or Alt | flippers, left and right |
+| Down arrow | pull the plunger, let go to launch |
+| Space | nudge the table (too much and you tilt) |
+| M | music on or off (stays that way for the next games too) |
+| P | pause |
+| Escape | give up the game, with the ball still at the plunger. With no game on, leave the table (Y to confirm) |
 
-## Screen sizes and recordings
+**Paused**
 
-The resolution option has the original's two sizes, which follow the ball up and down the
-table, and two that show the whole table at once:
+| Key | What it does |
+| --- | --- |
+| A | angle: low, high or higher (steeper, with stronger flippers) |
+| S | scrolling: hard, medium or soft |
+| R | resolution: normal, high, full or tall |
+| M | music on or off |
+| Up / Down arrows | scroll the table by hand |
+| F7 | lamps: all on, all off, back to normal |
+| F8 | ball trail on or off |
+| P | back to the game |
+| Escape | give up the game (Y to confirm) |
 
-- **Normal** and **High**: 240 and 350 rows, as in 1994.
-- **Full**: the whole table and the dot matrix, with High's pixels, for an ordinary screen.
-- **Tall**: the whole table with square pixels, for a wide screen turned on its side, where it
-  nearly fills the height.
+**Any time**
 
-A recording (`.RPL`) dropped on the game's window plays the game again, in your own screen
-size, whatever its player used; Escape stops it. The online scores' recordings can be
-downloaded from the website and watched the same way.
+| Key | What it does |
+| --- | --- |
+| F9 | CRT look on or off |
+| F10 | redrawn or original pictures |
+| F11 (or Cmd+F on a Mac) | full screen or window |
 
-## A downloaded build on macOS
+## First run on macOS and Windows
 
-The application is signed without a certificate, so macOS quarantines it like anything else
-from the internet and refuses to open it — from the Finder it does nothing at all, while the
-binary inside still runs from a terminal. Either right-click it and choose Open, and then Open
-again, or clear the flag:
+The game isn't signed with a paid developer certificate, so the first time you open it your
+system will stop and ask. You only need to do this once.
+
+- **Windows:** when it says "Windows protected your PC", click **More info**, then **Run anyway**.
+- **macOS:** when it says the app can't be opened, go to **System Settings → Privacy &
+  Security**, scroll down and click **Open Anyway**.
+
+On macOS you can also do it from a terminal instead:
 
 ```bash
 xattr -dr com.apple.quarantine "Pinball Fantasies.app"
 ```
 
-Signing it properly, so that nobody has to do this, needs an Apple Developer certificate and
-notarisation.
-
-## Controls
-
-The original layout.
-
-| Key | Action |
-| --- | --- |
-| F1 to F4 | choose a table in the menu |
-| F5 | options (in the menu) |
-| Enter | start a game; again, before plunging, to add a player (or F1 to F8 for 1 to 8 players) |
-| Left and right Shift, Ctrl or Alt | flippers |
-| Down arrow | pull the plunger, release to shoot |
-| Space | nudge the table (too often tilts it) |
-| P | pause (see below) |
-| M | music on or off, kept as the music option for the next game too |
-| Escape | with the ball at the plunger, abandon the game; in attract mode, leave the table (Y to confirm); in the menu, quit |
-| F11 | fullscreen or back to a window, remembered for next time (on a Mac, Command+F too) |
-
-While paused, the original's own options, and two of this version's for looking at the artwork:
-
-| Key | Action |
-| --- | --- |
-| A | angle: low, high, or higher — a steeper table with stronger flippers |
-| S | scrolling: hard, medium or soft |
-| M, R | music on or off; resolution: normal, high, full (the whole table) or tall (the whole table, for a screen turned on its side) |
-| F7 | every lamp on, then every lamp off, then as the game has them |
-| F8 | the ball's trail on or off |
-| Up and down arrows | scroll the table by hand |
-| P | back to the game |
-| Escape | abandon the game (Y to confirm) |
-
-These two work at any time, in the menu or in play:
-
-| Key | Action |
-| --- | --- |
-| F9 | CRT look on or off |
-| F10 | the remastered pictures, or the originals |
-
 ## Building it yourself
 
-The game builds on macOS, Linux and Windows with CMake, a C++20 compiler and SDL3, and
-nothing else — see [docs/building.md](docs/building.md), which also lists the command-line
-options, the tools that come with it and where everything lives in the source.
+You need CMake, a C++20 compiler and SDL3, on macOS, Linux or Windows.
+[docs/building.md](docs/building.md) has the steps, the command-line options, the extra tools
+and a map of the source.
 
 ## Licence
 
-The code is under the **GNU General Public License, version 3 or later** ([LICENSE](LICENSE)).
-The redrawn artwork in `assets` is under **CC BY-SA 4.0** instead, since a software licence
-fits pictures badly. [NOTICE.md](NOTICE.md) says which is which.
+The code is under the [GNU GPL, version 3 or later](LICENSE). The redrawn artwork in `assets`
+is under CC BY-SA 4.0, which suits pictures better. [NOTICE.md](NOTICE.md) has the details.
 
-*Pinball Fantasies* belongs to its respective owners and this project is not affiliated with
-them. No file of the original game is included here, or in anything built from it.
+*Pinball Fantasies* belongs to its owners, and this project isn't affiliated with them. No file
+from the original game is included here or in the downloads.

@@ -251,6 +251,8 @@ section { padding: 36px 0 12px; }
 
 .muted { color: var(--muted); }
 .small { font-size: 14px; }
+.first-run { margin-top: -8px; padding-left: 20px; }
+.first-run li { margin: 2px 0; }
 
 code, .kbd {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -294,6 +296,11 @@ code, .kbd {
 #download .dmd-title { margin-bottom: 8px; }
 #release { margin-top: 0; margin-bottom: 0; }
 .news ul { margin: 4px 0 0; }
+/* With room for it, the highlights in two columns rather than a list down the left. */
+@media (min-width: 720px) {
+  .news ul { columns: 2; column-gap: 40px; }
+  .news li { break-inside: avoid; margin-top: 0; }
+}
 
 /* ---- high scores ------------------------------------------------------------------------- */
 
