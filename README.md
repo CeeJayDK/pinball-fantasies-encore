@@ -29,7 +29,7 @@ Unzip it and run it, there's nothing to install.
 
 Found a problem? Please [open an issue](https://github.com/pedrocatalao/pinball-fantasies-encore/issues).
 
-## It needs the original game file
+## It needs the original game files
 
 Nothing from the original game is included here. The game reads everything from the 1994 DOS
 files: the pictures, the collision maps, the table scripts, the music and the sound effects.
