@@ -111,7 +111,7 @@ vec2 Dist(vec2 pos)
 {
     pos = pos*uSceneSize;
     
-    return -((pos - floor(pos)) - vec2(0.5));
+    return 0.5 - fract(pos);  // = -((pos - floor(pos)) - 0.5), bit for bit; one instruction less on AMD
 }
     
 // 1D Gaussian.
